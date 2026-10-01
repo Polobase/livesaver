@@ -1,0 +1,53 @@
+{
+  "name": "@livesaver/node",
+  "version": "0.0.0",
+  "description": "Node.js/Bun host for livesaver: file system, gzip, APFS clones, directory walker, worker pool, Ableton Live setup discovery.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Manuel Haller Polo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polobase/livesaver.git",
+    "directory": "packages/node"
+  },
+  "homepage": "https://github.com/Polobase/livesaver/tree/main/packages/node#readme",
+  "bugs": {
+    "url": "https://github.com/Polobase/livesaver/issues"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.build.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@livesaver/core": "workspace:*",
+    "@livesaver/plugins": "workspace:*",
+    "@livesaver/xml": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "ableton",
+    "ableton-live",
+    "node",
+    "bun"
+  ],
+  "devDependencies": {
+    "@livesaver/test-kit": "workspace:*"
+  }
+}

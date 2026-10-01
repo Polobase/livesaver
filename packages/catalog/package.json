@@ -1,0 +1,55 @@
+{
+  "name": "@livesaver/catalog",
+  "version": "0.0.0",
+  "description": "A searchable catalog of Ableton Live projects: incremental index of sets, plug-ins and samples in SQLite (FTS5), and a query language. Runtime-agnostic (SQLite through a port).",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Manuel Haller Polo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polobase/livesaver.git",
+    "directory": "packages/catalog"
+  },
+  "homepage": "https://github.com/Polobase/livesaver/tree/main/packages/catalog#readme",
+  "bugs": {
+    "url": "https://github.com/Polobase/livesaver/issues"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.build.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@livesaver/core": "workspace:*",
+    "@livesaver/ops": "workspace:*",
+    "@livesaver/plugins": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "ableton",
+    "ableton-live",
+    "catalog",
+    "search",
+    "sqlite",
+    "fts5"
+  ],
+  "devDependencies": {
+    "@livesaver/test-kit": "workspace:*"
+  }
+}

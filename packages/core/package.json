@@ -1,0 +1,51 @@
+{
+  "name": "@livesaver/core",
+  "version": "0.0.0",
+  "description": "Ableton Live file formats: documents (.als/.adg/.adv/.alc), FileRefs, paths, Live's CRC and fingerprints, analysis. Runtime-agnostic.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Manuel Haller Polo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polobase/livesaver.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/Polobase/livesaver/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/Polobase/livesaver/issues"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.build.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@livesaver/xml": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "ableton",
+    "ableton-live",
+    "als",
+    "adg",
+    "adv",
+    "fileref",
+    "samples"
+  ]
+}

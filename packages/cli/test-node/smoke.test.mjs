@@ -1,0 +1,116 @@
+// Node.js smoke test of the built packages (run after `bun run build`): `bun run test:node`.
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { gzipSync } from 'node:zlib'
+
+const bin = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'bin.js')
+
+function set(samplePath, size) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12.0_12402" Creator="Ableton Live 12.4.6">
+\t<LiveSet>
+\t\t<SampleRef>
+\t\t\t<FileRef>
+\t\t\t\t<RelativePathType Value="0" />
+\t\t\t\t<RelativePath Value="" />
+\t\t\t\t<Path Value="${samplePath}" />
+\t\t\t\t<Type Value="2" />
+\t\t\t\t<LivePackName Value="" />
+\t\t\t\t<LivePackId Value="" />
+\t\t\t\t<OriginalFileSize Value="${size}" />
+\t\t\t\t<OriginalCrc Value="0" />
+\t\t\t</FileRef>
+\t\t\t<LastModDate Value="1" />
+\t\t</SampleRef>
+\t</LiveSet>
+</Ableton>
+`
+}
+
+test('collect --apply under Node relinks and collects, undo restores', () => {
+  const root = mkdtempSync(join(tmpdir(), 'livesaver-node-'))
+  const env = {
+    ...process.env,
+    LIVESAVER_HOME: join(root, 'home'),
+    LIVESAVER_TRASH_DIR: join(root, 'trash'),
+  }
+  try {
+    const project = join(root, 'Song Project')
+    mkdirSync(join(project, 'Ableton Project Info'), { recursive: true })
+    const sample = join(root, 'library', 'Kick.wav')
+    mkdirSync(dirname(sample), { recursive: true })
+    writeFileSync(sample, 'RIFF kick')
+    const setPath = join(project, 'Song.als')
+    const original = gzipSync(set('/gone/Kick.wav', 9))
+    writeFileSync(setPath, original)
+    const args = [
+      'collect',
+      project,
+      '--no-default-search',
+      '--search',
+      join(root, 'library'),
+      '--apply',
+      '--force',
+      '--json',
+      '--workers',
+      '2',
+    ]
+    const run = spawnSync(process.execPath, [bin, ...args], { env, encoding: 'utf8' })
+    assert.equal(run.status, 0, run.stderr)
+    const out = JSON.parse(run.stdout)
+    assert.equal(out.counts.found, 1)
+    assert.equal(out.sets[0].written, true)
+    assert.equal(
+      readFileSync(join(project, 'Samples', 'Imported', 'Kick.wav'), 'utf8'),
+      'RIFF kick',
+    )
+    const undo = spawnSync(process.execPath, [bin, 'undo', out.run, '--force'], {
+      env,
+      encoding: 'utf8',
+    })
+    assert.equal(undo.status, 0, undo.stderr)
+    assert.deepEqual(readFileSync(setPath), original)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('status --apply under Node sets Finder tags (xattr tool), undo removes them', {
+  skip: process.platform !== 'darwin',
+}, () => {
+  const root = mkdtempSync(join(tmpdir(), 'livesaver-node-'))
+  const env = { ...process.env, LIVESAVER_HOME: join(root, 'home') }
+  const tags = (path) =>
+    spawnSync('/usr/bin/xattr', ['-p', 'com.apple.metadata:_kMDItemUserTags', path], {
+      encoding: 'utf8',
+    }).status === 0
+  try {
+    const project = join(root, 'Song Project')
+    mkdirSync(join(project, 'Ableton Project Info'), { recursive: true })
+    const setPath = join(project, 'Song.als')
+    writeFileSync(setPath, gzipSync(set('/gone/Kick.wav', 9)))
+    const args = ['status', root, '--apply', '--no-comments', '--no-sheet', '--no-auval']
+    const run = spawnSync(process.execPath, [bin, ...args, '--json', '--workers', '2'], {
+      env,
+      encoding: 'utf8',
+    })
+    assert.equal(run.status, 0, run.stderr)
+    const out = JSON.parse(run.stdout)
+    assert.deepEqual(out.outcome.tagsChanged.sort(), [project, setPath].sort())
+    assert.equal(tags(setPath), true)
+    const undo = spawnSync(process.execPath, [bin, 'undo', out.run, '--force'], {
+      env,
+      encoding: 'utf8',
+    })
+    assert.equal(undo.status, 0, undo.stderr)
+    assert.equal(tags(setPath), false)
+    assert.equal(tags(project), false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

@@ -1,0 +1,85 @@
+name: CI
+
+# Build, lint, typecheck and test every package on macOS (where APFS clones, xattrs and Finder tags
+# matter) and Ubuntu; run the built CLI under Node 22 and 24; lint the published package shape.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bun:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
+
+      # Build before check: each package's typecheck also runs `tsc -p tsconfig.build.json --noEmit`,
+      # which resolves sibling packages through their `dist` types, exactly what consumers see.
+      - name: Build
+        run: bun run build
+      - name: Check (biome + typecheck)
+        run: bun run check
+      - name: Test
+        run: bun test
+
+  node:
+    needs: bun
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Node smoke test (built CLI, worker threads, apply + undo)
+        run: bun run test:node
+
+  package-lint:
+    needs: bun
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      # attw's esm-only profile ignores node10/CJS resolution: every package is ESM-only.
+      - name: publint + arethetypeswrong
+        run: |
+          failed=0
+          for dir in packages/xml packages/core packages/plugins packages/node packages/ops packages/catalog packages/cli; do
+            echo "::group::${dir}"
+            bunx publint@0.3.24 --strict "$dir" || failed=1
+            (cd "$dir" && bunx @arethetypeswrong/cli@0.18.5 --pack . --profile esm-only --format ascii) || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed

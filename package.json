@@ -1,0 +1,26 @@
+{
+  "name": "livesaver-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "typecheck": "bun run --filter '*' typecheck && tsc -p scripts/tsconfig.json",
+    "test": "bun test",
+    "check": "biome check . && bun run typecheck",
+    "format": "biome format --write .",
+    "reserve-names": "bun scripts/reserve-npm-names.ts",
+    "release:sync-lock": "bun scripts/sync-lock-versions.ts .",
+    "test:node": "node --test packages/cli/test-node/smoke.test.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/bun": "^1.4.2",
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2",
+    "@changesets/cli": "^3.0.3"
+  }
+}

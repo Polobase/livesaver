@@ -1,0 +1,52 @@
+export { type Alternative, alternativesOf, type Link } from './alternatives.js'
+export {
+  type Blocker,
+  CHUNK_PRESET,
+  type ConvertOptions,
+  type ConvertResult,
+  convertText,
+  type PluginOutcome,
+  REASONS,
+  reasonsText,
+  supportsVst3,
+  targetFor,
+  UNKNOWN_VALUE,
+  UNSET_VISUAL_INDEX,
+} from './convert.js'
+export {
+  addCatalogRows,
+  type Catalog,
+  type CatalogEntry,
+  codeHex,
+  derivedTarget,
+  fieldsToUid,
+  fourCC,
+  IPLUG2_PREFIX,
+  iplug2Vst3Uid,
+  JUCE_PREFIX,
+  juceVst3Uid,
+  Target,
+  uidToFields,
+  vst2ToVst3Uid,
+} from './identity.js'
+export {
+  type AuComponent,
+  type Availability,
+  type BundleInfo,
+  Bundles,
+  type DbModule,
+  type DbPlugin,
+  findBundles,
+  type InstalledPlugin,
+  Inventory,
+  type InventorySources,
+  identOf,
+  loadInventory,
+  PROCESSOR_ARM,
+  PROCESSOR_INTEL,
+  parseAuval,
+  SCAN_OK,
+  simpleName,
+} from './inventory.js'
+export { KNOWN, type Known, omnisphereState } from './known.js'
+export { type ModuleClass, type ModuleInfo, parseModuleInfo } from './moduleinfo.js'

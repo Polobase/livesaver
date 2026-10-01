@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+.DS_Store
+.env
+.npmrc
+
+# Benchmark output (may contain paths from your library)
+bench/results/
+bench/out/
+
+# Personal files that must not be published
+fixtures/local/
+CLAUDE.local.md

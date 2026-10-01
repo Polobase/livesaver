@@ -1,0 +1,54 @@
+{
+  "name": "@livesaver/plugins",
+  "version": "0.0.0",
+  "description": "Plug-in identity for Ableton Live Sets: VST2/VST3/AU ids, VST2\u2192VST3 class-id derivation, and byte-exact VST2\u2192VST3 conversion of Live Sets. Runtime-agnostic.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Manuel Haller Polo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polobase/livesaver.git",
+    "directory": "packages/plugins"
+  },
+  "homepage": "https://github.com/Polobase/livesaver/tree/main/packages/plugins#readme",
+  "bugs": {
+    "url": "https://github.com/Polobase/livesaver/issues"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.build.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@livesaver/core": "workspace:*",
+    "@livesaver/xml": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "ableton",
+    "ableton-live",
+    "vst2",
+    "vst3",
+    "plugin",
+    "migration"
+  ],
+  "devDependencies": {
+    "@livesaver/test-kit": "workspace:*"
+  }
+}

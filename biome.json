@@ -1,0 +1,102 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!fixtures",
+      "!bench/results",
+      "!bench/out",
+      "!**/*.generated.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "asNeeded"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "nursery": {
+        "noFloatingPromises": "warn",
+        "noMisusedPromises": "warn"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "packages/xml/src/**",
+        "packages/core/src/**",
+        "packages/ops/src/**",
+        "packages/plugins/src/**",
+        "packages/catalog/src/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "node:*",
+                      "bun",
+                      "bun:*",
+                      "fs",
+                      "fs/*",
+                      "path",
+                      "os",
+                      "crypto",
+                      "zlib",
+                      "child_process",
+                      "worker_threads",
+                      "url",
+                      "buffer",
+                      "stream"
+                    ],
+                    "message": "Runtime-agnostic package: do I/O through the Host ports (@livesaver/core host.ts), never through Node or Bun modules."
+                  }
+                ]
+              }
+            },
+            "noRestrictedGlobals": {
+              "level": "error",
+              "options": {
+                "deniedGlobals": {
+                  "Buffer": "Runtime-agnostic package: use Uint8Array.",
+                  "process": "Runtime-agnostic package: pass options in explicitly.",
+                  "Bun": "Runtime-agnostic package: use the Host ports.",
+                  "require": "ESM only.",
+                  "__dirname": "ESM only.",
+                  "__filename": "ESM only."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/*/test/**"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noFloatingPromises": "error",
+            "noMisusedPromises": "error"
+          }
+        }
+      }
+    }
+  ]
+}

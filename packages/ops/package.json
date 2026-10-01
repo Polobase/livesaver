@@ -1,0 +1,55 @@
+{
+  "name": "@livesaver/ops",
+  "version": "0.0.0",
+  "description": "livesaver operations: doctor, relink, Collect All and Save, transactions with journal and undo, reports. Runtime-agnostic.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Manuel Haller Polo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polobase/livesaver.git",
+    "directory": "packages/ops"
+  },
+  "homepage": "https://github.com/Polobase/livesaver/tree/main/packages/ops#readme",
+  "bugs": {
+    "url": "https://github.com/Polobase/livesaver/issues"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.build.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@livesaver/core": "workspace:*",
+    "@livesaver/plugins": "workspace:*",
+    "@livesaver/xml": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "ableton",
+    "ableton-live",
+    "collect-all-and-save",
+    "relink",
+    "missing-samples"
+  ],
+  "devDependencies": {
+    "@livesaver/node": "workspace:*",
+    "@livesaver/test-kit": "workspace:*"
+  }
+}

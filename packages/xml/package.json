@@ -1,0 +1,47 @@
+{
+  "name": "@livesaver/xml",
+  "version": "0.0.0",
+  "description": "Lossless byte-level XML scanner, element index and byte-exact patcher, built for large Ableton Live files. Zero dependencies.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Manuel Haller Polo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polobase/livesaver.git",
+    "directory": "packages/xml"
+  },
+  "homepage": "https://github.com/Polobase/livesaver/tree/main/packages/xml#readme",
+  "bugs": {
+    "url": "https://github.com/Polobase/livesaver/issues"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.build.json --noEmit",
+    "test": "bun test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "xml",
+    "parser",
+    "lossless",
+    "byte-exact",
+    "patch",
+    "ableton"
+  ]
+}
