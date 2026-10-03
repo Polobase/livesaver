@@ -1,9 +1,27 @@
 /** Words and number formats of the page. */
-import type { Status } from '@livesaver/ops'
+import type { CheckView, Status } from '@livesaver/ops'
+
+/** The command line's advice, in the page's terms. */
+export function inPageWords<V extends CheckView>(view: V): V {
+  const missingSources = view.missingSources.map((source) => ({
+    ...source,
+    hint: source.hint.replace('pass it with --search', 'add it as a sample folder'),
+  }))
+  return { ...view, missingSources }
+}
 
 const integer = new Intl.NumberFormat('en-US')
 
 export const count = (n: number): string => integer.format(n)
+
+/** The vendor's rules only apply where the user says installed libraries are. */
+export const INSTALLED = 'Contains installed libraries'
+
+/**
+ * Folders in which vendors keep installed libraries: Native Instruments uses /Users/Shared, and
+ * its libraries are called "… Library". (Ableton's own folders are recognised without this.)
+ */
+export const LIBRARY_NAME = /^(shared|native instruments)$|^(?!user |core ).+ librar(y|ies)$/i
 
 export const plural = (n: number, word: string): string =>
   `${count(n)} ${word}${n === 1 ? '' : 's'}`

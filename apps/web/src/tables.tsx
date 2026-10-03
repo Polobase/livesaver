@@ -3,7 +3,7 @@ import type { ComponentChildren } from 'preact'
 import { useMemo, useState } from 'preact/hooks'
 import { ACTION_LABEL, bytes, count, type Health, STATUS_LABEL } from './format.js'
 import { HealthIcon } from './icons.js'
-import type { ChangeRow, MissingRow, RunResult, SetRow } from './protocol.js'
+import type { ChangeRow, MissingRow, ProjectRow, RunResult, SetRow } from './protocol.js'
 
 const PAGE = 50
 
@@ -135,6 +135,54 @@ function State({ health, label }: { health: Health; label: string }) {
 
 const zero = (n: number) => (n ? count(n) : <span class="zero">0</span>)
 
+function projectState(row: ProjectRow): [Health, string] {
+  if (row.missing > 0 || row.errors > 0) return ['missing', 'Incomplete']
+  return row.changes > 0 ? ['fixable', 'Can be fixed'] : ['fine', 'Complete']
+}
+
+/** One row per project; with `onFix`, a button fixes that project alone. */
+function projectColumns(onFix?: (project: ProjectRow) => void): Column<ProjectRow>[] {
+  return [
+    { header: 'Project', cell: (r) => <Path value={r.path} /> },
+    {
+      header: 'State',
+      cell: (r) => <State health={projectState(r)[0]} label={projectState(r)[1]} />,
+    },
+    { header: 'Sets', cell: (r) => count(r.sets), numeric: true },
+    { header: 'To fix', cell: (r) => zero(r.changes), numeric: true },
+    { header: 'Missing', cell: (r) => zero(r.missing), numeric: true },
+    { header: 'Files to copy', cell: (r) => zero(r.copyFiles), numeric: true },
+    { header: 'Size', cell: (r) => (r.copyBytes ? bytes(r.copyBytes) : ''), numeric: true },
+    ...(onFix
+      ? [
+          {
+            header: 'Fix',
+            cell: (r: ProjectRow) =>
+              r.changingSets > 0 && (
+                <button
+                  type="button"
+                  class="small"
+                  aria-label={`Fix ${r.path}`}
+                  onClick={() => onFix(r)}
+                >
+                  Fix
+                </button>
+              ),
+          },
+        ]
+      : []),
+  ]
+}
+
+const PROJECT_FILTERS: readonly Filter<ProjectRow>[] = [
+  { label: 'All projects', test: () => true },
+  { label: 'Can be fixed', test: (r) => r.changingSets > 0 },
+  { label: 'Incomplete', test: (r) => projectState(r)[1] === 'Incomplete' },
+  { label: 'Complete', test: (r) => projectState(r)[1] === 'Complete' },
+]
+
+const projectText = (r: ProjectRow) => r.path
+
 const SET_COLUMNS: readonly Column<SetRow>[] = [
   { header: 'Project', cell: (r) => <Path value={r.project} /> },
   { header: 'Set', cell: (r) => <Path value={r.error ? `${r.name}: ${r.error}` : r.name} /> },
@@ -203,11 +251,19 @@ const missingText = (r: MissingRow) => `${r.name} ${r.path} ${r.source}`
 const changeText = (r: ChangeRow) =>
   `${r.project} ${r.set} ${r.name} ${r.oldPath} ${r.newPath} ${r.source}`
 
-type Tab = 'sets' | 'missing' | 'changes'
+type Tab = 'projects' | 'sets' | 'missing' | 'changes'
 
-export function Details({ result }: { result: RunResult }) {
-  const [tab, setTab] = useState<Tab>('sets')
+interface DetailsProps {
+  readonly result: RunResult
+  /** Fix one project (where livesaver runs on this computer). */
+  readonly onFix?: (project: ProjectRow) => void
+}
+
+export function Details({ result, onFix }: DetailsProps) {
+  const [tab, setTab] = useState<Tab>('projects')
+  const projects = useMemo(() => projectColumns(onFix), [onFix])
   const tabs: readonly [Tab, string, number][] = [
+    ['projects', 'Projects', result.projectRows.length],
     ['sets', 'Sets', result.setRows.length],
     ['missing', 'Missing samples', result.missing.length],
     ['changes', 'Planned changes', result.changes.length],
@@ -231,6 +287,15 @@ export function Details({ result }: { result: RunResult }) {
         ))}
       </div>
       <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
+        {tab === 'projects' && (
+          <Table
+            name="projects"
+            rows={result.projectRows}
+            columns={projects}
+            filters={PROJECT_FILTERS}
+            text={projectText}
+          />
+        )}
         {tab === 'sets' && (
           <Table
             name="sets"

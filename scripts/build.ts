@@ -14,7 +14,7 @@
  *
  * Usage: bun scripts/build.ts
  */
-import { readFileSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -87,6 +87,20 @@ async function build(ws: Workspace): Promise<boolean> {
   return code === 0
 }
 
+/**
+ * `livesaver web` serves the page from its own package, so the built page (without its source
+ * maps) goes into the CLI's `dist`. Both are built by then: the web app depends on the CLI.
+ */
+function shipWebApp(): void {
+  const page = join(ROOT, 'apps', 'web', 'dist')
+  const cli = join(ROOT, 'packages', 'cli', 'dist')
+  if (!existsSync(join(page, 'index.html')) || !existsSync(cli)) return
+  const shipped = join(cli, 'web-app')
+  rmSync(shipped, { recursive: true, force: true })
+  cpSync(page, shipped, { recursive: true, filter: (source) => !source.endsWith('.map') })
+  console.log(`livesaver build: web app copied to ${relative(ROOT, shipped)}`)
+}
+
 async function main(): Promise<number> {
   const pending = new Map(workspaces().map((w) => [w.name, w]))
   const built = new Set<string>()
@@ -107,6 +121,7 @@ async function main(): Promise<number> {
       pending.delete(w.name)
     }
   }
+  shipWebApp()
   return 0
 }
 

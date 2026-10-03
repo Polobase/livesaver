@@ -1,0 +1,135 @@
+/* Fixing, where livesaver runs on this computer: the fix bar, the dialogs, the folder browser. */
+
+/* ----------------------------------------------------------------------------------------- fix */
+
+.fix-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fix-bar > div {
+  flex: 1 1 420px;
+}
+
+.fix-bar .hint {
+  max-width: 78ch;
+}
+
+button.small {
+  padding: 2px 10px;
+  font-size: 13px;
+}
+
+.callout .note-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.callout ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------------------------- dialogs */
+
+.dialog {
+  width: min(560px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dialog h2 {
+  font-size: 17px;
+  margin-bottom: 10px;
+}
+
+.dialog ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.dialog li + li {
+  margin-top: 4px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.browser-path {
+  display: flex;
+  gap: 8px;
+}
+
+.browser-path input {
+  flex: 1;
+  font-size: 13px;
+}
+
+.places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 14px;
+  margin: 4px 0 8px;
+  font-size: 13px;
+}
+
+.dialog .browser-list {
+  list-style: none;
+  height: min(320px, 45vh);
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dialog .browser-list li + li {
+  margin-top: 0;
+}
+
+.browser-list .hint {
+  padding: 6px 8px;
+}
+
+button.browser-item {
+  width: 100%;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: none;
+  padding: 5px 8px;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.browser-item .icon {
+  color: var(--ink-2);
+}
+
+.up {
+  width: 16px;
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.stale {
+  margin-top: 6px;
+  color: var(--ink);
+}

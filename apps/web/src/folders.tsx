@@ -5,15 +5,9 @@
 import { type FolderSource, foldersFromDrop, foldersFromFiles } from '@livesaver/web'
 import { useRef, useState } from 'preact/hooks'
 import { holdsNames, holdsOf } from './ableton.js'
-import { plural } from './format.js'
+import { INSTALLED, LIBRARY_NAME, plural } from './format.js'
 import { CloseIcon, FolderIcon, PlusIcon } from './icons.js'
 import type { FolderInput, LocatedFolder } from './protocol.js'
-
-/**
- * Folders in which vendors keep installed libraries: Native Instruments uses /Users/Shared, and
- * its libraries are called "… Library". (Ableton's own folders are recognised without this.)
- */
-const LIBRARY_NAME = /^(shared|native instruments)$|^(?!user |core ).+ librar(y|ies)$/i
 
 /** Folders are told apart by a number of their own: two can have the same name. */
 let folderCount = 0
@@ -30,9 +24,6 @@ function contents(source: FolderSource): string {
   const files = source.kind === 'files' ? source.files.length : source.paths.length
   return [plural(files, 'file'), ...holdsNames(holdsOf(source))].join(' · ')
 }
-
-/** The vendor's rules only apply where the user says installed libraries are. */
-export const INSTALLED = 'Contains installed libraries'
 
 interface RowProps {
   readonly folder: FolderInput

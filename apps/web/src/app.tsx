@@ -1,40 +1,20 @@
-/** The page: give folders, run the check in a worker, read the result. */
+/**
+ * The page on its own, in a browser: it is given folders, checks them in a worker and shows the
+ * result. It can only read, so it cannot fix (see `local-app.tsx` for the page with livesaver).
+ */
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { FolderList, INSTALLED } from './folders.js'
-import { count } from './format.js'
+import { FolderList } from './folders.js'
+import { INSTALLED } from './format.js'
 import { HealthIcon } from './icons.js'
 import type {
   EngineEvent,
   FolderInput,
   LocatedFolder,
-  Phase,
   RunOptions,
-  RunResult,
   ToEngine,
   WireFolder,
 } from './protocol.js'
-import { References, Reports, RunFacts, Sources, Tiles } from './results.js'
-import { Details } from './tables.js'
-
-type RunState =
-  | { readonly kind: 'idle' }
-  | {
-      readonly kind: 'running'
-      readonly phase: Phase
-      readonly done: number
-      readonly total: number
-      readonly name: string
-      readonly files: number
-    }
-  | { readonly kind: 'done'; readonly result: RunResult }
-  | { readonly kind: 'failed'; readonly message: string }
-
-const PHASE: Record<Phase, string> = {
-  locating: 'Finding out where the folders lie on disk',
-  indexing: 'Listing audio files and Max devices',
-  checking: 'Checking sets',
-  reporting: 'Writing the report',
-}
+import { NoLibraryMarked, Options, Progress, Results, type RunState, starting } from './shared.js'
 
 /** A folder as it travels to the engine: an upload as the paths of its files, without the files. */
 function wire(folder: FolderInput): WireFolder {
@@ -42,68 +22,6 @@ function wire(folder: FolderInput): WireFolder {
   if (source.kind === 'handle') return { ...folder, source }
   const paths = source.kind === 'files' ? source.files.map((f) => f.path) : source.paths
   return { ...folder, source: { kind: 'listing', name: source.name, paths } }
-}
-
-function Progress({ run }: { run: Extract<RunState, { kind: 'running' }> }) {
-  const checking = run.phase === 'checking' && run.total > 0
-  return (
-    <div class="progress" role="status" aria-live="polite">
-      <div class="progress-label">
-        <span>
-          {PHASE[run.phase]}
-          {checking ? `: ${count(run.done)} of ${count(run.total)}` : '…'}
-        </span>
-        <span class="hint">
-          {checking ? run.name : run.files ? `${count(run.files)} files listed` : ''}
-        </span>
-      </div>
-      {checking ? <progress max={run.total} value={run.done} /> : <progress />}
-    </div>
-  )
-}
-
-function Results({ result }: { result: RunResult }) {
-  if (result.sets === 0)
-    return (
-      <section class="card">
-        <h2>No Live Sets found</h2>
-        <p class="hint">
-          There is no <code>.als</code> file in the project folders (backup folders are not
-          checked).
-        </p>
-      </section>
-    )
-  return (
-    <>
-      {!result.ableton.coreLibrary && (
-        <p class="callout" role="note">
-          <HealthIcon health="missing" />
-          <span>
-            Live's own content was not among the folders: samples of Live's Core Library cannot be
-            found, and content that Live moved between versions is not recognised. Drag the Ableton
-            Live app from your Applications folder onto Sample folders, and check again.
-          </span>
-        </p>
-      )}
-      <Tiles result={result} />
-      <References counts={result.counts} />
-      <div class="columns">
-        <Sources
-          title="Most common sources of missing samples"
-          empty="No samples are missing."
-          rows={result.missingSources}
-        />
-        <Sources
-          title="Most common sources of found samples"
-          empty="No missing sample was found in the given folders."
-          rows={result.foundSources}
-        />
-      </div>
-      <Details result={result} />
-      <Reports reports={result.reports} />
-      <RunFacts result={result} />
-    </>
-  )
 }
 
 export function App() {
@@ -135,14 +53,7 @@ export function App() {
     stop()
     const worker = new Worker(new URL('./engine.worker.js', import.meta.url), { type: 'module' })
     engine.current = worker
-    let run: Extract<RunState, { kind: 'running' }> = {
-      kind: 'running',
-      phase: 'locating',
-      done: 0,
-      total: 0,
-      name: '',
-      files: 0,
-    }
+    let run = starting('locating')
     setLocated(new Map())
     setState(run)
     const folders = [...projects, ...search]
@@ -250,46 +161,12 @@ export function App() {
             counts as "missing, can be repaired".
           </p>
         </details>
-        <div class="options">
-          <label class="check">
-            <input
-              type="checkbox"
-              checked={options.matchLibraryPath}
-              disabled={running}
-              autocomplete="off"
-              onChange={(event) =>
-                setOptions({ ...options, matchLibraryPath: event.currentTarget.checked })
-              }
-            />
-            Also accept a library file with another fingerprint when its name and place in the
-            library match (marked uncertain)
-          </label>
-          {options.matchLibraryPath && !search.some((folder) => folder.vendor) && (
-            <p class="hint option-note" role="note">
-              None of your sample folders is marked "{INSTALLED}", so this only applies to Ableton's
-              packs. Tick it on the folder that holds your libraries (Native Instruments installs
-              them in <code>/Users/Shared</code>).
-            </p>
-          )}
-          <label class="field">
-            Keep pack files larger than
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={options.packLimitMB}
-              disabled={running}
-              autocomplete="off"
-              onInput={(event) =>
-                setOptions({
-                  ...options,
-                  packLimitMB: Math.max(0, Number(event.currentTarget.value) || 0),
-                })
-              }
-            />
-            MB in their pack
-          </label>
-        </div>
+        <Options
+          options={options}
+          disabled={running}
+          onChange={setOptions}
+          libraryNote={!search.some((folder) => folder.vendor) && <NoLibraryMarked />}
+        />
         <div class="actions">
           <button
             type="button"
@@ -321,7 +198,12 @@ export function App() {
         )}
       </section>
 
-      {state.kind === 'done' && <Results result={state.result} />}
+      {state.kind === 'done' && (
+        <Results
+          result={state.result}
+          liveAdvice="Drag the Ableton Live app from your Applications folder onto Sample folders, and check again."
+        />
+      )}
     </main>
   )
 }

@@ -18,6 +18,7 @@ livesaver collect ~/Music/Projects     # dry run of "Collect All and Save" for e
 livesaver collect ~/Music/Projects --apply   # really do it (quit Live first)
 livesaver runs                         # past runs, with their reports and journals
 livesaver undo <run>                   # restore the sets of a run; unused copies go to the Trash
+livesaver web                          # all of the above in the browser, with a Fix button per project
 livesaver plugins upgrade ~/Music/Projects [--apply]   # VST2 → VST3 for verified plug-ins
 livesaver index ~/Music/Projects               # catalog every set (later runs read only changed sets)
 livesaver find plugin:serum bpm:120..128 stage:arranged missing:samples
@@ -102,16 +103,21 @@ your Live setup):
 ```
 
 ### In the browser
-`bun run web` serves the web app on `http://127.0.0.1:5173/`. Add your project folders and the
-folders to search (choose them or drop them on the page: the files are only read by the page, on
-your computer), and it checks every set like `doctor` does: what is complete, what can be
-collected or repaired, what is missing and where it came from, with the same report files to
-download. It never writes.
+`livesaver web` opens the web app (from the repository: `bun run web`, on
+`http://127.0.0.1:5173/`). It shows what `doctor` finds: what is complete, what can be collected
+or repaired, what is missing and where it came from, per project and per set, with the same
+report files to download. **Fix all** does what `collect --apply` does, and every project has a
+**Fix** of its own; the page asks first, and a fix can be undone there, like `livesaver undo`.
 
-A browser does not tell a page where a folder lies on disk. livesaver works that out for project
-folders from the sets themselves; a path can also be typed. Drop the Ableton Live app on the page
-as well: it holds the Core Library and Live's own list of content it moved between versions, and
-with it the page reports exactly what the command line reports.
+The page talks to livesaver on your computer, which reads and writes the files with your
+settings: nothing leaves the computer, and only the page that livesaver served can ask it for
+anything.
+
+The same page also runs without livesaver behind it, on its own in a browser. Then you choose or
+drop the folders and it checks them by itself, read-only. A browser does not tell a page where a
+folder lies on disk: livesaver works that out for project folders from the sets themselves. Drop
+the Ableton Live app on the page as well: it holds the Core Library and Live's own list of
+content it moved between versions, and with it the page reports what the command line reports.
 
 ## Why livesaver
 - **Byte-exact edits.** Only the bytes that must change do change; everything else in a Live Set

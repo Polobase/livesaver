@@ -10,7 +10,7 @@ import { join } from 'node:path'
 const HERE = import.meta.dir
 export const DIST = join(HERE, 'dist')
 /** The stylesheets, joined in this order into one `styles.css`. */
-const STYLES = ['styles.css', 'results.css']
+const STYLES = ['styles.css', 'results.css', 'fix.css']
 
 export async function build(options: { minify?: boolean } = {}): Promise<void> {
   mkdirSync(DIST, { recursive: true })

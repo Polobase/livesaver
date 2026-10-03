@@ -14,3 +14,21 @@ export {
   resolveConfig,
 } from './config.js'
 export { main, program } from './main.js'
+export type {
+  WebEvent,
+  WebFixed,
+  WebFixRequest,
+  WebFolder,
+  WebFolderInfo,
+  WebFolders,
+  WebInfo,
+  WebLastFix,
+  WebOptions,
+  WebPhase,
+  WebPlace,
+  WebRequest,
+  WebResult,
+  WebUndone,
+} from './web/protocol.js'
+export { TOKEN_HEADER, TOKEN_META } from './web/protocol.js'
+export { startWeb, type WebServer, type WebServerOptions } from './web/server.js'

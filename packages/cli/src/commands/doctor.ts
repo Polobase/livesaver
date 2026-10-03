@@ -5,13 +5,17 @@ import {
   applyWriter,
   buildReports,
   CompleteSets,
+  type DoctorEvent,
+  type DoctorResult,
   doctor,
+  Environment,
   Probe,
+  type RunContext,
   summary,
   totalCounts,
 } from '@livesaver/ops'
 import pc from 'picocolors'
-import { absolute, resolveConfig } from '../config.js'
+import { absolute, type ResolvedConfig, resolveConfig } from '../config.js'
 import { acquireLock, cachePath, newRun, readText, writeStateFile } from '../state.js'
 
 export interface DoctorFlags {
@@ -31,10 +35,96 @@ export interface DoctorFlags {
   readonly full?: boolean
 }
 
+/** What a run needs beyond the command line's flags. */
+export interface CollectHooks {
+  readonly onEvent?: (event: DoctorEvent) => void
+  /** Folders of installed libraries, in place of those of the configuration. */
+  readonly vendorLibraries?: readonly string[]
+  /** Build the report files even when no folder is given for them. */
+  readonly reports?: boolean
+  /** Told the run folder as soon as there is one: what a run that fails did is in there. */
+  readonly onRun?: (run: RunContext) => void
+}
+
+export interface CollectRun {
+  readonly result: DoctorResult
+  readonly config: ResolvedConfig
+  readonly env: Environment
+  /** The run folder: `collect` always has one, with the reports and, applied, journal and originals. */
+  readonly run: RunContext | undefined
+  readonly reportDir: string | undefined
+  /** The report files: name → content (when a report folder or `reports` was given). */
+  readonly reports: Record<string, string> | undefined
+}
+
 /**
  * `doctor` (read-only) and `collect` (dry run, or `--apply`) share this pipeline; `collect` always
  * gets a run folder with reports, and with --apply a journal and the original sets for `undo`.
+ * The caller checks that Live is not running and holds the lock when applying.
  */
+export async function collectRun(
+  command: 'doctor' | 'collect',
+  targets: readonly string[],
+  flags: DoctorFlags,
+  hooks: CollectHooks = {},
+): Promise<CollectRun> {
+  const apply = command === 'collect' && Boolean(flags.apply)
+  const resolved = await resolveConfig({
+    ...(flags.config ? { config: flags.config } : {}),
+    search: flags.search ?? [],
+    noDefaultSearch: flags.defaultSearch === false,
+    ...(flags.packLimit !== undefined ? { packLimit: Number(flags.packLimit) } : {}),
+    targets,
+  })
+  const config: ResolvedConfig = hooks.vendorLibraries
+    ? { ...resolved, env: { ...resolved.env, vendorLibraries: hooks.vendorLibraries } }
+    : resolved
+  const host = createNodeHost({
+    write: apply,
+    ...(process.env.LIVESAVER_TRASH_DIR ? { trashDir: process.env.LIVESAVER_TRASH_DIR } : {}),
+  })
+  const run = command === 'collect' ? await newRun(command, apply) : undefined
+  if (run) hooks.onRun?.(run)
+  const probe = new Probe(host.fs, host.hash)
+  const writer = apply && run ? applyWriter(host, run, probe) : undefined
+  const parser = createWorkerParser({
+    host,
+    ...(flags.workers !== undefined ? { workers: Number(flags.workers) } : {}),
+  })
+  const cache = flags.full
+    ? undefined
+    : CompleteSets.parse(readText(cachePath()), config.packCopyLimit)
+  const result = await doctor(host, {
+    targets,
+    searchRoots: config.searchRoots,
+    ignore: (flags.ignore ?? []).map(absolute),
+    excludes: (flags.exclude ?? []).map(absolute),
+    env: config.env,
+    packCopyLimit: config.packCopyLimit,
+    matchLibraryPath: Boolean(flags.matchLibraryPath),
+    parser,
+    probe,
+    ...(cache ? { cache } : {}),
+    ...(writer ? { writer } : {}),
+    ...(hooks.onEvent ? { onEvent: hooks.onEvent } : {}),
+  })
+  await parser.close()
+  if (cache) await writeStateFile(cachePath(), cache.serialize())
+
+  const reportDir = flags.reportDir ? absolute(flags.reportDir) : run?.dir
+  let reports: Record<string, string> | undefined
+  if (reportDir || hooks.reports) {
+    reports = await buildReports(result.results, result.base, probe)
+    if (reportDir) {
+      mkdirSync(reportDir, { recursive: true })
+      for (const [name, content] of Object.entries(reports))
+        writeFileSync(join(reportDir, name), content)
+    }
+  }
+  const env = result.projects[0]?.env ?? new Environment(config.env, probe)
+  return { result, config, env, run, reportDir, reports }
+}
+
 export async function runCollect(
   command: 'doctor' | 'collect',
   targetArgs: string[],
@@ -56,44 +146,12 @@ export async function runCollect(
   }
   const release = apply ? acquireLock() : () => {}
   try {
-    const config = await resolveConfig({
-      ...(flags.config ? { config: flags.config } : {}),
-      search: flags.search ?? [],
-      noDefaultSearch: flags.defaultSearch === false,
-      ...(flags.packLimit !== undefined ? { packLimit: Number(flags.packLimit) } : {}),
-      targets,
-    })
-    const host = createNodeHost({
-      write: apply,
-      ...(process.env.LIVESAVER_TRASH_DIR ? { trashDir: process.env.LIVESAVER_TRASH_DIR } : {}),
-    })
-    const run = command === 'collect' ? await newRun(command, apply) : undefined
-    const probe = new Probe(host.fs, host.hash)
-    const writer = apply && run ? applyWriter(host, run, probe) : undefined
-    const parser = createWorkerParser({
-      host,
-      ...(flags.workers !== undefined ? { workers: Number(flags.workers) } : {}),
-    })
-    const cache = flags.full
-      ? undefined
-      : CompleteSets.parse(readText(cachePath()), config.packCopyLimit)
     const tty = process.stderr.isTTY && !flags.quiet && !flags.json
     const log = (line: string) => {
       if (!flags.quiet && !flags.json) process.stderr.write(`${line}\n`)
     }
     log(pc.dim('Building search index …'))
-    const result = await doctor(host, {
-      targets,
-      searchRoots: config.searchRoots,
-      ignore: (flags.ignore ?? []).map(absolute),
-      excludes: (flags.exclude ?? []).map(absolute),
-      env: config.env,
-      packCopyLimit: config.packCopyLimit,
-      matchLibraryPath: Boolean(flags.matchLibraryPath),
-      parser,
-      probe,
-      ...(cache ? { cache } : {}),
-      ...(writer ? { writer } : {}),
+    const { result, run, reportDir } = await collectRun(command, targets, flags, {
       onEvent: (e) => {
         if (e.type === 'index') {
           log(
@@ -107,17 +165,7 @@ export async function runCollect(
         }
       },
     })
-    await parser.close()
-    if (cache) await writeStateFile(cachePath(), cache.serialize())
     if (tty) process.stderr.write('\r\x1b[2K')
-
-    const reportDir = flags.reportDir ? absolute(flags.reportDir) : run?.dir
-    if (reportDir) {
-      mkdirSync(reportDir, { recursive: true })
-      const files = await buildReports(result.results, result.base, probe)
-      for (const [name, content] of Object.entries(files))
-        writeFileSync(join(reportDir, name), content)
-    }
 
     if (flags.json) {
       console.log(

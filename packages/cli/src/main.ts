@@ -10,6 +10,7 @@ import { runReorgPlan, runReorgRun } from './commands/reorg.js'
 import { runRun } from './commands/run.js'
 import { runRuns, runUndo } from './commands/runs.js'
 import { runStatus } from './commands/status.js'
+import { runWeb } from './commands/web.js'
 
 const collect = (value: string, previous: string[] = []) => [...previous, value]
 
@@ -305,6 +306,18 @@ Ranges: 120..128  >120  >=120  <4:00  2024..2025   Negation: -stage:empty   Quot
     .option('--force', 'undo even while Live is running')
     .action(async (id: string, flags) => {
       process.exitCode = await runUndo(id, flags)
+    })
+
+  cli
+    .command('web')
+    .description(
+      'Open the web app on this computer: check projects for missing samples and fix them, all at once or one project at a time',
+    )
+    .option('--port <number>', 'port to listen on (default 5173)')
+    .option('--no-open', 'do not open the browser')
+    .option('--config <file>', 'config file')
+    .action(async (flags) => {
+      process.exitCode = await runWeb(flags, cli.version() ?? '')
     })
 
   cli

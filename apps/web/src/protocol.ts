@@ -1,6 +1,8 @@
 /** What the page and its engine worker say to each other. */
-import type { Status } from '@livesaver/ops'
+import type { CheckView } from '@livesaver/ops'
 import type { DirectoryHandleLike, FolderSource, FsUsage } from '@livesaver/web'
+
+export type { ChangeRow, MissingRow, ProjectRow, SetRow, SourceRow } from '@livesaver/ops'
 
 export interface FolderInput {
   readonly id: string
@@ -54,76 +56,18 @@ export interface LocatedFolder {
   readonly how: 'typed' | 'found' | 'unknown'
 }
 
-export interface SourceRow {
-  readonly kind: string
-  readonly name: string
-  readonly samples: number
-  readonly projects: number
-  /** What to do about it (sources of missing samples only). */
-  readonly hint: string
-}
-
-export interface SetRow {
-  /** Relative to the common folder of the project folders. */
-  readonly path: string
-  readonly project: string
-  readonly name: string
-  readonly live: string
-  readonly counts: Readonly<Record<Status, number>>
-  readonly changes: number
-  readonly error: string
-}
-
-export interface MissingRow {
-  readonly status: Status
-  readonly device: boolean
-  readonly name: string
-  readonly path: string
-  readonly source: string
-  readonly size: number
-  readonly sets: number
-  readonly projects: number
-  readonly candidates: readonly string[]
-}
-
-export interface ChangeRow {
-  readonly project: string
-  readonly set: string
-  readonly action: string
-  readonly name: string
-  readonly oldPath: string
-  readonly newPath: string
-  readonly source: string
-  readonly method: string
-  readonly certain: boolean
-}
-
-export interface RunResult {
-  /** Common folder of the project folders; paths in the rows are relative to it. */
-  readonly base: string
-  readonly seconds: number
-  /** Seconds spent in each phase of the run. */
-  readonly phases: Readonly<Record<Phase, number>>
-  readonly indexedFiles: number
-  readonly projects: number
-  readonly completeProjects: number
-  readonly sets: number
-  readonly completeSets: number
-  readonly counts: Readonly<Record<Status, number>>
-  readonly uncertain: number
-  readonly copyFiles: number
-  readonly copyBytes: number
-  readonly changingSets: number
-  readonly missingSources: readonly SourceRow[]
-  readonly foundSources: readonly SourceRow[]
-  readonly setRows: readonly SetRow[]
-  readonly missing: readonly MissingRow[]
-  readonly changes: readonly ChangeRow[]
+/** A check's result, as the engine in the page or livesaver on this computer delivers it. */
+export interface RunResult extends CheckView {
+  /** Seconds spent in each phase of the run, where they were measured. */
+  readonly phases?: Readonly<Partial<Record<Phase, number>>>
   /** Report files as the command line writes them: name → content. */
   readonly reports: Readonly<Record<string, string>>
+  /** Where the folders were placed (a page does not know where a folder lies on disk). */
   readonly folders: readonly LocatedFolder[]
-  /** Files fetched and bytes read from the browser. */
-  readonly usage: FsUsage
+  /** Files fetched and bytes read from the browser (none when the computer itself reads). */
+  readonly usage?: FsUsage
+  /** Folders the computer could not read (permissions, privacy). */
+  readonly unreadable?: readonly string[]
   /** Ableton's own folders among the given ones ('' = not given). */
   readonly ableton: {
     readonly userLibrary: string
@@ -134,7 +78,7 @@ export interface RunResult {
   }
 }
 
-export type Phase = 'locating' | 'indexing' | 'checking' | 'reporting'
+export type Phase = 'locating' | 'indexing' | 'checking' | 'fixing' | 'reporting'
 
 export type EngineEvent =
   | { readonly type: 'phase'; readonly phase: Phase }

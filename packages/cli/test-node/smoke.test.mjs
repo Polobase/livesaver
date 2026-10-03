@@ -1,6 +1,6 @@
 // Node.js smoke test of the built packages (run after `bun run build`): `bun run test:node`.
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -111,6 +111,49 @@ test('status --apply under Node sets Finder tags (xattr tool), undo removes them
     assert.equal(tags(setPath), false)
     assert.equal(tags(project), false)
   } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('web under Node serves the page it ships with, and answers only that page', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'livesaver-node-'))
+  const env = { ...process.env, LIVESAVER_HOME: join(root, 'home') }
+  const config = join(root, 'config.json')
+  writeFileSync(config, JSON.stringify({ appResources: '', searchRoots: [root] }))
+  const child = spawn(
+    process.execPath,
+    [bin, 'web', '--no-open', '--port', '0', '--config', config],
+    { env },
+  )
+  try {
+    const url = await new Promise((resolve, reject) => {
+      let out = ''
+      child.stdout.on('data', (chunk) => {
+        out += chunk
+        const found = /http:\/\/127\.0\.0\.1:\d+\//.exec(out)
+        if (found) resolve(found[0])
+      })
+      child.on('exit', (code) => reject(new Error(`web exited with ${code}: ${out}`)))
+      child.stderr.on('data', (chunk) => {
+        out += chunk
+      })
+    })
+    const page = await (await fetch(url)).text()
+    const token = /name="livesaver-local" content="([0-9a-f]+)"/.exec(page)?.[1]
+    assert.ok(token, 'the served page carries the token')
+    assert.match(page, /<script type="module" src="\.\/main\.js">/)
+    assert.equal((await fetch(`${url}main.js`)).status, 200)
+    assert.equal((await fetch(`${url}engine.worker.js`)).status, 200)
+    assert.equal((await fetch(`${url}api/info`)).status, 403)
+    const info = await (
+      await fetch(`${url}api/info`, { headers: { 'x-livesaver-token': token } })
+    ).json()
+    assert.deepEqual(
+      info.search.map((folder) => folder.path),
+      [root],
+    )
+  } finally {
+    child.kill('SIGINT')
     rmSync(root, { recursive: true, force: true })
   }
 })

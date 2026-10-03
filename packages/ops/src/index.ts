@@ -244,6 +244,15 @@ export { STATUS_FILES, WORDS as STATUS_WORDS, type Words as StatusWords } from '
 export { summary, totalCounts } from './summary.js'
 export { type UndoReport, undoRun } from './undo.js'
 export {
+  type ChangeRow,
+  type CheckView,
+  checkView,
+  type MissingRow,
+  type ProjectRow,
+  type SetRow,
+  type SourceRow,
+} from './view.js'
+export {
   type SetUpgrade,
   UPGRADE_REPORT,
   type UpgradeOptions,

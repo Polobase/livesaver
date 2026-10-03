@@ -2,14 +2,14 @@
   "name": "livesaver-web",
   "version": "0.0.0",
   "private": true,
-  "description": "livesaver in the browser: check Live projects for missing samples, read-only.",
+  "description": "livesaver in the browser: check Live projects for missing samples; with livesaver on the same computer, fix them.",
   "type": "module",
   "license": "MIT",
   "scripts": {
     "dev": "bun dev.ts",
     "build": "bun build.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test:e2e": "bun test ./e2e/app.e2e.ts"
+    "test:e2e": "bun test ./e2e/app.e2e.ts ./e2e/local.e2e.ts"
   },
   "dependencies": {
     "@livesaver/core": "workspace:*",
@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@livesaver/test-kit": "workspace:*",
+    "livesaver": "workspace:*",
     "playwright-core": "1.63.0"
   }
 }

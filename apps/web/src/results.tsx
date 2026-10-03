@@ -206,7 +206,7 @@ export function Reports({ reports }: { reports: Readonly<Record<string, string>>
 }
 
 export function RunFacts({ result }: { result: RunResult }) {
-  const { ableton } = result
+  const { ableton, usage } = result
   const own = Object.entries({
     'User Library': ableton.userLibrary,
     'Factory Packs': ableton.factoryPacks,
@@ -215,13 +215,16 @@ export function RunFacts({ result }: { result: RunResult }) {
   return (
     <p
       class="facts"
-      title={Object.entries(result.phases)
+      title={Object.entries(result.phases ?? {})
         .map(([phase, seconds]) => `${phase} ${seconds.toFixed(1)} s`)
         .join(', ')}
     >
       Checked {plural(result.sets, 'set')} against {count(result.indexedFiles)} audio files and Max
-      devices in {result.seconds.toFixed(1)} s, reading {bytes(result.usage.bytes)} from{' '}
-      {plural(result.usage.opened, 'file')}.{' '}
+      devices in {result.seconds.toFixed(1)} s
+      {usage
+        ? `, reading ${bytes(usage.bytes)} from ${plural(usage.opened, 'file')}`
+        : ' on this computer'}
+      .{' '}
       {own.length > 0
         ? `Recognised: ${own.map(([name]) => name).join(', ')}.`
         : 'No User Library, Factory Packs or Core Library among the folders.'}{' '}
@@ -230,7 +233,7 @@ export function RunFacts({ result }: { result: RunResult }) {
         : ableton.coreLibrary
           ? "Give Live's whole App-Resources folder instead of the Core Library, and content Live moved between versions is found too. "
           : ''}
-      Nothing was changed: this page only reads.
+      {usage ? 'Nothing was changed: this page only reads.' : 'The check changed nothing.'}
     </p>
   )
 }

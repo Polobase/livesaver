@@ -8,7 +8,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 - `bun test`: all tests. `LIVESAVER_CORPUS=<folder> bun test corpus` runs the read-only corpus round trip.
 - `bun run check`: Biome plus a typecheck of every package (run `build` first)
 - `bun run test:node`: the built CLI under Node.js (after `build`)
-- `bun run web`: the web app on `http://127.0.0.1:5173/` (rebuilt when the page is reloaded after a change)
+- `bun run web`: the web app on `http://127.0.0.1:5173/` as `livesaver web` serves it, so it can also fix (rebuilt when the page is reloaded after a change)
 - `bun run test:web`: the web app in a real, headless Chromium-based browser (`LIVESAVER_BROWSER` = its executable if none is found)
 - `bench/`: performance measurements only (see `bench/README.md`)
 - CLI tests outside the real library: set `LIVESAVER_HOME` (run folders) and `LIVESAVER_TRASH_DIR` (undo's Trash).
@@ -23,14 +23,14 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 | `@livesaver/catalog` | SQLite catalog of sets, incremental index, the `find` language | anywhere |
 | `@livesaver/node` | Node/Bun host: fs, gzip, workers, xattr, Finder comments, SQLite, Live setup and plug-in database | Node/Bun |
 | `@livesaver/web` | browser host: uploaded/dropped/picked folders as a read-only file system, gzip, hash, worker-based parsing | browser |
-| `livesaver` (packages/cli) | the CLI | Node/Bun |
-| `livesaver-web` (apps/web) | the web app: Preact page, engine worker, parse workers (private) | browser |
+| `livesaver` (packages/cli) | the CLI; `livesaver web` serves the web app and checks, fixes and undoes for it (`src/web/`) | Node/Bun |
+| `livesaver-web` (apps/web) | the web app: Preact page; with livesaver behind it it can fix, on its own it checks in workers, read-only (private) | browser |
 | `@livesaver/test-kit` | fixture builders (private) | tests |
 
 ## Hard rules
 1. **Ableton Extensions are out of scope.** Never look at `../cloned-extensions`, `../my-extensions` or `../ignore`.
 2. **Never write to the real library from tests.** Tests work in temp dirs only. Corpus tests are read-only.
-3. **Never run `--apply` against a real library** (the user's projects, see `CLAUDE.local.md`, or `~/Music/Ableton`) **without the user's explicit OK** in the current conversation. This includes `status --apply` (Finder tags, comments, the rating sheet), `reorg run --apply`, `move run/sets --apply` and `run <codemod> --apply`.
+3. **Never run `--apply` against a real library** (the user's projects, see `CLAUDE.local.md`, or `~/Music/Ableton`) **without the user's explicit OK** in the current conversation. This includes `status --apply` (Finder tags, comments, the rating sheet), `reorg run --apply`, `move run/sets --apply`, `run <codemod> --apply`, and Fix or Undo in the web app (its `/api/fix` and `/api/undo`): try those on temporary copies only.
 4. **The repo is self-contained and public.** No references to private tools, scripts or folders outside the repo, and no personal data: no user names, home folders, or project and song names from a real library in code, tests, docs or fixtures. Tests use `fixtures/` (sets saved by Live, anonymized with `scripts/anonymize-fixture.ts`) and the builders in `@livesaver/test-kit`. When a case needs a set only Live can produce, ask the user to save one and add it to `fixtures/` (see the wanted list in `fixtures/README.md`).
 5. **Runtime-agnostic packages** (xml, core, plugins, ops, catalog; also `@livesaver/web` and the web app's `src`, which may use browser APIs):
    - no `node:*`/`bun` imports and no `Buffer`/`process`/`Bun` (Biome enforces this)

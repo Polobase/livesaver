@@ -23,6 +23,7 @@
       },
       "devDependencies": {
         "@livesaver/test-kit": "workspace:*",
+        "livesaver": "workspace:*",
         "playwright-core": "1.63.0",
       },
     },

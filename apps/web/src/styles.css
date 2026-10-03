@@ -401,3 +401,8 @@ progress {
   border: 1px solid var(--border);
   border-radius: 8px;
 }
+
+/* Between the cards the page's own gap is the distance. */
+main > .callout {
+  margin-top: 0;
+}

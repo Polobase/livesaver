@@ -1,13 +1,13 @@
 /**
- * The web app on http://127.0.0.1:5173/, rebuilt whenever the page is loaded after a source
- * change (reload the page to see it).
+ * The web app on http://127.0.0.1:5173/ as `livesaver web` serves it (so it can also fix),
+ * rebuilt whenever the page is loaded after a source change (reload the page to see it).
  *
  * Usage: bun dev.ts [port]
  */
 import { statSync } from 'node:fs'
 import { join } from 'node:path'
-import { build } from './build.js'
-import { serve } from './serve.js'
+import { startWeb } from 'livesaver'
+import { build, DIST } from './build.js'
 
 const ROOT = join(import.meta.dir, '..', '..')
 const WATCHED = ['apps/web/index.html', 'apps/web/src/**/*', 'packages/*/src/**/*.ts']
@@ -21,15 +21,18 @@ function newestChange(): number {
 }
 
 let builtAt = 0
-const { url } = serve({
+const rebuild = async () => {
+  const changed = newestChange()
+  if (changed <= builtAt) return
+  const started = performance.now()
+  await build({ minify: false })
+  builtAt = changed
+  console.log(`built in ${Math.round(performance.now() - started)} ms`)
+}
+await rebuild()
+const { url } = await startWeb({
   port: Number(process.argv[2] ?? 5173),
-  async beforePage() {
-    const changed = newestChange()
-    if (changed <= builtAt) return
-    const started = performance.now()
-    await build({ minify: false })
-    builtAt = changed
-    console.log(`built in ${Math.round(performance.now() - started)} ms`)
-  },
+  assets: DIST,
+  beforePage: rebuild,
 })
 console.log(`livesaver web app: ${url}`)

@@ -13,21 +13,14 @@ import {
 } from '@livesaver/core'
 import {
   buildReports,
+  checkView,
   type DoctorResult,
   doctor,
   type EnvConfig,
   Environment,
-  FOUND_NAMES,
   findSets,
-  foundSources,
-  HINTS,
-  isComplete,
-  KIND_NAMES,
-  libraryGroups,
-  missingGroups,
   Probe,
   projectRootOf,
-  totalCounts,
 } from '@livesaver/ops'
 import {
   createWebHost,
@@ -42,6 +35,7 @@ import {
   WebFs,
 } from '@livesaver/web'
 import { APP_RESOURCES_IN } from './ableton.js'
+import { inPageWords } from './format.js'
 import type {
   EngineEvent,
   FolderInput,
@@ -226,78 +220,11 @@ function shape(
   reports: Record<string, string>,
   folders: readonly LocatedFolder[],
   usage: FsUsage,
-  phases: Record<Phase, number>,
+  phases: Partial<Record<Phase, number>>,
 ): RunResult {
-  const rel = (path: string) => {
-    const relative = posix.relpath(path, r.base)
-    return relative === '.' ? posix.basename(path) : relative
-  }
-  const groups = missingGroups(r.results)
-  const byProject = new Map<string, boolean>()
-  for (const s of r.results)
-    byProject.set(s.projectRoot, (byProject.get(s.projectRoot) ?? true) && isComplete(s))
   return {
-    base: r.base,
-    seconds: r.ms / 1000,
+    ...inPageWords(checkView(r, env)),
     phases,
-    indexedFiles: r.index.fileCount,
-    projects: byProject.size,
-    completeProjects: [...byProject.values()].filter((complete) => complete).length,
-    sets: r.results.length,
-    completeSets: r.results.filter(isComplete).length,
-    counts: totalCounts(r.results),
-    uncertain: r.results.reduce((n, s) => n + s.changes.filter((c) => !c.certain).length, 0),
-    copyFiles: r.projects.reduce((n, p) => n + p.copiedFiles, 0),
-    copyBytes: r.projects.reduce((n, p) => n + p.copiedBytes, 0),
-    changingSets: r.results.filter((s) => s.changes.length > 0 && !s.error).length,
-    missingSources: libraryGroups(groups).map((lib) => ({
-      kind: KIND_NAMES[lib.kind],
-      name: lib.name,
-      samples: lib.samples,
-      projects: lib.projects.size,
-      // The command line's advice, in the page's terms.
-      hint: HINTS[lib.kind].replace('pass it with --search', 'add it as a sample folder'),
-    })),
-    foundSources: foundSources(r.results, env, r.index.roots).map((f) => ({
-      kind: FOUND_NAMES[f.kind],
-      name: f.name,
-      samples: f.files.size,
-      projects: f.projects.size,
-      hint: '',
-    })),
-    setRows: r.results.map((s) => ({
-      path: rel(s.setPath),
-      project: rel(s.projectRoot),
-      name: posix.basename(s.setPath),
-      live: s.creator.replace('Ableton Live ', ''),
-      counts: s.counts,
-      changes: s.changes.length,
-      error: s.error,
-    })),
-    missing: groups.map((g) => ({
-      status: g.status,
-      device: g.kind === 'device',
-      name: g.name,
-      path: g.path,
-      source: g.source,
-      size: g.size,
-      sets: g.sets.size,
-      projects: g.projects.size,
-      candidates: g.choice.candidates.slice(0, 10),
-    })),
-    changes: r.results.flatMap((s) =>
-      s.changes.map((c) => ({
-        project: rel(s.projectRoot),
-        set: posix.basename(s.setPath),
-        action: c.action,
-        name: c.name,
-        oldPath: c.oldPath,
-        newPath: c.newPath,
-        source: c.source,
-        method: c.method,
-        certain: c.certain,
-      })),
-    ),
     reports,
     folders,
     usage,
@@ -315,10 +242,10 @@ export async function run(
   emit: (event: EngineEvent) => void,
   options: EngineOptions,
 ): Promise<void> {
-  const phases: Record<Phase, number> = { locating: 0, indexing: 0, checking: 0, reporting: 0 }
-  let phase: Phase = 'locating'
+  const phases = { locating: 0, indexing: 0, checking: 0, reporting: 0 }
+  let phase: keyof typeof phases = 'locating'
   let since = performance.now()
-  const enter = (next: Phase) => {
+  const enter = (next: keyof typeof phases) => {
     phases[phase] += (performance.now() - since) / 1000
     since = performance.now()
     phase = next
