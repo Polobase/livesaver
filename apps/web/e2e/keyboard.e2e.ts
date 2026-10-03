@@ -11,6 +11,7 @@ import type { Browser, Page } from 'playwright'
 import { build, DIST } from '../build.js'
 import {
   barriers,
+  commandKey,
   ENGINES,
   eventually,
   idle,
@@ -127,7 +128,7 @@ for (const [name, type] of ENGINES) {
       await page.getByRole('dialog').waitFor({ state: 'hidden' })
 
       // The palette knows what can be done now, from any place.
-      await page.keyboard.press('ControlOrMeta+k')
+      await page.keyboard.press(`${await commandKey(page)}+k`)
       await page.getByPlaceholder('Search or jump to…').fill('review')
       await page.locator('[data-highlighted]', { hasText: 'Review and fix' }).waitFor()
       await page.keyboard.press('Enter')
@@ -183,7 +184,7 @@ for (const [name, type] of ENGINES) {
       expect(await page.getByRole('dialog').count()).toBe(0)
       await page.keyboard.press('Backspace')
       expect(await eventually(() => rows.count(), 1)).toBe(1)
-      await page.keyboard.press('ControlOrMeta+a')
+      await page.keyboard.press(`${await commandKey(page)}+a`)
       await page.keyboard.press('Backspace')
       expect(await eventually(() => rows.count(), 3)).toBe(3)
 

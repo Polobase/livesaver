@@ -58,6 +58,15 @@ export async function watch(
   return { page, problems, outside }
 }
 
+/**
+ * The key that goes with K, A and the like on the system the page believes it is on: ⌘ on a
+ * Mac, Ctrl elsewhere. The page goes by what the browser says it runs on, and a test browser
+ * may say something else than the machine is (WebKit calls itself a Mac on Linux, too).
+ */
+export async function commandKey(page: Page): Promise<'Meta' | 'Control'> {
+  return (await page.evaluate(() => navigator.userAgent.includes('Macintosh'))) ? 'Meta' : 'Control'
+}
+
 /** Findings of axe that keep someone from using the page (serious and critical). */
 export async function barriers(page: Page): Promise<string[]> {
   // What fades in is judged when it is there: half-way, its text has no contrast yet.

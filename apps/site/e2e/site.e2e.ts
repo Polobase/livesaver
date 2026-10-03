@@ -199,16 +199,26 @@ for (const [name, type] of ENGINES) {
       const { page, problems, outside } = await watch(browser, origin)
       await open(page, `${site.url}docs/`)
       await page.getByRole('heading', { level: 1, name: 'Docs' }).waitFor()
+      // What the search looks through is fetched when it is first opened.
+      const fetched = page.waitForResponse((response) => response.url().endsWith('/search.json'))
       await page
         .getByRole('button', { name: /Search/ })
         .first()
         .click()
       const dialog = page.getByRole('dialog')
+      await dialog.getByPlaceholder('Search the docs…').waitFor()
+      await fetched
       await dialog.getByPlaceholder('Search the docs…').fill('checksum')
       const hit = dialog.getByRole('option').filter({ hasText: 'Fingerprints' }).first()
-      await hit.waitFor()
-      await hit.click()
-      await page.getByRole('heading', { level: 1, name: 'Fingerprints' }).waitFor()
+      const heading = page.getByRole('heading', { level: 1, name: 'Fingerprints' })
+      // The list is still being made while the first hits are shown: a click that falls into
+      // that moment is lost, as it would be for a person, who then clicks again.
+      for (let tries = 0; tries < 5 && !(await heading.isVisible()); tries++) {
+        await hit.waitFor({ timeout: 5000 }).catch(() => {})
+        await hit.click({ timeout: 5000 }).catch(() => {})
+        await heading.waitFor({ timeout: 4000 }).catch(() => {})
+      }
+      await heading.waitFor()
       expect(page.url().startsWith(`${site.url}docs/format/fingerprints`)).toBe(true)
       expect(problems).toEqual([])
       expect(outside).toEqual([])

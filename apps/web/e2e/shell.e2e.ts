@@ -11,7 +11,7 @@ import { startWeb, type WebServer } from 'livesaver'
 import type { Browser } from 'playwright'
 import { build, DIST } from '../build.js'
 import { serve } from '../serve.js'
-import { barriers, ENGINES, watch } from './support.js'
+import { barriers, commandKey, ENGINES, watch } from './support.js'
 
 let server: { url: string; stop: () => void }
 /** The same files served by livesaver, which then stands behind the page. */
@@ -65,7 +65,7 @@ for (const [name, type] of ENGINES) {
       await page.keyboard.press('g')
       await page.keyboard.press('s')
       await page.getByRole('heading', { level: 1, name: 'Samples', exact: true }).waitFor()
-      await page.keyboard.press('ControlOrMeta+k')
+      await page.keyboard.press(`${await commandKey(page)}+k`)
       await page.getByPlaceholder('Search or jump to…').fill('hist')
       // The palette filters a moment after typing; Enter takes what is highlighted then.
       await page.locator('[data-highlighted]', { hasText: 'History' }).waitFor()
