@@ -11,6 +11,7 @@ import { type Browser, chromium, type Page } from 'playwright'
 import { build, DIST } from '../build.js'
 import {
   barriers,
+  closeWith,
   idle,
   noPlugins,
   PATIENCE,
@@ -97,7 +98,7 @@ describe('a library with uncertain matches (Chromium)', () => {
       await dialog.getByTestId('review-continue').click()
       await dialog.getByTestId('review-apply').click()
       await dialog.getByTestId('review-done').waitFor({ timeout: 30_000 * PATIENCE })
-      await dialog.getByTestId('review-done').click()
+      await closeWith(dialog, dialog.getByTestId('review-done'))
       // The uncertain match was left alone: it is still there to fix.
       await page
         .getByTestId('fixable')

@@ -12,6 +12,7 @@ import type { Browser, Page } from 'playwright'
 import { build, DIST } from '../build.js'
 import {
   barriers,
+  closeWith,
   ENGINES,
   eventually,
   idle,
@@ -265,7 +266,7 @@ for (const [name, type] of ENGINES) {
         expect(await textOf(dialog.getByTestId('review-fix'))).toContain(
           'Fixed: 1 set rewritten, 1 file copied (2.0 MB).',
         )
-        await dialog.getByTestId('review-done').click()
+        await closeWith(dialog, dialog.getByTestId('review-done'))
         expect(onDisk()).toEqual([false, true, false])
         expect(existsSync(join(projects, 'Other Project', 'Samples', 'Imported', '1.wav'))).toBe(
           true,
@@ -342,7 +343,7 @@ for (const [name, type] of ENGINES) {
         await dialog.getByTestId('review-continue').click()
         await dialog.getByRole('button', { name: 'Fix 3 sets' }).click()
         await dialog.getByTestId('review-done').waitFor({ timeout: 30_000 * PATIENCE })
-        await dialog.getByTestId('review-done').click()
+        await closeWith(dialog, dialog.getByTestId('review-done'))
         await page
           .getByTestId('fix-card')
           .getByText('Nothing to fix')

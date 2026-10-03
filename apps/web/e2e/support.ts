@@ -92,6 +92,21 @@ export async function giveFolder(page: Page, input: string, folder: string): Pro
   }
 }
 
+/**
+ * Presses the button that closes a dialog, and sees it closed. A press that falls into the
+ * moment a dialog rearranges itself is lost, as it would be for a person, who presses again.
+ */
+export async function closeWith(dialog: Locator, button: Locator): Promise<void> {
+  for (let tries = 0; tries < 4; tries++) {
+    await button.click({ timeout: 5000 * PATIENCE }).catch(() => {})
+    try {
+      await dialog.waitFor({ state: 'hidden', timeout: 3000 * PATIENCE })
+      return
+    } catch {}
+  }
+  await dialog.waitFor({ state: 'hidden' })
+}
+
 /** Findings of axe that keep someone from using the page (serious and critical). */
 export async function barriers(page: Page): Promise<string[]> {
   // What fades in is judged when it is there: half-way, its text has no contrast yet.

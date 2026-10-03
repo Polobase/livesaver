@@ -283,7 +283,7 @@ there.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
   review, fix, undo, the history, a page that is opened again) against both engines; the app's
   own sums and words (states, plans, advice, what a run was and what its undo does).
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 207 tests.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 210 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.

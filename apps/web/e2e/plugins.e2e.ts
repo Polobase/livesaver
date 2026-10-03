@@ -21,6 +21,7 @@ import { serve } from '../serve.js'
 import {
   barriers,
   cellsOf,
+  closeWith,
   ENGINES,
   giveFolder,
   idle,
@@ -259,7 +260,7 @@ for (const [name, type] of ENGINES) {
         expect(await textOf(dialog.getByTestId('upgrade-result'))).toContain(
           'Upgraded: 1 set rewritten.',
         )
-        await dialog.getByTestId('upgrade-done').click()
+        await closeWith(dialog, dialog.getByTestId('upgrade-done'))
         expect(vst3Devices()).toBe(4)
 
         // Scanned and planned again: only Massive is left to upgrade.
@@ -288,7 +289,7 @@ for (const [name, type] of ENGINES) {
         await dialog.getByTestId('upgrade-continue').click()
         await dialog.getByRole('button', { name: 'Upgrade 1 set' }).click()
         await dialog.getByTestId('upgrade-done').waitFor({ timeout: 30_000 * PATIENCE })
-        await dialog.getByTestId('upgrade-done').click()
+        await closeWith(dialog, dialog.getByTestId('upgrade-done'))
         expect(vst3Devices()).toBe(5)
         await page.getByTestId('upgrade-headline').getByText('Nothing to upgrade').waitFor({
           timeout: 30_000,

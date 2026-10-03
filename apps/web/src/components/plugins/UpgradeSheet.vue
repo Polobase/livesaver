@@ -7,6 +7,7 @@ import { useEngineStore } from '../../stores/engine'
 import { usePluginsStore } from '../../stores/plugins'
 import { useScanStore } from '../../stores/scan'
 import ScrollRegion from '../common/ScrollRegion.vue'
+import RescanStatus from '../scan/RescanStatus.vue'
 import ScanProgress from '../scan/ScanProgress.vue'
 
 const engines = useEngineStore()
@@ -178,7 +179,7 @@ async function apply(): Promise<void> {
             :description="
               plugins.upgraded.errors.length
                 ? `${plural(plugins.upgraded.errors.length, 'set')} could not be written: ${plugins.upgraded.errors[0]?.error}`
-                : 'The sets were scanned again.'
+                : undefined
             "
             role="status"
           />
@@ -191,10 +192,11 @@ async function apply(): Promise<void> {
             :description="plugins.failure.message"
             role="alert"
           />
-          <ScanProgress
-            v-if="!plugins.running && scans.running"
+          <RescanStatus
+            v-if="!plugins.running && (plugins.upgraded || plugins.failure?.run)"
+            :busy="scans.running || plugins.planning"
             :progress="scans.progress"
-            title="Scanning again"
+            done="Scanned again: the list shows what is left to upgrade."
           />
         </div>
       </ScrollRegion>

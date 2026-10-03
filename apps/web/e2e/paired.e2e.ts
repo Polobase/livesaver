@@ -14,6 +14,7 @@ import { build } from '../build.js'
 import { serve } from '../serve.js'
 import {
   barriers,
+  closeWith,
   ENGINES,
   idle,
   noPlugins,
@@ -108,7 +109,7 @@ for (const [name, type] of ENGINES) {
         await dialog.getByTestId('review-continue').click()
         await dialog.getByRole('button', { name: 'Fix 1 set' }).click()
         await dialog.getByTestId('review-done').waitFor({ timeout: 30_000 * PATIENCE })
-        await dialog.getByTestId('review-done').click()
+        await closeWith(dialog, dialog.getByTestId('review-done'))
         await dialog.waitFor({ state: 'hidden' })
         expect(readSet(set())).toContain('Samples/Imported')
         // The undo waits for the scan that follows a fix.

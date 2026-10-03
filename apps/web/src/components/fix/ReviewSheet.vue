@@ -11,6 +11,7 @@ import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
 import { useScanStore } from '../../stores/scan'
 import ScrollRegion from '../common/ScrollRegion.vue'
+import RescanStatus from '../scan/RescanStatus.vue'
 import ScanProgress from '../scan/ScanProgress.vue'
 
 const engines = useEngineStore()
@@ -243,10 +244,10 @@ async function apply(): Promise<void> {
             :ui="{ icon: fix.fixed.errors.length ? 'text-(--status-missing)' : 'text-(--status-fine)' }"
             :title="`Fixed: ${plural(fix.fixed.sets, 'set')} rewritten, ${plural(fix.fixed.files, 'file')} copied${fix.fixed.bytes ? ` (${bytes(fix.fixed.bytes)})` : ''}.`"
             :description="
-            fix.fixed.errors.length
-              ? `${plural(fix.fixed.errors.length, 'set')} could not be written; the overview lists them.`
-              : 'The scan was renewed: the overview shows what is left.'
-          "
+              fix.fixed.errors.length
+                ? `${plural(fix.fixed.errors.length, 'set')} could not be written; the overview lists them.`
+                : undefined
+            "
             role="status"
           />
           <UAlert
@@ -258,10 +259,11 @@ async function apply(): Promise<void> {
             :description="fix.failure.message"
             role="alert"
           />
-          <ScanProgress
-            v-if="!fix.running && scans.running"
+          <RescanStatus
+            v-if="!fix.running && (fix.fixed || fix.failure?.run)"
+            :busy="scans.running"
             :progress="scans.progress"
-            title="Scanning again"
+            done="Scanned again: the overview shows what is left."
           />
         </div>
       </ScrollRegion>

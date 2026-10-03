@@ -231,22 +231,37 @@ for (const [name, type] of ENGINES) {
         await page.getByRole('heading', { level: 1, name: 'Docs' }).waitFor()
         // What the search looks through is fetched when it is first opened.
         const fetched = page.waitForResponse((response) => response.url().endsWith('/search.json'))
-        await page
-          .getByRole('button', { name: /Search/ })
-          .first()
-          .click()
         const dialog = page.getByRole('dialog')
-        await dialog.getByPlaceholder('Search the docs…').waitFor()
-        await fetched
-        await dialog.getByPlaceholder('Search the docs…').fill('checksum')
-        const hit = dialog.getByRole('option').filter({ hasText: 'Fingerprints' }).first()
+        const field = dialog.getByPlaceholder('Search the docs…')
+        const options = dialog.getByRole('option')
+        const hit = options.filter({ hasText: 'Fingerprints' }).first()
         const heading = page.getByRole('heading', { level: 1, name: 'Fingerprints' })
+        /** Searches, waits until the list of hits stands still, and takes the hit. */
+        const search = async () => {
+          if (!(await dialog.isVisible()))
+            await page
+              .getByRole('button', { name: /Search/ })
+              .first()
+              .click()
+          await field.waitFor({ timeout: 5000 * PATIENCE })
+          await field.fill('checksum')
+          await hit.waitFor({ timeout: 5000 * PATIENCE })
+          let before = ''
+          for (let same = 0; same < 2; ) {
+            const now = (await options.allInnerTexts()).join('|')
+            same = now === before ? same + 1 : 0
+            before = now
+            await page.waitForTimeout(150)
+          }
+          await hit.click({ timeout: 5000 * PATIENCE })
+        }
         // The list is still being made while the first hits are shown: a click that falls into
-        // that moment is lost, as it would be for a person, who then clicks again.
+        // that moment is lost or lands on another hit, as it would for a person, who then
+        // searches again.
         for (let tries = 0; tries < 5 && !(await heading.isVisible()); tries++) {
-          await hit.waitFor({ timeout: 5000 }).catch(() => {})
-          await hit.click({ timeout: 5000 }).catch(() => {})
-          await heading.waitFor({ timeout: 4000 }).catch(() => {})
+          await search().catch(() => {})
+          if (tries === 0) await fetched
+          await heading.waitFor({ timeout: 4000 * PATIENCE }).catch(() => {})
         }
         await heading.waitFor()
         expect(page.url().startsWith(`${site.url}docs/format/fingerprints`)).toBe(true)
