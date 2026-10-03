@@ -101,17 +101,17 @@ const busy = computed(() => scans.running || fix.running)
       <template #state="{ row }"><StatusPill :health="projectHealth(row)" /></template>
       <template #sets="{ row }">{{ count(row.sets) }}</template>
       <template #fix="{ row }">
-        <span :class="row.changes ? '' : 'text-dimmed'">{{ count(row.changes) }}</span>
+        <span :class="row.changes ? '' : 'text-muted'">{{ count(row.changes) }}</span>
       </template>
       <template #missing="{ row }">
-        <span :class="row.missing ? '' : 'text-dimmed'">{{ count(row.missing) }}</span>
+        <span :class="row.missing ? '' : 'text-muted'">{{ count(row.missing) }}</span>
       </template>
       <template #copies="{ row }">
         <span v-if="row.copyFiles">
           {{ count(row.copyFiles) }}
           <span class="text-muted">· {{ bytes(row.copyBytes) }}</span>
         </span>
-        <span v-else class="text-dimmed">0</span>
+        <span v-else class="text-muted">0</span>
       </template>
       <template #action="{ row }">
         <UButton

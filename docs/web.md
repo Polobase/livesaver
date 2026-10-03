@@ -30,6 +30,9 @@ could neither keep a journal for an undo nor see that Live is running.
 | **Samples › Missing** | missing samples grouped by where they came from, each group with advice | add the folder that has them, copy the list, open a sample |
 | **Samples › Changes** | every planned change: how the file was found, and whether the fingerprint confirms it | search, filter (uncertain only), open a change |
 | **Samples › Sets** | every set with what its samples are | search, filter, open a set |
+| **Plug-ins › In your sets** | every plug-in the sets use: format, state (not installed, Rosetta only, installed), how often and where | search, filter; a plug-in opens from the side with what to do, the sets that use it, where it is installed, and the same plug-in in other formats |
+| **Plug-ins › Installed** | what is installed: format, native or Rosetta only, version, known to Live, used by how many sets | filter (Rosetta only, used by no set, not scanned by Live); what breaks if a plug-in is uninstalled |
+| **Plug-ins › Upgrade to VST3** | per plug-in what converts and what stands in the way (in a rack, automation, an old file format, no VST3 installed); every plug-in in every set | upgrade all or the ticked plug-ins after a review; undo |
 | **Settings** | the folders and options of a scan, the appearance, what was detected | change them; the app says when a scan is older than they are |
 
 - **Nothing is written without a review.** A fix goes through three steps: what will happen
@@ -233,13 +236,16 @@ there.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
   review, fix, undo, a page that is opened again) against both engines; the app's own sums and
   words (states, plans, advice).
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 95 tests.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 128 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
   - With livesaver: a folder chosen in the page, a fix of one project after its review, undo, a
     selection fixed in one run, all fixed, the scan and the last fix still there after a reload,
     the uncertain matches left out; the files on disk are compared each time.
+  - Plug-ins: the set Live saved with VST2 and VST3 devices is upgraded after a review and
+    undone, byte for byte; what the sets use against a made-up set of installed plug-ins, and
+    what breaks if one is uninstalled; on its own, the app says what it cannot know there.
   - The whole flow from scan to undo with the keyboard alone; no barrier that axe can find on
     any screen, in light and dark; no error in the page; no request to another address.
   - The tests load the production build: a test runner's `NODE_ENV` would otherwise make Vite
@@ -250,7 +256,8 @@ there.
     counts, and for a fix without the uncertain matches what `doctor --certain-only` counts.
   - A scan equals the three commands it stands for: its report files those of `doctor --full`,
     its 199 plug-ins (order, state, instances, sets) those of `plugins audit`, and its upgrade
-    plan (386 rows) that of `plugins upgrade`.
+    plan (386 rows) that of `plugins upgrade`. The plug-in screens show these numbers, and the
+    257 installed plug-ins of `plugins list`.
   - On its own, given the project folder and the folders the command line searches with their
     paths typed, the report files are byte-identical to those of `livesaver doctor`, apart from
     the time stamp; with the Live app dropped and no path typed, the numbers equal the command

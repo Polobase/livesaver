@@ -81,13 +81,13 @@ const rows = computed(() =>
       <template #live="{ row }"><span class="text-muted">{{ row.live }}</span></template>
       <template #state="{ row }"><StatusPill :health="setHealth(row)" /></template>
       <template #fine="{ row }">
-        <span :class="fine(row) ? '' : 'text-dimmed'">{{ count(fine(row)) }}</span>
+        <span :class="fine(row) ? '' : 'text-muted'">{{ count(fine(row)) }}</span>
       </template>
       <template #fix="{ row }">
-        <span :class="toFix(row) ? '' : 'text-dimmed'">{{ count(toFix(row)) }}</span>
+        <span :class="toFix(row) ? '' : 'text-muted'">{{ count(toFix(row)) }}</span>
       </template>
       <template #missing="{ row }">
-        <span :class="missingOf(row.counts) ? '' : 'text-dimmed'">
+        <span :class="missingOf(row.counts) ? '' : 'text-muted'">
           {{ count(missingOf(row.counts)) }}
         </span>
       </template>

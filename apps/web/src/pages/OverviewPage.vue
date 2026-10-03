@@ -4,6 +4,7 @@ import LibrarySetup from '../components/library/LibrarySetup.vue'
 import FixCard from '../components/overview/FixCard.vue'
 import HealthHeadline from '../components/overview/HealthHeadline.vue'
 import MissingCard from '../components/overview/MissingCard.vue'
+import PluginsCard from '../components/overview/PluginsCard.vue'
 import ReferencesCard from '../components/overview/ReferencesCard.vue'
 import ReportsMenu from '../components/overview/ReportsMenu.vue'
 import ScanFacts from '../components/overview/ScanFacts.vue'
@@ -64,6 +65,7 @@ const fix = useFixStore()
           <FixCard :scan="scans.scan" />
           <MissingCard :scan="scans.scan" />
         </div>
+        <PluginsCard v-if="scans.scan.plugins.counts.used > 0" :scan="scans.scan" />
         <div v-if="scans.scan.samples.sets > 0" class="grid gap-4 lg:grid-cols-2">
           <ReferencesCard :scan="scans.scan" />
           <SourcesCard :rows="scans.scan.samples.foundSources" />

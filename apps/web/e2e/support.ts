@@ -125,3 +125,14 @@ export async function eventually<T>(read: () => Promise<T>, expected: T, ms = 30
   }
   return last
 }
+
+/** The rows of a table as the text of their cells. */
+export async function cellsOf(rows: Locator): Promise<string[][]> {
+  return rows.evaluateAll((all) =>
+    all.map((row) =>
+      [...row.querySelectorAll('td')].map((cell) =>
+        (cell.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      ),
+    ),
+  )
+}

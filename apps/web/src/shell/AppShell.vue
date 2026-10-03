@@ -3,9 +3,11 @@ import type { CommandPaletteGroup, CommandPaletteItem, NavigationMenuItem } from
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ReviewSheet from '../components/fix/ReviewSheet.vue'
+import UpgradeSheet from '../components/plugins/UpgradeSheet.vue'
 import { useEngineStore } from '../stores/engine'
 import { useFixStore } from '../stores/fix'
 import { useLibraryStore } from '../stores/library'
+import { usePluginsStore } from '../stores/plugins'
 import { useScanStore } from '../stores/scan'
 import AppLogo from './AppLogo.vue'
 import { PLACES, type Place, SETTINGS } from './navigation'
@@ -15,6 +17,7 @@ const engine = useEngineStore()
 const library = useLibraryStore()
 const scans = useScanStore()
 const fix = useFixStore()
+const plugins = usePluginsStore()
 
 /** What the engine starts with: its folders, the scan it kept, the last fix that can be undone. */
 onMounted(async () => {
@@ -22,7 +25,8 @@ onMounted(async () => {
   if (!engine.start) return
   library.init(engine.start)
   scans.restore(engine.start.last)
-  await fix.refreshLast()
+  plugins.restore(engine.start.last?.upgrade)
+  await Promise.all([fix.refreshLast(), plugins.refreshLast()])
 })
 
 // A folder dropped beside the lists must not make the browser leave the page for it.
@@ -171,5 +175,6 @@ defineShortcuts(
 
     <RouterView />
     <ReviewSheet />
+    <UpgradeSheet />
   </UDashboardGroup>
 </template>
