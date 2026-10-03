@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "bun scripts/build.ts",
+    "livesaver": "bun packages/cli/src/bin.ts",
     "typecheck": "bun run --filter '*' typecheck && tsc -p scripts/tsconfig.json",
     "test": "bun test",
     "check": "biome check . && bun run typecheck",

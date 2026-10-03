@@ -144,6 +144,7 @@ your Live setup):
 ## Development
 ```sh
 bun install
+bun run livesaver doctor ~/Music/Projects   # the CLI straight from source, no build needed
 bun run build      # tsc, dependency order
 bun test           # unit, property and end-to-end tests
 bun run check      # biome + typecheck
