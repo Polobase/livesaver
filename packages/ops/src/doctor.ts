@@ -28,6 +28,8 @@ export interface DoctorOptions {
   readonly excludes?: readonly string[]
   readonly env: EnvConfig
   readonly packCopyLimit?: number
+  /** Accept vendor library files by name and place in the library (see `ChooseOptions`). */
+  readonly matchLibraryPath?: boolean
   readonly writer?: Writer
   readonly keepXml?: boolean
   readonly onEvent?: (event: DoctorEvent) => void
@@ -64,7 +66,10 @@ export async function doctor(host: Host, options: DoctorOptions): Promise<Doctor
   const started = performance.now()
   const probe = options.probe ?? new Probe(host.fs, host.hash)
   const env = new Environment(options.env, probe)
-  const collect: CollectOptions = { packCopyLimit: options.packCopyLimit ?? DEFAULT_PACK_LIMIT }
+  const collect: CollectOptions = {
+    packCopyLimit: options.packCopyLimit ?? DEFAULT_PACK_LIMIT,
+    matchLibraryPath: options.matchLibraryPath ?? false,
+  }
   const writer = options.writer ?? DRY_RUN
 
   const index = await FileIndex.build(options.searchRoots, probe, { ignore: options.ignore ?? [] })

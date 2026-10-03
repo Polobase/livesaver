@@ -25,6 +25,25 @@ export const MISSING_STATES: readonly Status[] = ['not-found', 'ambiguous', 'mis
 /** Vendors appended a padding byte or ~1.5 KB of metadata when they re-saved library files. */
 export const MAX_VENDOR_GROWTH = 8192
 
+/**
+ * `matchLibraryPath` accepts a library file whose fingerprint differs when it has the same place in
+ * the library: the file name plus three folders (`Samples/Drums/Shaker/Shaker 1.wav`), so a library
+ * whose top folder was renamed between versions still counts.
+ */
+export const LIBRARY_PATH_LEVELS = 4
+/** New tags change a file's size by a few bytes; a larger difference is other audio. */
+export const LIBRARY_PATH_BYTES = 16
+
+export interface ChooseOptions {
+  /**
+   * Accept a vendor library file by its name and place in the library when no fingerprint matches.
+   * Vendors re-tagged samples between library versions; in a sample shorter than the 16 KB of
+   * Live's CRC the tags are part of the fingerprint, so the installed file can never match it.
+   * The audio cannot be confirmed, so such a choice is unverified.
+   */
+  readonly matchLibraryPath?: boolean
+}
+
 const APP_RESOURCES_RE = /^\/Applications\/Ableton Live [^/]*\.app\/Contents\/App-Resources\/(.+)$/
 
 /** What `resolveExisting` reads of a reference (a stored copy is enough, no parsed set needed). */
@@ -93,7 +112,7 @@ export function classify(path: string, projectRoot: string, env: Environment): L
   return 'external'
 }
 
-export type Check = 'vendor-update' | 'fingerprint' | 'size-only' | 'none'
+export type Check = 'vendor-update' | 'fingerprint' | 'size-only' | 'library-path' | 'none'
 
 export interface Choice {
   readonly status: Status
@@ -106,6 +125,8 @@ export interface Choice {
   readonly vendorUpdate: boolean
   /** Pack sample whose size matched but CRC not (Ableton updated the file). */
   readonly sizeOnly: boolean
+  /** Library file with another fingerprint, accepted by its name and place in the library. */
+  readonly libraryPath: boolean
   readonly candidates: readonly string[]
 }
 
@@ -117,6 +138,7 @@ function choice(status: Status, extra: Partial<Choice> = {}): Choice {
     verified: false,
     vendorUpdate: false,
     sizeOnly: false,
+    libraryPath: false,
     candidates: [],
     ...extra,
   }
@@ -126,6 +148,7 @@ export function checkOf(c: Choice): Check {
   if (c.vendorUpdate) return 'vendor-update'
   if (c.verified) return 'fingerprint'
   if (c.sizeOnly) return 'size-only'
+  if (c.libraryPath) return 'library-path'
   return 'none'
 }
 
@@ -135,6 +158,7 @@ export function methodText(c: Choice): string {
     'vendor-update': 'fingerprint ok (vendor update, file slightly larger)',
     fingerprint: 'fingerprint ok',
     'size-only': 'same size only (pack update)',
+    'library-path': 'name and library path only (other fingerprint)',
     none: 'no fingerprint',
   }[checkOf(c)]
   return `${text}, path end ${c.suffix} level(s)`
@@ -178,7 +202,8 @@ function priority(path: string, projectRoot: string, env: Environment): [number,
  * Pick the replacement for a missing sample or Max device:
  * 1. candidates with the same file name anywhere in the search roots;
  * 2. the stored fingerprint must match if known (vendor re-saves and, for pack samples, the same
- *    size count too); Max devices need the exact fingerprint;
+ *    size count too; with `matchLibraryPath` also the same place in a vendor library); Max devices
+ *    need the exact fingerprint;
  * 3. the longest matching path ending wins;
  * 4. several winners are fine only if their audio data is identical.
  */
@@ -188,13 +213,16 @@ export async function choose(
   projectRoot: string,
   env: Environment,
   probe: Probe,
+  options: ChooseOptions = {},
 ): Promise<Choice> {
   const candidates = index.candidates(ref.name)
   if (candidates.length === 0) return choice('not-found')
   const device = ref.kind === 'device'
+  const wanted = originalParts(ref)
   let verified = ref.size > 0
   let vendorUpdate = false
   let sizeOnly = false
+  let libraryPath = false
   let good: string[] = candidates
   if (verified) {
     const prints = await Promise.all(
@@ -229,16 +257,28 @@ export async function choose(
       verified = false
       sizeOnly = true
     }
+    if (good.length === 0 && !device && options.matchLibraryPath) {
+      good = prints
+        .filter(
+          ([c, fp]) =>
+            fp &&
+            Math.abs(fp[0] - ref.size) <= LIBRARY_PATH_BYTES &&
+            env.isVendorFile(c) &&
+            suffixLength(wanted, c) >= LIBRARY_PATH_LEVELS,
+        )
+        .map(([c]) => c)
+      sizeOnly = false
+      libraryPath = true
+    }
   } else if (device) {
     const hashes = new Set(await Promise.all(candidates.map((c) => probe.contentHash(c))))
     if (hashes.size > 1) return choice('ambiguous', { candidates })
   }
   if (good.length === 0) return choice('mismatch', { candidates })
-  const wanted = originalParts(ref)
   const scored = good.map((c) => [suffixLength(wanted, c), c] as const)
   const best = Math.max(...scored.map(([score]) => score))
   const top = scored.filter(([score]) => score === best).map(([, c]) => c)
-  const flags = { suffix: best, verified, vendorUpdate, sizeOnly }
+  const flags = { suffix: best, verified, vendorUpdate, sizeOnly, libraryPath }
   if (top.length > 1) {
     const hashes = new Set(await Promise.all(top.map((c) => probe.audioHash(c))))
     if (hashes.size > 1) return choice('ambiguous', { candidates: top, ...flags })

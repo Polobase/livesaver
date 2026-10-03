@@ -1,7 +1,7 @@
 /** Console summary of a doctor/collect run. */
 import { isComplete, type Project, type SetResult } from './collect.js'
 import type { Status } from './match.js'
-import { KIND_NAMES, libraryGroups, missingGroups } from './sources.js'
+import { FOUND_NAMES, foundSources, KIND_NAMES, libraryGroups, missingGroups } from './sources.js'
 
 export function totalCounts(results: readonly SetResult[]): Record<Status, number> {
   const total: Record<Status, number> = {
@@ -60,6 +60,16 @@ export function summary(
     for (const lib of libraries.slice(0, 15)) {
       lines.push(
         `  ${pad(lib.samples, 6)} samples in ${pad(lib.projects.size, 4)} projects  ${KIND_NAMES[lib.kind]}: ${lib.name}`,
+      )
+    }
+  }
+  const first = projects[0]
+  const found = first ? foundSources(results, first.env, first.index.roots) : []
+  if (found.length > 0) {
+    lines.push('Most common sources of found samples:')
+    for (const source of found.slice(0, 15)) {
+      lines.push(
+        `  ${pad(source.files.size, 6)} samples in ${pad(source.projects.size, 4)} projects  ${FOUND_NAMES[source.kind]}: ${source.name}`,
       )
     }
   }

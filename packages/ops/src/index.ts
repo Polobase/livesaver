@@ -80,10 +80,13 @@ export {
 export {
   type Check,
   type Choice,
+  type ChooseOptions,
   checkOf,
   choose,
   classify,
   isPackSample,
+  LIBRARY_PATH_BYTES,
+  LIBRARY_PATH_LEVELS,
   type Location,
   MAX_VENDOR_GROWTH,
   MISSING_STATES,
@@ -153,6 +156,11 @@ export {
   typedCells,
 } from './sheet.js'
 export {
+  FOUND_NAMES,
+  type FoundKind,
+  type FoundSource,
+  foundLocation,
+  foundSources,
   HINTS,
   KIND_NAMES,
   type Library,

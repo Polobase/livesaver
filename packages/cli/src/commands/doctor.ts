@@ -20,6 +20,7 @@ export interface DoctorFlags {
   readonly ignore?: string[]
   readonly exclude?: string[]
   readonly packLimit?: string
+  readonly matchLibraryPath?: boolean
   readonly config?: string
   readonly json?: boolean
   readonly quiet?: boolean
@@ -88,6 +89,7 @@ export async function runCollect(
       excludes: (flags.exclude ?? []).map(absolute),
       env: config.env,
       packCopyLimit: config.packCopyLimit,
+      matchLibraryPath: Boolean(flags.matchLibraryPath),
       parser,
       probe,
       ...(cache ? { cache } : {}),

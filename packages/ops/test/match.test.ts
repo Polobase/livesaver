@@ -23,6 +23,7 @@ import {
   writeFile,
 } from '@livesaver/test-kit'
 import {
+  type ChooseOptions,
   choose,
   classify,
   type EnvConfig,
@@ -155,8 +156,8 @@ describe('choice', () => {
   })
   afterEach(() => tmp.cleanup())
   const file = (rel: string, content: Uint8Array) => writeFile(join(tmp.path, rel), content)
-  const pick = async (ref: FileRef, e = env(), root = tmp.path) =>
-    choose(ref, await index([tmp.path]), root, e, new Probe(host.fs, host.hash))
+  const pick = async (ref: FileRef, e = env(), root = tmp.path, options: ChooseOptions = {}) =>
+    choose(ref, await index([tmp.path]), root, e, new Probe(host.fs, host.hash), options)
 
   test('not found', async () => {
     expect((await pick(await brokenRef())).status).toBe('not-found')
@@ -183,6 +184,81 @@ describe('choice', () => {
     const c = await pick(await brokenRef(), env({ vendorLibraries: [join(tmp.path, 'NI')] }))
     expect([c.status, c.verified, c.vendorUpdate]).toEqual(['found', true, true])
     expect((await pick(await brokenRef())).status).toBe('mismatch') // not trusted outside a vendor library
+  })
+
+  describe('library file with other tags (matchLibraryPath)', () => {
+    const SHAKER = 'Samples/Drums/Shaker/Shaker 1.wav'
+    const audio = repeat('\x01\x02\x03', 400)
+    // Shorter than Live's 16 KB CRC window, so the tags are part of the fingerprint.
+    const old = wav(audio, 'library 1.0')
+    const installed = wav(audio, 'library 1.1!')
+    const ni = () => env({ vendorLibraries: [join(tmp.path, 'NI')] })
+    const shaker = async (
+      path = `E:\\Maschine Library\\Drum Library\\${SHAKER}`,
+    ): Promise<FileRef> => ({
+      ...(await brokenRef()),
+      name: 'Shaker 1.wav',
+      path,
+      hintPath: '',
+      relPath: '',
+      size: old.length,
+      crc: liveCrc(old),
+    })
+    const on = { matchLibraryPath: true }
+
+    test('accepted by name and place in the library, unverified', async () => {
+      const path = file(`NI/Drum Library/${SHAKER}`, installed)
+      expect(installed.length - old.length).toBe(1)
+      expect((await pick(await shaker(), ni())).status).toBe('mismatch') // off by default
+      const c = await pick(await shaker(), ni(), tmp.path, on)
+      expect([c.status, c.path, c.suffix]).toEqual(['found', path, 5])
+      expect([c.verified, c.vendorUpdate, c.sizeOnly, c.libraryPath]).toEqual([
+        false,
+        false,
+        false,
+        true,
+      ])
+      expect(methodText(c)).toBe(
+        'name and library path only (other fingerprint), path end 5 level(s)',
+      )
+    })
+
+    test('a library whose top folder was renamed still counts', async () => {
+      file(`NI/Drum Library 2/${SHAKER}`, installed)
+      const c = await pick(await shaker(), ni(), tmp.path, on)
+      expect([c.status, c.suffix]).toEqual(['found', 4])
+    })
+
+    test('not for another size, another place, other folders, or Max devices', async () => {
+      file(`NI/Drum Library/${SHAKER}`, wav(repeat('\x01\x02\x03', 406), 'library 1.1')) // 18 bytes more
+      expect((await pick(await shaker(), ni(), tmp.path, on)).status).toBe('mismatch')
+      rmSync(join(tmp.path, 'NI'), { recursive: true })
+
+      file('NI/Drum Library/Samples/Other/Shaker/Shaker 1.wav', installed) // two levels match
+      expect((await pick(await shaker(), ni(), tmp.path, on)).status).toBe('mismatch')
+      rmSync(join(tmp.path, 'NI'), { recursive: true })
+
+      file(`NI/Drum Library/${SHAKER}`, installed)
+      expect((await pick(await shaker(), env(), tmp.path, on)).status).toBe('mismatch') // no vendor library
+      const device: FileRef = { ...(await shaker()), kind: 'device' }
+      expect((await pick(device, ni(), tmp.path, on)).status).toBe('mismatch')
+    })
+
+    test('a file with the right fingerprint wins', async () => {
+      file(`NI/Drum Library/${SHAKER}`, installed)
+      const exact = file('Old Disk/Shaker 1.wav', old)
+      const c = await pick(await shaker(), ni(), tmp.path, on)
+      expect([c.status, c.path, c.verified, c.libraryPath]).toEqual(['found', exact, true, false])
+    })
+
+    test('two libraries with different audio are ambiguous, with the same audio found', async () => {
+      file(`NI/Drum Library 2/${SHAKER}`, installed)
+      file(`NI/Drum Selection/${SHAKER}`, wav(repeat('\x03\x02\x01', 400), 'library 1.1!'))
+      const c = await pick(await shaker(), ni(), tmp.path, on)
+      expect([c.status, c.candidates.length]).toEqual(['ambiguous', 2])
+      file(`NI/Drum Selection/${SHAKER}`, wav(audio, 'selection 1'))
+      expect((await pick(await shaker(), ni(), tmp.path, on)).status).toBe('found')
+    })
   })
 
   test('audio hash ignores metadata', async () => {

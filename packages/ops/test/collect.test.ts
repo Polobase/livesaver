@@ -39,6 +39,7 @@ import {
   doctor,
   type EnvConfig,
   Probe,
+  summary,
 } from '../src/index.js'
 
 const fixtures = fixturesDir()
@@ -69,7 +70,12 @@ interface Run extends DoctorResult {
 async function run(
   targets: string[],
   search: string[],
-  options: { env?: Partial<EnvConfig>; apply?: boolean; packLimit?: number } = {},
+  options: {
+    env?: Partial<EnvConfig>
+    apply?: boolean
+    packLimit?: number
+    matchLibraryPath?: boolean
+  } = {},
 ): Promise<Run> {
   const host = createNodeHost({ write: true })
   const probe = new Probe(host.fs, host.hash)
@@ -79,6 +85,7 @@ async function run(
     searchRoots: search,
     env: env(options.env),
     packCopyLimit: options.packLimit ?? DEFAULT_PACK_LIMIT,
+    matchLibraryPath: options.matchLibraryPath ?? false,
     probe,
     ...(options.apply ? { writer: applyWriter(host, context, probe) } : {}),
   })
@@ -142,6 +149,9 @@ describe('Brokenpath', () => {
     expect(change?.['Copied from']).toBe(join(samples, 'Lib1', 'Kick', '1.wav'))
     expect(change?.['New path (in project)']).toBe(join('Samples', 'Imported', '1.wav'))
     expect(change?.Confidence).toBe('certain')
+    const lines = summary(r.results, r.projects, false).split('\n')
+    const found = lines.indexOf('Most common sources of found samples:')
+    expect(lines[found + 1]?.trim()).toBe('1 samples in    1 projects  Folder: samples/Lib1')
   })
 
   test('apply equals Live\'s "Collect All and Save"', async () => {
@@ -454,6 +464,43 @@ describe('big pack files', () => {
       REL_DOCUMENT,
       '../../packs/Big Pack/Samples/Lib1/Kick/1.wav',
     ])
+  })
+})
+
+describe('library file with other tags', () => {
+  test('relinked only with matchLibraryPath, and reported as uncertain', async () => {
+    const shaker = join('Drum Library', 'Samples', 'Drums', 'Shaker', 'Shaker 1.wav')
+    const library = join(tmp.path, 'NI')
+    // The set was made with an older version of the library: same sound, other tags, one byte less.
+    const old = new TextEncoder().encode(`RIFF${'shaker '.repeat(400)}tags 1.0`)
+    const installed = new TextEncoder().encode(`RIFF${'shaker '.repeat(400)}tags 1.1!`)
+    const source = writeFile(join(library, shaker), installed)
+    const project = makeProject(tmp.path, 'Song')
+    const setPath = join(project, 'Song.als')
+    const text = deviceSet(`/Volumes/Old Disk/Maschine Library/${shaker}`, old.length, liveCrc(old))
+    writeSet(setPath, text.replaceAll('MxPatchRef', 'SampleRef'))
+    const vendor = { env: { vendorLibraries: [library] } }
+
+    const strict = await run([project], [library], vendor)
+    expect(strict.results[0]?.counts.mismatch).toBe(1)
+    expect(strict.results[0]?.changes).toEqual([])
+
+    const r = await run([project], [library], { ...vendor, matchLibraryPath: true, apply: true })
+    expect(r.results[0]?.error).toBe('')
+    const imported = join('Samples', 'Imported', 'Shaker 1.wav')
+    expect(r.results[0]?.changes.map((c) => [c.action, c.newPath, c.check, c.certain])).toEqual([
+      ['repaired', imported, 'library-path', false],
+    ])
+    expect(readFileSync(join(project, imported))).toEqual(readFileSync(source))
+    const [change] = csv(r.reports['changes.csv'] as string)
+    expect([change?.Method, change?.Confidence]).toEqual([
+      'name and library path only (other fingerprint), path end 5 level(s)',
+      'uncertain',
+    ])
+    const [ref] = await refsOf(setPath)
+    expect([ref?.relType, ref?.relPath]).toEqual([REL_PROJECT, imported])
+    // complete now, also for a run without the option
+    expect((await run([project], [library], vendor)).results[0]?.counts.ok).toBe(1)
   })
 })
 

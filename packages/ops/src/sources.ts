@@ -1,6 +1,10 @@
-/** Where missing samples came from, grouped by pack / expansion / project / folder. */
+/**
+ * Where missing samples came from, and where found ones lie, grouped by pack / library / project /
+ * folder.
+ */
 import { CORE_LIBRARY_PACK_ID, type FileRef, norm, posix, REL_USER_LIBRARY } from '@livesaver/core'
 import type { SetResult } from './collect.js'
+import { type Environment, isInside } from './env.js'
 import type { Choice, Status } from './match.js'
 
 /** Where a missing sample originally came from. */
@@ -184,6 +188,101 @@ export function libraryGroups(groups: readonly MissingGroup[]): Library[] {
   return [...libraries.values()].sort(
     (a, b) =>
       b.samples - a.samples ||
+      (kindName(a) < kindName(b) ? -1 : kindName(a) > kindName(b) ? 1 : 0) ||
+      (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+  )
+}
+
+// ------------------------------------------------------------------------------------ found samples
+
+export type FoundKind =
+  | 'project'
+  | 'core-library'
+  | 'pack'
+  | 'user-library'
+  | 'library'
+  | 'other-project'
+  | 'folder'
+
+export const FOUND_NAMES: Record<FoundKind, string> = {
+  project: 'Own project',
+  'core-library': 'Ableton Core Library',
+  pack: 'Ableton pack',
+  'user-library': 'User Library',
+  library: 'Library',
+  'other-project': 'Other project',
+  folder: 'Folder',
+}
+
+/** The first `levels` folders of `path` below `root` ("Samples/Imported"), as spelled on disk. */
+function below(path: string, root: string, levels: number): string {
+  const skip = posix.splitPath(root).length
+  return posix
+    .splitPath(posix.dirname(path))
+    .slice(skip, skip + levels)
+    .join('/')
+}
+
+/** (kind, name) of the place a found file lies in; `roots` are the search roots. */
+export function foundLocation(
+  path: string,
+  projectRoot: string,
+  env: Environment,
+  roots: readonly string[],
+): [FoundKind, string] {
+  if (isInside(path, projectRoot)) return ['project', below(path, projectRoot, 2) || '.']
+  if (env.coreLibrary && isInside(path, env.coreLibrary)) return ['core-library', 'Core Library']
+  if (env.factoryPacks && isInside(path, env.factoryPacks))
+    return ['pack', below(path, env.factoryPacks, 1)]
+  if (env.userLibrary && isInside(path, env.userLibrary))
+    return ['user-library', below(path, env.userLibrary, 2) || '.']
+  for (const root of env.config.vendorLibraries)
+    if (isInside(path, root)) return ['library', below(path, root, 1) || posix.basename(root)]
+  const project = posix
+    .splitPath(posix.dirname(path))
+    .find((folder) => folder.toLowerCase().endsWith(' project'))
+  if (project) return ['other-project', project]
+  for (const root of [...env.config.preferredRoots, ...roots])
+    if (isInside(path, root))
+      return ['folder', posix.join(posix.basename(root), below(path, root, 1))]
+  return ['folder', posix.dirname(path)]
+}
+
+export interface FoundSource {
+  readonly kind: FoundKind
+  readonly name: string
+  /** Distinct files found there. */
+  readonly files: Set<string>
+  readonly projects: Set<string>
+}
+
+/** Where the missing samples that can be repaired were found, largest first. */
+export function foundSources(
+  results: readonly SetResult[],
+  env: Environment,
+  roots: readonly string[],
+): FoundSource[] {
+  const sources = new Map<string, FoundSource>()
+  for (const r of results) {
+    for (const change of r.changes) {
+      if (change.action !== 'repaired') continue
+      // Without a copy the file stays where it was found: in the project, or in its pack.
+      const path = change.source || posix.join(r.projectRoot, change.newPath)
+      const [kind, name] = foundLocation(path, r.projectRoot, env, roots)
+      const key = `${kind}\u0000${name}`
+      let source = sources.get(key)
+      if (!source) {
+        source = { kind, name, files: new Set(), projects: new Set() }
+        sources.set(key, source)
+      }
+      source.files.add(norm(path))
+      source.projects.add(r.projectRoot)
+    }
+  }
+  const kindName = (f: FoundSource) => FOUND_NAMES[f.kind]
+  return [...sources.values()].sort(
+    (a, b) =>
+      b.files.size - a.files.size ||
       (kindName(a) < kindName(b) ? -1 : kindName(a) > kindName(b) ? 1 : 0) ||
       (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
   )

@@ -1,10 +1,17 @@
 /** Where missing samples came from: packs, expansions, projects, folders. */
 import { describe, expect, test } from 'bun:test'
+import { EMPTY_REMAP } from '@livesaver/core'
 import {
+  Environment,
+  FOUND_NAMES,
+  foundLocation,
+  foundSources,
   KIND_NAMES,
   libraryGroups,
   libraryOf,
   type MissingGroup,
+  type Probe,
+  type SetResult,
   type Status,
 } from '../src/index.js'
 
@@ -84,5 +91,79 @@ describe('library of a missing sample (LibraryOfTest)', () => {
     const top = libs[0]
     expect([top?.name, top?.samples, top?.notFound]).toEqual(['Dark Pressure Library', 2, 1])
     expect([top?.sets.size, top?.projects.size]).toEqual([2, 2])
+  })
+})
+
+describe('where found samples lie', () => {
+  const env = new Environment(
+    {
+      userLibrary: '/Users/someone/Music/Ableton/User Library',
+      factoryPacks: '/Users/someone/Music/Ableton/Factory Packs',
+      appResources: '/Applications/Live.app/Contents/App-Resources',
+      preferredRoots: ['/Users/someone/Music/Samples'],
+      vendorLibraries: ['/Users/Shared'],
+      remap: EMPTY_REMAP,
+    },
+    undefined as unknown as Probe, // only needed to read pack properties
+  )
+  const roots = ['/Users/someone/Music', '/Users/Shared']
+  const project = '/Users/someone/Music/Projects/Song Project'
+
+  test('own project, pack, library, other project, folder', () => {
+    const cases: [string, string][] = [
+      [`${project}/Samples/Imported/a.wav`, 'Own project: Samples/Imported'],
+      [`${project}/a.wav`, 'Own project: .'],
+      [
+        '/Applications/Live.app/Contents/App-Resources/Core Library/Samples/a.wav',
+        'Ableton Core Library: Core Library',
+      ],
+      [
+        '/Users/someone/Music/Ableton/Factory Packs/Drum Essentials/Samples/a.wav',
+        'Ableton pack: Drum Essentials',
+      ],
+      [
+        '/Users/someone/Music/Ableton/User Library/Samples/Imported/a.wav',
+        'User Library: Samples/Imported',
+      ],
+      ['/Users/Shared/Drum Library/Samples/Drums/Kick/a.wav', 'Library: Drum Library'],
+      [
+        '/Users/someone/Music/Projects/Old/Demo Project/Samples/Imported/a.wav',
+        'Other project: Demo Project',
+      ],
+      ['/Users/someone/Music/Samples/Vocal Pack/Dry/a.wav', 'Folder: Samples/Vocal Pack'],
+      ['/Users/someone/Music/Recordings/2020/a.wav', 'Folder: Music/Recordings'],
+      ['/Volumes/Old Disk/Loops/a.wav', 'Folder: /Volumes/Old Disk/Loops'],
+    ]
+    for (const [path, expected] of cases) {
+      const [kind, name] = foundLocation(path, project, env, roots)
+      expect([path, `${FOUND_NAMES[kind]}: ${name}`]).toEqual([path, expected])
+    }
+  })
+
+  test('repaired samples are counted per place: distinct files and projects', () => {
+    const change = (action: string, source: string, newPath = 'Samples/Imported/x.wav') =>
+      ({ action, source, newPath }) as SetResult['changes'][number]
+    const set = (projectRoot: string, changes: SetResult['changes']) =>
+      ({ projectRoot, changes }) as SetResult
+    const kick = '/Users/Shared/Drum Library/Samples/Kick/Kick 1.wav'
+    const sources = foundSources(
+      [
+        set(project, [
+          change('repaired', kick),
+          change('repaired', '/Users/Shared/Drum Library/Samples/Kick/Kick 2.wav'),
+          change('repaired', '', 'Samples/Old/y.wav'), // found inside the project: not copied
+          change('collected', '/Users/someone/Music/Samples/Vocal Pack/z.wav'), // was never missing
+        ]),
+        set('/Users/someone/Music/Projects/B Project', [change('repaired', kick)]),
+      ],
+      env,
+      roots,
+    )
+    expect(
+      sources.map((f) => [FOUND_NAMES[f.kind], f.name, f.files.size, f.projects.size]),
+    ).toEqual([
+      ['Library', 'Drum Library', 2, 2],
+      ['Own project', 'Samples/Old', 1, 1],
+    ])
   })
 })

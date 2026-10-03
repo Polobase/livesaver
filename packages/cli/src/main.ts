@@ -29,6 +29,10 @@ export function program(): Command {
         '--pack-limit <MB>',
         'pack/Core Library files above this size stay in the pack (default 50; 0 = never copy)',
       )
+      .option(
+        '--match-library-path',
+        'also accept a library file with another fingerprint when its name and place in the library match and its size differs by at most 16 bytes (marked uncertain)',
+      )
       .option('--config <file>', 'config file (default ~/.config/livesaver/config.json)')
       .option('--report-dir <dir>', 'write the report files (CSV, Markdown) to this folder')
       .option('--json', 'print the full result as JSON')

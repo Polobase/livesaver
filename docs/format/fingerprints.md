@@ -26,6 +26,10 @@ The fixture `fixtures/samples/Lib1/Kick/1.wav` gives `(2000324, 17226)`. Around 
 - **Pack samples.** Ableton updated pack files in place, so the same size is enough.
   - Applies when the ref is a pack sample (`LivePackName` set, type 5, or "core library"/"factory packs" in the stored path, lowercased) or the candidate lies in an installed pack.
   - Marked **uncertain**.
+- **Library files with other tags** (opt-in: `--match-library-path`). Vendors also changed the tags of samples between library versions, and tags sit after the audio. A sample shorter than 16 KB has them inside the fingerprint, so the installed file can never match it.
+  - Used when nothing above matched: the candidate lies inside a vendor root, its last 4 path components equal those of the stored path (the file name plus three folders, e.g. `Samples/Drums/Shaker/Shaker 1.wav`, so a renamed library folder still counts), and `|Δsize| ≤ 16`.
+  - Marked **uncertain**: the audio cannot be confirmed.
+  - Not for Max devices.
 - **crc = 0 and size > 0:** a size match counts as **certain**.
 - **Max devices:** exact fingerprint only. Without a stored size, all candidates must be byte-identical (`content_hash`).
 

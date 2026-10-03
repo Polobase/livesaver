@@ -21,7 +21,14 @@ import {
 import { decodeUtf8, type Edit } from '@livesaver/xml'
 import { type Environment, isInside } from './env.js'
 import type { FileIndex } from './file-index.js'
-import { type Choice, type checkOf, choose, MISSING_STATES, type Status } from './match.js'
+import {
+  type Choice,
+  type ChooseOptions,
+  type checkOf,
+  choose,
+  MISSING_STATES,
+  type Status,
+} from './match.js'
 import type { Probe } from './probe.js'
 
 export const PROJECT_MARKER = 'Ableton Project Info'
@@ -34,7 +41,7 @@ export const MAX_DEVICE_DIRS: Readonly<Record<string, string>> = {
 }
 export const OTHER_DEVICE_DIR = 'Presets/Imported'
 
-export interface CollectOptions {
+export interface CollectOptions extends ChooseOptions {
   /** Files from Ableton packs / the Core Library larger than this stay in the pack; 0 = never copy. */
   readonly packCopyLimit: number
 }
@@ -198,7 +205,7 @@ export class Project {
   choose(ref: FileRef): Promise<Choice> {
     let c = this.choices.get(ref.key)
     if (!c) {
-      c = choose(ref, this.index, this.root, this.env, this.probe)
+      c = choose(ref, this.index, this.root, this.env, this.probe, this.options)
       this.choices.set(ref.key, c)
     }
     return c

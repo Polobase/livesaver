@@ -105,7 +105,8 @@ your Live setup):
   stays identical. Nothing is ever re-serialized.
 - **Live's own matching.** Samples are identified the way Live identifies them: file size plus
   Live's CRC-16 over the first 16 KB. The name alone is never enough. Vendor re-saves and Ableton's
-  in-place pack updates are handled explicitly.
+  in-place pack updates are handled explicitly. `--match-library-path` also accepts a library file
+  with other tags by its name and place in the library, and reports it as uncertain.
 - **Every format.** Reads `.als`, `.adg`, `.adv`, `.alc` and `.agr` from Live 8.2 to 12, including
   old (Live 9/10) and new FileRef formats, macOS aliases and Windows paths.
 - **Safe by default.**
