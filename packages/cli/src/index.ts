@@ -7,6 +7,7 @@ export {
   SetView,
   TrackView,
 } from '@livesaver/ops'
+export { pairingLink, SITE_APP } from './commands/web.js'
 export {
   type FileConfig,
   type ResolvedConfig,
@@ -37,5 +38,5 @@ export type {
   WebUpgraded,
   WebUpgradeRequest,
 } from './web/protocol.js'
-export { TOKEN_HEADER, TOKEN_META } from './web/protocol.js'
+export { TOKEN_HEADER, TOKEN_META, WEB_API } from './web/protocol.js'
 export { startWeb, type WebServer, type WebServerOptions } from './web/server.js'

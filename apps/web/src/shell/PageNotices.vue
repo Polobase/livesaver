@@ -3,12 +3,41 @@
  * What has to be said on whichever page one is: livesaver is gone (nothing works until it is
  * back), and a scan that failed (it may have been started from any page).
  */
+import { computed } from 'vue'
+import { disconnect } from '../engine/create'
 import { useEngineStore } from '../stores/engine'
 import { useScanStore } from '../stores/scan'
 
 const engines = useEngineStore()
 const scans = useScanStore()
 const reload = () => window.location.reload()
+
+/** What to do when livesaver is gone: it depends on how the page came to it. */
+const advice = computed(() =>
+  engines.kind !== 'computer'
+    ? 'Reload this page to start again.'
+    : engines.paired
+      ? 'Nothing can be read or written until it is back. If livesaver runs, your browser may keep this page from reaching it (Safari does): use the app that “livesaver web” opens itself. If it was stopped, start it again with “livesaver web --pair”, which connects this page anew.'
+      : 'Nothing can be read or written until it is back. If livesaver still runs, reload this page; if not, start it again with “livesaver web”: it opens the app anew.',
+)
+const actions = computed(() => [
+  {
+    label: 'Reload this page',
+    color: 'neutral' as const,
+    variant: 'subtle' as const,
+    onClick: reload,
+  },
+  ...(engines.paired
+    ? [
+        {
+          label: 'Use this page on its own',
+          color: 'neutral' as const,
+          variant: 'ghost' as const,
+          onClick: disconnect,
+        },
+      ]
+    : []),
+])
 </script>
 
 <template>
@@ -22,14 +51,10 @@ const reload = () => window.location.reload()
       variant="subtle"
       icon="i-lucide-unplug"
       :title="engines.problem"
-      :description="
-        engines.kind === 'computer'
-          ? 'Nothing can be read or written until it is back. If livesaver still runs, reload this page; if not, start it again with “livesaver web”: it opens the app anew.'
-          : 'Reload this page to start again.'
-      "
+      :description="advice"
       role="alert"
       data-testid="engine-problem"
-      :actions="[{ label: 'Reload this page', color: 'neutral', variant: 'subtle', onClick: reload }]"
+      :actions="actions"
     />
     <UAlert
       v-else-if="scans.problem"

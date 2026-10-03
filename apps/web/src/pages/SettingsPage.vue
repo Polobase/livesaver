@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import RevealLink from '../components/common/RevealLink.vue'
 import LibrarySetup from '../components/library/LibrarySetup.vue'
 import ScanButton from '../components/scan/ScanButton.vue'
+import { disconnect } from '../engine/create'
 import PagePanel from '../shell/PagePanel.vue'
 import { shortcutsOpen } from '../shell/shortcuts'
 import { useEngineStore } from '../stores/engine'
@@ -140,10 +141,21 @@ const found = computed(() => {
           <dt class="text-muted">Runs</dt>
           <dd>
             {{
-              engines.kind === 'computer'
-                ? 'on this computer, with livesaver behind it: it reads and writes your files'
-                : 'in this browser, on its own: it reads the folders you give it and changes nothing'
+              engines.kind !== 'computer'
+                ? 'in this browser, on its own: it reads the folders you give it and changes nothing'
+                : engines.paired
+                  ? 'in this page, connected to livesaver on this computer: it reads and writes your files'
+                  : 'on this computer, with livesaver behind it: it reads and writes your files'
             }}
+            <UButton
+              v-if="engines.paired"
+              size="xs"
+              color="neutral"
+              variant="link"
+              class="p-0 underline"
+              label="Disconnect"
+              @click="disconnect()"
+            />
           </dd>
           <template v-if="engines.start?.version">
             <dt class="text-muted">livesaver</dt>

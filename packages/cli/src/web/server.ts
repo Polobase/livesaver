@@ -43,6 +43,12 @@ export interface WebServerOptions extends WebSettings {
    * server serves the page and passes its requests on. They need the token all the same.
    */
   readonly origins?: readonly string[]
+  /**
+   * The origin of a site whose app may be connected to this livesaver (`livesaver web --pair`):
+   * its pages ask from the browser, across origins, so they get the answers a browser demands
+   * for that (CORS). They need the token all the same, which only the pairing link carries.
+   */
+  readonly pair?: string
 }
 
 export interface WebServer {
@@ -113,16 +119,23 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
     notes = undefined
   }
 
+  const hosts = () => [`127.0.0.1:${port}`, `localhost:${port}`]
+  /** The request comes from a page of the paired site (and is addressed to this computer). */
+  const paired = (req: IncomingMessage) =>
+    options.pair !== undefined &&
+    req.headers.origin === options.pair &&
+    hosts().includes(req.headers.host ?? '')
+
   /** Only the page this server served may ask: it has the token, and it came from this address. */
   const allowed = (req: IncomingMessage) => {
-    const hosts = [`127.0.0.1:${port}`, `localhost:${port}`]
     const origin = req.headers.origin
     return (
       req.headers[TOKEN_HEADER] === token &&
-      hosts.includes(req.headers.host ?? '') &&
+      hosts().includes(req.headers.host ?? '') &&
       (origin === undefined ||
-        hosts.some((host) => origin === `http://${host}`) ||
-        (options.origins ?? []).includes(origin))
+        hosts().some((host) => origin === `http://${host}`) ||
+        (options.origins ?? []).includes(origin) ||
+        paired(req))
     )
   }
 
@@ -288,10 +301,34 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
     return send(res, 200, html, type)
   }
 
+  /**
+   * What a browser asks before it lets a page of another origin send a request with the token:
+   * whether this origin, this header and this network (a public site reaching this computer)
+   * are welcome. Only the paired site is told yes.
+   */
+  const preflight = (req: IncomingMessage, res: ServerResponse) => {
+    if (!paired(req)) return send(res, 403, 'not allowed', 'text/plain')
+    res.writeHead(204, {
+      'Access-Control-Allow-Methods': 'GET, POST',
+      'Access-Control-Allow-Headers': `content-type, ${TOKEN_HEADER}`,
+      'Access-Control-Allow-Private-Network': 'true',
+      'Access-Control-Max-Age': '600',
+    })
+    res.end()
+  }
+
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    const answer = url.pathname.startsWith('/api/')
-      ? api(req, res, url)
+    const isApi = url.pathname.startsWith('/api/')
+    // The paired site's pages may read the answers (also the refusals, to say why).
+    if (isApi && paired(req)) {
+      res.setHeader('Access-Control-Allow-Origin', options.pair as string)
+      res.setHeader('Vary', 'Origin')
+    }
+    const answer = isApi
+      ? req.method === 'OPTIONS'
+        ? Promise.resolve(preflight(req, res))
+        : api(req, res, url)
       : req.method === 'GET'
         ? page(res, url.pathname)
         : Promise.resolve(send(res, 405, 'not allowed', 'text/plain'))

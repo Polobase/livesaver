@@ -123,6 +123,9 @@ The app talks to livesaver on your computer, which reads and writes the files wi
 settings: nothing leaves the computer, and only the page that livesaver served can ask it for
 anything.
 
+`livesaver web --pair` opens the app on livesaver's site instead, connected to the livesaver of
+your computer (where the browser allows a site to reach it; Safari does not).
+
 The same app also runs without livesaver behind it, on its own in a browser (Chrome, Safari,
 Firefox). Then you choose or drop the folders and it scans them by itself, read-only. A browser
 does not tell a page where a folder lies on disk: livesaver works that out for project folders

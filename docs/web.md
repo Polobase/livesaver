@@ -103,6 +103,27 @@ could neither keep a journal for an undo nor see that Live is running.
   browser hands out remembered ticks by position, so an option could show the tick of another
   box while the page itself had it off.
 
+## The app elsewhere, connected to this computer
+The app on livesaver's site is the same files as the app livesaver serves. On its own it only
+reads; `livesaver web --pair` connects it to the livesaver of the same computer:
+
+- **The pairing link** opens the app with where livesaver is and its token behind the `#` of
+  the address (`#/connect?at=http://127.0.0.1:5483&token=…`), a part a browser does not send to
+  the site. The app takes it before it reads the address as a place to go to, keeps it for the
+  tab (so a reload stays connected), and clears the address. It accepts only an address of this
+  computer: a link cannot make the page talk to another machine.
+- **The server lets exactly that site in.** Started with `--pair`, it answers what a browser
+  asks before a page of another origin may send the token (the origin, the header, and that a
+  public site reaches this computer), and lets the paired site read its answers. Every other
+  origin is refused as before, and the token and the address checks stay as they are. Without
+  `--pair`, the site is a stranger like any other.
+- **A browser has the last word.** Chrome, Edge, Firefox and Brave ask the user whether the page
+  may reach this computer; Safari does not allow it. The page then says that livesaver does not
+  answer, and that the app livesaver serves itself works everywhere.
+- **Both sides name their protocol** (`api` in `/api/info`, `WEB_API`). A page that livesaver
+  serves always fits; a connected page may be older or newer than its livesaver, and says so
+  instead of misreading its answers.
+
 ## A scan
 A scan is what the screens are built on: the samples (as `doctor` reports them) and the
 plug-ins of every set (as `plugins audit` reports them).
@@ -259,7 +280,7 @@ there.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
   review, fix, undo, the history, a page that is opened again) against both engines; the app's
   own sums and words (states, plans, advice, what a run was and what its undo does).
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 198 tests.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 207 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
@@ -285,6 +306,11 @@ there.
   - Whether Live runs is told to the server by each test (`liveRunning`), so the tests do not
     depend on the machine they run on; told that it runs, the review does not let a fix start,
     and an undo is refused.
+  - A page from one address connected to livesaver at another: the pairing link, a fix and
+    its undo across the two, a reload that stays connected, disconnecting; a livesaver that was
+    not started for pairing, and one of another version.
+  - What a test waits for gets three times as long on a CI, whose machines are slower in
+    spurts.
 - `bun run test:node`: the built `livesaver web` under Node.js serves the app it ships with.
 - On a real library (876 sets, 138,662 indexed files), read-only:
   - A scan in the app takes 13 s and shows the numbers of the command line: what `doctor`

@@ -28,6 +28,11 @@ Where the app says that something needs livesaver (fixing, the history, the inst
 an upgrade), it links to the guide that says how to get it; the guide is also one click away in
 the sidebar and in the palette. The result of a first scan is shown from its top.
 
+`livesaver web --pair` opens the app on livesaver's site connected to this computer's livesaver:
+the pairing link carries where livesaver is and its token behind the `#`, the server answers
+that site across origins (and no other), and both sides name their protocol version. The app
+says where it runs, and disconnects.
+
 The default port of `livesaver web` is now 5483. A fix can take several projects (`only` of
 `/api/fix`). `checkView` names for every missing sample the sets that use it and the source it
 is counted under, and for every planned change its set's path.

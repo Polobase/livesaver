@@ -16,6 +16,7 @@ import AppLogo from './AppLogo.vue'
 import { PLACES, type Place, SETTINGS } from './navigation'
 import ShortcutsHelp from './ShortcutsHelp.vue'
 import { shortcutsOpen } from './shortcuts'
+import WhereDialog from './WhereDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -124,8 +125,10 @@ const where = computed(() =>
   engine.kind === 'computer'
     ? {
         label: 'On this computer',
-        icon: 'i-lucide-monitor',
-        note: 'livesaver reads and writes your files here. Nothing leaves this computer.',
+        icon: engine.paired ? 'i-lucide-link' : 'i-lucide-monitor',
+        note: engine.paired
+          ? 'This page is connected to livesaver on this computer, which reads and writes your files. Nothing leaves this computer.'
+          : 'livesaver reads and writes your files here. Nothing leaves this computer.',
       }
     : {
         label: 'In this browser',
@@ -133,6 +136,7 @@ const where = computed(() =>
         note: 'The page reads the folders you give it and changes nothing. Nothing leaves this computer.',
       },
 )
+const whereOpen = ref(false)
 /** The sidebar as a drawer on narrow screens. */
 const open = ref(false)
 
@@ -252,10 +256,16 @@ defineShortcuts({
         <footer v-if="collapsed"><UColorModeButton /></footer>
         <footer v-else class="flex w-full items-center justify-between gap-2">
           <UTooltip :text="where.note">
-            <span class="flex min-w-0 items-center gap-1.5 text-xs text-muted" data-testid="where">
-              <UIcon :name="where.icon" class="size-4 shrink-0" />
-              <span class="truncate">{{ where.label }}</span>
-            </span>
+            <UButton
+              color="neutral"
+              variant="link"
+              size="xs"
+              class="min-w-0 p-0 text-muted"
+              :icon="where.icon"
+              :label="where.label"
+              data-testid="where"
+              @click="whereOpen = true"
+            />
           </UTooltip>
           <div class="flex shrink-0 items-center">
             <UTooltip text="The guide (opens the site)">
@@ -289,5 +299,6 @@ defineShortcuts({
     <ReviewSheet />
     <UpgradeSheet />
     <ShortcutsHelp />
+    <WhereDialog v-model:open="whereOpen" />
   </UDashboardGroup>
 </template>

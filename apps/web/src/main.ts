@@ -1,3 +1,5 @@
+// First of all: a pairing in the address is taken before the router reads the address.
+import './engine/take-pairing'
 import '@fontsource-variable/inter'
 import './assets/css/main.css'
 

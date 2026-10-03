@@ -201,6 +201,51 @@ test('web under Node serves the page it ships with, and answers only that page',
     assert.deepEqual(await ask('api/scan'), {})
     const status = await ask('api/status')
     assert.deepEqual([status.busy, status.lastScan], ['', ''])
+    // Not started for pairing: a page of the site is a stranger.
+    const stranger = await fetch(`${url}api/status`, {
+      method: 'OPTIONS',
+      headers: { origin: 'https://polobase.github.io' },
+    })
+    assert.equal(stranger.status, 403)
+  } finally {
+    child.kill('SIGINT')
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('web --pair under Node names the link that connects the app on the site, and lets that site in', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'livesaver-node-'))
+  const env = { ...plain, LIVESAVER_HOME: join(root, 'home') }
+  const config = join(root, 'config.json')
+  writeFileSync(config, JSON.stringify({ appResources: '', searchRoots: [root] }))
+  const child = spawn(
+    process.execPath,
+    [bin, 'web', '--pair', '--no-open', '--port', '0', '--config', config],
+    { env },
+  )
+  try {
+    const link = await new Promise((resolve, reject) => {
+      let out = ''
+      child.stdout.on('data', (chunk) => {
+        out += chunk
+        const found = /https:\/\/polobase\.github\.io\/livesaver\/app\/#\/connect\?\S+/.exec(out)
+        if (found) resolve(found[0])
+      })
+      child.on('exit', (code) => reject(new Error(`web exited with ${code}: ${out}`)))
+    })
+    const query = new URLSearchParams(link.slice(link.indexOf('?') + 1))
+    const at = query.get('at')
+    assert.match(at, /^http:\/\/127\.0\.0\.1:\d+$/)
+    assert.match(query.get('token'), /^[0-9a-f]{48}$/)
+    // What a browser asks before a page of the site may send the token, and the request itself.
+    const site = 'https://polobase.github.io'
+    const asked = await fetch(`${at}/api/info`, { method: 'OPTIONS', headers: { origin: site } })
+    assert.deepEqual([asked.status, asked.headers.get('access-control-allow-origin')], [204, site])
+    const info = await fetch(`${at}/api/info`, {
+      headers: { origin: site, 'x-livesaver-token': query.get('token') },
+    })
+    assert.deepEqual([info.status, info.headers.get('access-control-allow-origin')], [200, site])
+    assert.equal((await info.json()).api, 1)
   } finally {
     child.kill('SIGINT')
     rmSync(root, { recursive: true, force: true })

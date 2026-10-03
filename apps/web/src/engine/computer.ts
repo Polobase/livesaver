@@ -42,12 +42,20 @@ const TOKEN_HEADER = 'x-livesaver-token'
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>
 
 export interface ComputerOptions {
-  /** The token of the page livesaver served (see `localToken`). */
+  /** The token of the page livesaver served (see `localToken`), or of a pairing. */
   readonly token: string
   /** Where livesaver answers; '' = where the page came from. */
   readonly base?: string
   readonly fetch?: Fetch
+  /** The page came from elsewhere and was connected to livesaver (`livesaver web --pair`). */
+  readonly paired?: boolean
 }
+
+/**
+ * The version of the protocol this page speaks (`WEB_API` of the command line). A page that
+ * livesaver serves always fits; a connected one may be older or newer than its livesaver.
+ */
+export const API = 1
 
 /** The page was served by livesaver if its HTML carries a token. */
 export function localToken(page: Pick<Document, 'querySelector'>): string {
@@ -81,6 +89,7 @@ const scanOf = ({ scan, at }: Pick<WebLastScan, 'scan' | 'at'>): Scan => ({
 
 export class ComputerEngine implements Engine {
   readonly kind = 'computer'
+  readonly paired: boolean
   capabilities: Capabilities = {
     paths: true,
     fix: true,
@@ -100,6 +109,7 @@ export class ComputerEngine implements Engine {
 
   constructor(options: ComputerOptions) {
     this.base = (options.base ?? '').replace(/\/$/, '')
+    this.paired = options.paired ?? false
     this.headers = { [TOKEN_HEADER]: options.token, 'Content-Type': 'application/json' }
     this.fetch = options.fetch ?? ((url, init) => fetch(url, init))
   }
@@ -169,6 +179,10 @@ export class ComputerEngine implements Engine {
 
   async start(): Promise<Start> {
     const info = await this.json<WebInfo>('/api/info')
+    if (info.api !== API)
+      throw new Unreachable(
+        `This page and livesaver ${info.version} on this computer do not fit together: one of them is newer than the other.`,
+      )
     this.capabilities = { ...this.capabilities, reveal: Boolean(info.reveal) }
     const last = await this.json<Partial<WebLastScan>>('/api/scan')
     return {

@@ -399,6 +399,19 @@ for (const [name, type] of ENGINES) {
         )
         await goTo('Overview')
         expect(await page.getByTestId('recent-runs').count()).toBe(0)
+
+        // Where the app runs says what that means, and how to get livesaver behind it.
+        await page.getByTestId('where').click()
+        const where = page.getByRole('dialog')
+        await where.getByTestId('where-dialog').waitFor()
+        expect(await textOf(where)).toContain('In this browser, on its own.')
+        expect(await textOf(where)).toContain('livesaver web --pair')
+        expect(
+          await where.getByRole('link', { name: 'How to get livesaver' }).getAttribute('href'),
+        ).toContain('/docs/guide/getting-started/')
+        expect(await barriers(page)).toEqual([])
+        await page.keyboard.press('Escape')
+        await where.waitFor({ state: 'hidden' })
       },
       30_000 * PATIENCE,
     )

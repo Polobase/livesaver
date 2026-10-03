@@ -37,6 +37,21 @@ A browser does not tell a page where a folder lies on your disk, but sets refer 
 
 Writing needs an access that only some browsers give, and that hides files with certain names from the page: a page could then call samples missing that are there. A page can also not see whether Live is running, and could keep no journal for an undo. So the page only reads, and fixing is livesaver's job: see [Getting started](getting-started.md#install-livesaver-on-your-mac).
 
+## Connect the page to livesaver
+
+If livesaver is on your Mac, the page on the site can use it, and then does everything:
+
+```sh
+livesaver web --pair
+```
+
+opens the app on the site, connected to the livesaver that runs in your terminal. The page then reads and writes through it, on your computer; nothing of your files goes to the site.
+
+- Chrome, Edge, Firefox and Brave ask whether the page may reach your computer. Allow it.
+- Safari does not let a page of a site reach your computer. Use `livesaver web` without `--pair` there: it opens the same app from your own computer, which works in every browser.
+
+The connection lasts as long as the tab and the `livesaver web` in your terminal. **Where the app runs**, at the bottom of the sidebar, says how the page is connected, and disconnects it.
+
 ## Nothing leaves your computer
 
 The page asks no server for anything once it is loaded: no fonts, no icons, no statistics. You can check that in your browser's developer tools, and it is tested with every change to the app. See [How the web app works](../web.md).

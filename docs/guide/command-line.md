@@ -58,6 +58,9 @@ livesaver undo <run>
 
 # the app: scan, review, fix and undo in the browser
 livesaver web
+
+# the app on livesaver's site, connected to this livesaver
+livesaver web --pair
 ```
 
 See [History and undo](history.md).

@@ -43,8 +43,17 @@ export interface WebFound {
   readonly remembered: boolean
 }
 
+/**
+ * The version of this protocol. A page that livesaver serves itself always fits; a page from
+ * elsewhere that is connected to it (`livesaver web --pair`) may be older or newer, and says so
+ * instead of misreading the answers. Raised when a request or an answer changes its meaning.
+ */
+export const WEB_API = 1
+
 /** What the page starts with: the last check's folders, else livesaver's settings. */
 export interface WebInfo {
+  /** `WEB_API` of the livesaver that answers. */
+  readonly api: number
   readonly version: string
   readonly home: string
   /** Folders to start browsing from. */

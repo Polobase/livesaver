@@ -113,6 +113,15 @@ for (const [name, type] of ENGINES) {
     test(
       'a project folder is chosen in the page, by clicking through folders or by its path',
       async () => {
+        // The folder the browser starts in takes long to list (a large folder, a drive that
+        // wakes up): its listing arrives after the path that is typed meanwhile was opened.
+        let first = true
+        await page.route(`${server.url}api/folders?*`, async (route) => {
+          const slow = first
+          first = false
+          if (slow) await new Promise((resolve) => setTimeout(resolve, 1500))
+          await route.continue()
+        })
         await page
           .getByTestId('projects-folders')
           .getByRole('button', { name: 'Add folder' })
@@ -121,6 +130,11 @@ for (const [name, type] of ENGINES) {
         const path = dialog.getByLabel('Path of the folder')
         await path.fill(tmp.path)
         await path.press('Enter')
+        await dialog.getByRole('button', { name: 'projects', exact: true }).waitFor()
+        // The late listing changes neither what is listed nor the path that was typed.
+        await page.waitForTimeout(2000)
+        await page.unroute(`${server.url}api/folders?*`)
+        expect(await path.inputValue()).toBe(tmp.path)
         await dialog.getByRole('button', { name: 'projects', exact: true }).click()
         await dialog.getByRole('button', { name: 'Brokenpath Project' }).waitFor()
         expect(await path.inputValue()).toBe(projects)

@@ -31,6 +31,7 @@ import type {
   WebResult,
   WebUndone,
 } from './protocol.js'
+import { WEB_API } from './protocol.js'
 
 export interface WebSettings {
   /** Config file in place of ~/.config/livesaver/config.json. */
@@ -148,6 +149,7 @@ export async function webInfo(settings: WebSettings = {}): Promise<WebInfo> {
   const there = (path: string) => (path && isFolder(path) ? path : '')
   const { userLibrary, factoryPacks, appResources } = config.env
   return {
+    api: WEB_API,
     version: settings.version ?? '',
     found: {
       config: existsSync(file) ? file : '',

@@ -79,6 +79,8 @@ export const useEngineStore = defineStore('engine', () => {
   }
 
   const kind = computed(() => current.value?.kind ?? 'browser')
+  /** The page came from elsewhere and was connected to livesaver on this computer. */
+  const paired = computed(() => current.value?.paired ?? false)
 
-  return { engine, start, problem, load, reset, use, kind, capabilities }
+  return { engine, start, problem, load, reset, use, kind, paired, capabilities }
 })

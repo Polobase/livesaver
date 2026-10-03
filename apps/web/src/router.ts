@@ -19,6 +19,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/plugins', name: 'plugins', component: PluginsPage },
   { path: '/history', name: 'history', component: HistoryPage },
   { path: '/settings', name: 'settings', component: SettingsPage },
+  // A pairing link is taken before the router starts (`engine/take-pairing.ts`). Should one
+  // get here all the same, nothing of it stays in the address.
+  { path: '/connect', redirect: { path: '/', query: {} } },
   { path: '/:rest(.*)*', redirect: '/' },
 ]
 

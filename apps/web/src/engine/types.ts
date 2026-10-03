@@ -262,6 +262,11 @@ export class Unreachable extends RunFailed {
 
 export interface Engine {
   readonly kind: EngineKind
+  /**
+   * The page did not come from the livesaver it talks to: it was connected to it. Its files
+   * are read and written on this computer all the same.
+   */
+  readonly paired?: boolean
   readonly capabilities: Capabilities
   start(): Promise<Start>
   /** Forgets the folders and options of the last scan, and starts with its own settings again. */

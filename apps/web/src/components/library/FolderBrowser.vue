@@ -18,17 +18,26 @@ const typed = ref('')
 const problem = ref('')
 const loading = ref(false)
 
+/** Counts what was asked for: of two listings on their way, only the one asked for last counts. */
+let asked = 0
+
 async function go(path: string): Promise<void> {
+  const mine = ++asked
+  const written = typed.value
   problem.value = ''
   loading.value = true
   try {
     const next = await engines.engine().folders(path)
+    // A listing that takes long (a large folder, a drive that wakes up) arrives after one that
+    // was asked for later: it is no longer wanted.
+    if (mine !== asked) return
     listing.value = next
-    typed.value = next.path
+    // The path that is shown follows the listing, unless someone is typing another one.
+    if (typed.value === written) typed.value = next.path
   } catch (error) {
-    problem.value = (error as Error).message
+    if (mine === asked) problem.value = (error as Error).message
   } finally {
-    loading.value = false
+    if (mine === asked) loading.value = false
   }
 }
 
@@ -69,7 +78,16 @@ function choose(): void {
           spellcheck="false"
           icon="i-lucide-folder-open"
         />
-        <UButton type="submit" color="neutral" variant="subtle" label="Open" :loading="loading" />
+        <!-- Never disabled: while a listing is on its way, a path can be typed and opened
+             (Enter in the field does nothing if the form's button is disabled). -->
+        <UButton
+          type="submit"
+          color="neutral"
+          variant="subtle"
+          label="Open"
+          :trailing-icon="loading ? 'i-lucide-loader-circle' : undefined"
+          :ui="{ trailingIcon: 'animate-spin' }"
+        />
       </form>
       <ul class="flex flex-wrap gap-1.5" aria-label="Places">
         <li v-for="place in places" :key="place.path">

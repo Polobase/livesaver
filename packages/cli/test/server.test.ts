@@ -5,6 +5,7 @@ import { request as httpRequest } from 'node:http'
 import { join } from 'node:path'
 import { Inventory } from '@livesaver/plugins'
 import { copyFixtures, tempDir, writeFile } from '@livesaver/test-kit'
+import { pairingLink, SITE_APP } from '../src/commands/web.js'
 import {
   TOKEN_HEADER,
   type WebEvent,
@@ -131,6 +132,103 @@ test('only the page that was served may ask: token, address and origin must be i
   const byName = { ...own(), host: `localhost:${server.port}` }
   expect((await ask('/api/info', { headers: byName })).status).toBe(200)
   expect((await ask('/api/fix', { method: 'POST', body: {} })).status).toBe(403)
+})
+
+test('a paired site is answered across origins, and only it: with the token, on this address', async () => {
+  const site = 'https://polobase.github.io'
+  const api = await startWeb({ assets: false, pair: site })
+  const at = `127.0.0.1:${api.port}`
+  /** A request as a browser sends it for a page of `origin`. */
+  const from = (
+    origin: string,
+    options: { method?: string; token?: string; host?: string; path?: string } = {},
+  ) =>
+    new Promise<{ status: number; headers: Record<string, string | string[] | undefined> }>(
+      (resolve, reject) => {
+        const req = httpRequest(
+          {
+            host: '127.0.0.1',
+            port: api.port,
+            path: options.path ?? '/api/status',
+            method: options.method ?? 'GET',
+            headers: {
+              host: options.host ?? at,
+              origin,
+              ...(options.token ? { [TOKEN_HEADER]: options.token } : {}),
+            },
+          },
+          (res) => {
+            res.resume()
+            res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers }))
+          },
+        )
+        req.on('error', reject)
+        req.end()
+      },
+    )
+  try {
+    // Before it sends the token, a browser asks whether it may: origin, header, and reaching
+    // this computer from a public site.
+    const asked = await from(site, { method: 'OPTIONS' })
+    expect([asked.status, asked.headers['access-control-allow-origin']]).toEqual([204, site])
+    expect(asked.headers['access-control-allow-headers']).toBe(`content-type, ${TOKEN_HEADER}`)
+    expect(asked.headers['access-control-allow-private-network']).toBe('true')
+    expect(asked.headers.vary).toBe('Origin')
+
+    const answered = await from(site, { token: api.token })
+    expect([answered.status, answered.headers['access-control-allow-origin']]).toEqual([200, site])
+    // Without the token it is refused, but may read why.
+    const tokenless = await from(site)
+    expect([tokenless.status, tokenless.headers['access-control-allow-origin']]).toEqual([
+      403,
+      site,
+    ])
+
+    // Any other site gets neither an answer it could read nor a yes to its question.
+    for (const other of ['https://evil.example', 'https://polobase.github.io.evil.example']) {
+      const refused = await from(other, { token: api.token })
+      expect([other, refused.status, refused.headers['access-control-allow-origin']]).toEqual([
+        other,
+        403,
+        undefined,
+      ])
+      const question = await from(other, { method: 'OPTIONS' })
+      expect([other, question.status, question.headers['access-control-allow-origin']]).toEqual([
+        other,
+        403,
+        undefined,
+      ])
+    }
+    // A name that merely points at this computer is no way in for the paired site either.
+    const rebound = await from(site, { token: api.token, host: 'evil.example' })
+    expect([rebound.status, rebound.headers['access-control-allow-origin']]).toEqual([
+      403,
+      undefined,
+    ])
+  } finally {
+    await api.close()
+  }
+
+  // Without pairing, the site is a stranger like any other.
+  const asked = await ask('/api/status', {
+    method: 'OPTIONS',
+    headers: { origin: site },
+  })
+  expect(asked.status).toBe(403)
+  expect((await ask('/api/status', { headers: { ...own(), origin: site } })).status).toBe(403)
+})
+
+test('the pairing link opens the app elsewhere with where livesaver is and its token behind the #', () => {
+  const link = pairingLink(SITE_APP, 'http://127.0.0.1:5483/', 'abc123')
+  expect(link).toBe(
+    'https://polobase.github.io/livesaver/app/#/connect?at=http%3A%2F%2F127.0.0.1%3A5483&token=abc123',
+  )
+  // Nothing of it is in the part of the address that is sent to the site.
+  const url = new URL(link)
+  expect([url.pathname, url.search]).toEqual(['/livesaver/app/', ''])
+  expect(pairingLink('http://localhost:4173/app', 'http://127.0.0.1:1', 't')).toBe(
+    'http://localhost:4173/app/#/connect?at=http%3A%2F%2F127.0.0.1%3A1&token=t',
+  )
 })
 
 test('a development server may stand in front: its address is allowed, the token still needed', async () => {

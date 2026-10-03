@@ -320,6 +320,10 @@ Ranges: 120..128  >120  >=120  <4:00  2024..2025   Negation: -stage:empty   Quot
     )
     .option('--port <number>', `port to listen on (default ${DEFAULT_PORT})`)
     .option('--no-open', 'do not open the browser')
+    .option(
+      '--pair [url]',
+      "open the app on livesaver's site (or at this address) connected to this livesaver, instead of the app livesaver serves itself",
+    )
     .option('--config <file>', 'config file')
     .action(async (flags) => {
       process.exitCode = await runWeb(flags, cli.version() ?? '')
