@@ -29,7 +29,18 @@ export default defineNuxtConfig({
   },
   // A static host serves a page as a folder, with a slash at its end, and sends a browser that
   // asks without one there. Every link has the slash already, so nobody is sent anywhere.
-  experimental: { defaults: { nuxtLink: { trailingSlash: 'append' } } },
+  //
+  // A page is fetched ahead when its link is pointed at, not when the link comes into view:
+  // the landing page has dozens of links, and whoever leaves it for the app would cut most of
+  // those fetches off half-way.
+  experimental: {
+    defaults: {
+      nuxtLink: {
+        trailingSlash: 'append',
+        prefetchOn: { visibility: false, interaction: true },
+      },
+    },
+  },
   // The font is part of the build, as in the app, not fetched from a font service.
   ui: { fonts: false },
   // Every icon is part of the build: a static host has no server to ask for one, and the site

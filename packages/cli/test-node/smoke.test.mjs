@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
 const bin = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'bin.js')
+// What the command line prints is compared as text: no colours, also where a CI asks for them.
+const plain = { ...process.env, NO_COLOR: '1', FORCE_COLOR: undefined }
 
 function set(samplePath, size) {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -35,7 +37,7 @@ function set(samplePath, size) {
 test('collect --apply under Node relinks and collects, undo restores', () => {
   const root = mkdtempSync(join(tmpdir(), 'livesaver-node-'))
   const env = {
-    ...process.env,
+    ...plain,
     LIVESAVER_HOME: join(root, 'home'),
     LIVESAVER_TRASH_DIR: join(root, 'trash'),
   }
@@ -108,7 +110,7 @@ test('status --apply under Node sets Finder tags (xattr tool), undo removes them
   skip: process.platform !== 'darwin',
 }, () => {
   const root = mkdtempSync(join(tmpdir(), 'livesaver-node-'))
-  const env = { ...process.env, LIVESAVER_HOME: join(root, 'home') }
+  const env = { ...plain, LIVESAVER_HOME: join(root, 'home') }
   const tags = (path) =>
     spawnSync('/usr/bin/xattr', ['-p', 'com.apple.metadata:_kMDItemUserTags', path], {
       encoding: 'utf8',
@@ -141,7 +143,7 @@ test('status --apply under Node sets Finder tags (xattr tool), undo removes them
 
 test('web under Node serves the page it ships with, and answers only that page', async () => {
   const root = mkdtempSync(join(tmpdir(), 'livesaver-node-'))
-  const env = { ...process.env, LIVESAVER_HOME: join(root, 'home') }
+  const env = { ...plain, LIVESAVER_HOME: join(root, 'home') }
   const config = join(root, 'config.json')
   writeFileSync(config, JSON.stringify({ appResources: '', searchRoots: [root] }))
   const child = spawn(

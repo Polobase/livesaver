@@ -69,7 +69,8 @@ test('every page is there, and every link and picture on it leads somewhere', as
       broken.push(`${from} → ${to.pathname}${to.hash}`)
   }
   expect(broken).toEqual([])
-  expect([...elsewhere].sort()).toEqual(LINKED)
+  // (The guides name the app by its address on the web, which is this site once it is deployed.)
+  expect([...elsewhere].sort()).toEqual(LINKED.filter((host) => host !== new URL(origin).hostname))
   const docs = [...pages.keys()].filter(
     (url) => url.startsWith(`${site.url}docs/`) && pages.get(url),
   )
