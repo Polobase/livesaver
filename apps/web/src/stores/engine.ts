@@ -44,6 +44,8 @@ export const useEngineStore = defineStore('engine', () => {
   const capabilities = shallowRef<Capabilities>(NOTHING)
   /** Why the engine cannot be reached ('' = it can, or was not asked yet). */
   const problem = ref('')
+  /** The engine was asked what it starts with, and has not answered yet. */
+  const loading = ref(false)
 
   /** Puts an engine in place of the page's own (tests bring theirs). */
   function use(engine: Engine): void {
@@ -62,6 +64,7 @@ export const useEngineStore = defineStore('engine', () => {
   async function load(): Promise<void> {
     problem.value = ''
     const own = engine()
+    loading.value = true
     try {
       start.value = await own.start()
       // livesaver has said by now what its system can do.
@@ -69,6 +72,8 @@ export const useEngineStore = defineStore('engine', () => {
     } catch (error) {
       // Said in the engine's own words if it is gone; else it answered, and something is wrong.
       if (!problem.value) problem.value = (error as Error).message
+    } finally {
+      loading.value = false
     }
   }
 
@@ -82,5 +87,5 @@ export const useEngineStore = defineStore('engine', () => {
   /** The page came from elsewhere and was connected to livesaver on this computer. */
   const paired = computed(() => current.value?.paired ?? false)
 
-  return { engine, start, problem, load, reset, use, kind, paired, capabilities }
+  return { engine, start, problem, loading, load, reset, use, kind, paired, capabilities }
 })

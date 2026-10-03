@@ -118,8 +118,11 @@ reads; `livesaver web --pair` connects it to the livesaver of the same computer:
   origin is refused as before, and the token and the address checks stay as they are. Without
   `--pair`, the site is a stranger like any other.
 - **A browser has the last word.** Chrome, Edge, Firefox and Brave ask the user whether the page
-  may reach this computer; Safari does not allow it. The page then says that livesaver does not
-  answer, and that the app livesaver serves itself works everywhere.
+  may reach this computer; Safari does not allow it. While a browser asks, the page says that
+  it is connecting; refused, it says that livesaver does not answer and that the app livesaver
+  serves itself works everywhere; either way it can go on on its own. Checked with the app as
+  deployed on the site: Chromium connects and scans once that permission is given, and WebKit
+  refuses.
 - **Both sides name their protocol** (`api` in `/api/info`, `WEB_API`). A page that livesaver
   serves always fits; a connected page may be older or newer than its livesaver, and says so
   instead of misreading its answers.

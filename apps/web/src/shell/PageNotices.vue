@@ -12,6 +12,9 @@ const engines = useEngineStore()
 const scans = useScanStore()
 const reload = () => window.location.reload()
 
+/** A connected page waits for its livesaver's first answer: a browser may be asking the user. */
+const connecting = computed(() => engines.paired && engines.loading && !engines.problem)
+
 /** What to do when livesaver is gone: it depends on how the page came to it. */
 const advice = computed(() =>
   engines.kind !== 'computer'
@@ -42,11 +45,25 @@ const actions = computed(() => [
 
 <template>
   <div
-    v-if="engines.problem || (scans.problem && !scans.running)"
+    v-if="engines.problem || connecting || (scans.problem && !scans.running)"
     class="space-y-3 border-b border-default p-4 sm:px-6"
   >
+    <!-- A page of a site reaches this computer only if the browser lets it, and some ask first. -->
     <UAlert
-      v-if="engines.problem"
+      v-if="connecting"
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-link"
+      title="Connecting to livesaver on this computer …"
+      description="Your browser may ask whether this page may reach your computer: allow it. If nothing happens, your browser does not let a site do that; use the app that “livesaver web” opens itself."
+      role="status"
+      data-testid="connecting"
+      :actions="[
+        { label: 'Use this page on its own', color: 'neutral', variant: 'subtle', onClick: disconnect },
+      ]"
+    />
+    <UAlert
+      v-else-if="engines.problem"
       color="error"
       variant="subtle"
       icon="i-lucide-unplug"

@@ -410,7 +410,7 @@ for (const [name, type] of ENGINES) {
           await where.getByRole('link', { name: 'How to get livesaver' }).getAttribute('href'),
         ).toContain('/docs/guide/getting-started/')
         expect(await barriers(page)).toEqual([])
-        await page.keyboard.press('Escape')
+        await where.getByRole('button', { name: 'Close' }).click()
         await where.waitFor({ state: 'hidden' })
       },
       30_000 * PATIENCE,

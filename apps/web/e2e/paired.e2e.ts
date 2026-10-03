@@ -98,7 +98,7 @@ for (const [name, type] of ENGINES) {
         )
         expect(await textOf(where)).toContain(`The page comes from ${new URL(site.url).origin}`)
         expect(await barriers(page)).toEqual([])
-        await page.keyboard.press('Escape')
+        await where.getByRole('button', { name: 'Close' }).click()
         await where.waitFor({ state: 'hidden' })
 
         await page.getByTestId('scan-library').click()
@@ -155,6 +155,36 @@ for (const [name, type] of ENGINES) {
         expect(await page.getByTestId('engine-problem').count()).toBe(0)
         await page.context().close()
         await closed.close()
+      },
+      60_000 * PATIENCE,
+    )
+
+    test(
+      'while the browser has not let the page through, it says that it is connecting',
+      async () => {
+        const { page } = await watch(browser, site.url)
+        // A browser that asks its user first holds the request back until the answer.
+        let release = () => {}
+        const held = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        await page.route(`${server.url}api/info`, async (route) => {
+          await held
+          await route.continue()
+        })
+        await page.goto(pairingLink(site.url, server.url, server.token))
+        const notice = page.getByTestId('connecting')
+        await notice.waitFor()
+        expect(await textOf(notice)).toContain('Connecting to livesaver on this computer')
+        expect(await textOf(notice)).toContain('Your browser may ask whether this page may reach')
+        expect(await barriers(page)).toEqual([])
+        // Allowed: the page is connected (it shows the scan livesaver kept), and the notice is gone.
+        release()
+        await notice.waitFor({ state: 'hidden' })
+        await page.locator('#headline').waitFor()
+        expect(await notice.count()).toBe(0)
+        expect(await page.getByTestId('engine-problem').count()).toBe(0)
+        await page.context().close()
       },
       60_000 * PATIENCE,
     )
