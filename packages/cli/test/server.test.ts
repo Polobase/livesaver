@@ -43,7 +43,7 @@ beforeEach(async () => {
   server = await startWeb({
     assets,
     config,
-    force: true,
+    liveRunning: () => false,
     // Nothing of this computer: no plug-in is installed, and no window is opened.
     plugins: async () => ({ inventory: new Inventory([]), catalog: new Map() }),
     reveal: async (path) => {
@@ -233,7 +233,12 @@ test('a scan is kept until something is written, and the history tells what was'
     search: [{ path: samples, vendor: false }],
     options: { packLimitMB: 50, matchLibraryPath: false },
   }
-  expect(await get<WebStatus>('/api/status')).toMatchObject({ busy: '', lastScan: '' })
+  // Whether Live runs is what the server is told here, not what runs on the machine of the test.
+  expect(await get<WebStatus>('/api/status')).toMatchObject({
+    busy: '',
+    lastScan: '',
+    liveRunning: false,
+  })
   expect(await get<object>('/api/scan')).toEqual({})
 
   const scanned = await post('/api/scan', request)
@@ -256,6 +261,13 @@ test('a scan is kept until something is written, and the history tells what was'
   const fix = JSON.parse(fixed.text.trim().split('\n').at(-1) as string) as WebEvent
   expect(fix.type === 'fixed' && [fix.fixed.sets, fix.fixed.files]).toEqual([1, 1])
   expect(await get<object>('/api/scan')).toEqual({})
+
+  // An undo that cannot be done answers with why, as a fix does: it is no fault of the request.
+  const refused = await post('/api/undo', { run: 'no-such-run' })
+  expect([refused.status, JSON.parse(refused.text)]).toEqual([
+    200,
+    { problem: 'This is not a run that changed anything: no-such-run' },
+  ])
 
   const runs = await get<WebRun[]>('/api/runs')
   expect(runs.map((run) => [run.command, run.state, run.sets, run.files])).toEqual([

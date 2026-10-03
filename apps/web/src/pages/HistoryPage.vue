@@ -6,6 +6,7 @@ import RunRow from '../components/history/RunRow.vue'
 import UndoConfirm from '../components/history/UndoConfirm.vue'
 import type { Run } from '../engine/types'
 import { count, plural } from '../lib/format'
+import { GET_LIVESAVER } from '../lib/links'
 import { byDay, changedSomething } from '../lib/runs'
 import PagePanel from '../shell/PagePanel.vue'
 import { useEngineStore } from '../stores/engine'
@@ -57,6 +58,7 @@ async function undo(run: Run): Promise<void> {
         icon="i-lucide-history"
         title="There is no history here"
         description="A page in a browser changes nothing, so there is nothing to keep and nothing to undo. With “livesaver web” on your computer, every fix and every upgrade is listed here, with its reports and its undo."
+        :actions="[{ ...GET_LIVESAVER, color: 'neutral', variant: 'subtle' }]"
         class="my-12"
         data-testid="no-history"
       />

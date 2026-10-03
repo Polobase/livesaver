@@ -45,7 +45,7 @@ describe('a library with uncertain matches (Chromium)', () => {
         status: { projects: demo.projects },
       }),
     )
-    server = await startWeb({ assets: DIST, config, force: true, plugins: noPlugins })
+    server = await startWeb({ assets: DIST, config, liveRunning: () => false, plugins: noPlugins })
     browser = await chromium.launch()
     ;({ page } = await watch(browser, server.url))
     await page.goto(server.url)

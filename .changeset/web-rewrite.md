@@ -24,6 +24,10 @@ options to those of the command line (`POST /api/reset`). `?` lists the keyboard
 searches a table and the arrow keys walk its rows. When livesaver no longer answers, every page
 says so and what to do.
 
+Where the app says that something needs livesaver (fixing, the history, the installed plug-ins,
+an upgrade), it links to the guide that says how to get it; the guide is also one click away in
+the sidebar and in the palette. The result of a first scan is shown from its top.
+
 The default port of `livesaver web` is now 5483. A fix can take several projects (`only` of
 `/api/fix`). `checkView` names for every missing sample the sets that use it and the source it
 is counted under, and for every planned change its set's path.

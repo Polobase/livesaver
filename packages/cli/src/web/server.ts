@@ -9,9 +9,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { liveIsRunning } from '@livesaver/node'
 import { stateDir } from '../state.js'
 import {
+  liveRuns,
   type WebSettings,
   webCheck,
   webFix,
@@ -160,7 +160,7 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
   const status = async (path: string): Promise<WebStatus> => {
     const freeBytes = await freeBytesAt(path)
     return {
-      liveRunning: liveIsRunning(),
+      liveRunning: liveRuns(options),
       busy,
       ...progress,
       lastScan: lastScan?.at ?? '',
@@ -242,7 +242,15 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
       forget()
       try {
         const { run } = (await body(req)) as { run?: string }
-        return json(res, 200, await webUndo(String(run ?? ''), options))
+        // An undo that is refused (Live runs, the run is not there) is an answer, like a fix
+        // that fails: the page says why.
+        return json(
+          res,
+          200,
+          await webUndo(String(run ?? ''), options).catch((error: unknown) => ({
+            problem: (error as Error).message || String(error),
+          })),
+        )
       } finally {
         busy = ''
       }

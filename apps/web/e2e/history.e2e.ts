@@ -37,6 +37,7 @@ for (const [name, type] of ENGINES) {
     let projects: string
     let problems: string[]
     let outside: string[]
+    let live = false
     const revealed: string[] = []
 
     beforeAll(async () => {
@@ -80,7 +81,8 @@ for (const [name, type] of ENGINES) {
       server = await startWeb({
         assets: DIST,
         config,
-        force: true,
+        // No set of the copies is open in any Live; a test says when "Live runs".
+        liveRunning: () => live,
         plugins: noPlugins,
         reveal: async (path) => {
           revealed.push(path)
@@ -287,6 +289,19 @@ for (const [name, type] of ENGINES) {
       await confirm.getByRole('button', { name: 'Cancel' }).click()
       await confirm.waitFor({ state: 'hidden' })
       expect(onDisk()).toEqual([true, true])
+
+      // While Live runs, an undo is refused, and says why; nothing is touched.
+      live = true
+      await panel.getByTestId('run-undo').click()
+      await confirm.getByTestId('undo-confirm').click()
+      const refused = page.getByTestId('history-problem')
+      await refused.waitFor({ timeout: 30_000 })
+      expect(await textOf(refused)).toContain(
+        'The undo failed: Ableton Live is running. Quit it first',
+      )
+      expect(onDisk()).toEqual([true, true])
+      await page.getByTestId('progress').waitFor({ state: 'hidden', timeout: 30_000 })
+      live = false
 
       await panel.getByTestId('run-undo').click()
       await confirm.getByTestId('undo-confirm').click()

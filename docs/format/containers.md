@@ -1,5 +1,7 @@
 # Containers and id spaces
 
+How Live's files are packed: which are gzip-compressed XML and which are binary, what lies beside them, and how the ids inside a document are numbered.
+
 ## Documents
 - `.als` (Live Set), `.adg` (rack preset), `.adv` (device preset), `.alc` (clip): **gzip-compressed UTF-8 XML**.
   - Recognized by the gzip magic `1f 8b`. Plain XML (starting with `<?xml`) is accepted too.

@@ -1,5 +1,7 @@
 # Fingerprints
 
+How Live recognises a file again: the size and the checksum it stores with every reference, where vendors and pack updates break that, and what livesaver compares instead.
+
 ## `OriginalCrc` / `Crc` = CRC-16/UMTS over the first 16 KB
 - Algorithm: width 16, poly `0x8005`, init `0`, no reflection, xorout `0` (a.k.a. CRC-16/BUYPASS).
 - Check value: `"123456789"` → `0xFEE8`.

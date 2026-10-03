@@ -9,7 +9,7 @@ import type { WebEvent, WebFixed, WebRequest, WebResult } from '../src/web/proto
 let tmp: { path: string; cleanup: () => void }
 let projects: string
 let samples: string
-let settings: { config: string; force: true }
+let settings: { config: string; liveRunning: () => boolean }
 const saved = { home: process.env.LIVESAVER_HOME, trash: process.env.LIVESAVER_TRASH_DIR }
 
 beforeEach(() => {
@@ -29,7 +29,8 @@ beforeEach(() => {
       searchRoots: [samples],
     }),
   )
-  settings = { config, force: true }
+  // No set of the copies is open in any Live, whether one runs on this machine or not.
+  settings = { config, liveRunning: () => false }
 })
 afterEach(() => {
   tmp.cleanup()
@@ -202,6 +203,31 @@ describe('a check on this computer', () => {
 })
 
 describe('a fix on this computer', () => {
+  test('nothing is written while Live runs: neither a fix nor an undo', async () => {
+    const original = readFileSync(setOf(broken()))
+    const { fixed } = await fix()
+    const written = readFileSync(setOf(broken()))
+    // Live was started in the meantime.
+    const running = { ...settings, liveRunning: () => true }
+    expect(webUndo(fixed.run, running)).rejects.toThrow(
+      'Ableton Live is running. Quit it first, so that no open set gets overwritten.',
+    )
+    expect(readFileSync(setOf(broken())).equals(written)).toBe(true)
+    await webUndo(fixed.run, settings)
+    expect(readFileSync(setOf(broken())).equals(original)).toBe(true)
+
+    const events: WebEvent[] = []
+    await webFix(request(), (event) => events.push(event), running)
+    expect(events).toEqual([
+      {
+        type: 'failed',
+        message: 'Ableton Live is running. Quit it first, so that no open set gets overwritten.',
+      },
+    ])
+    expect(readFileSync(setOf(broken())).equals(original)).toBe(true)
+    expect(existsSync(join(broken(), 'Samples', 'Imported', '1.wav'))).toBe(false)
+  })
+
   test('collects and rewrites like the command line, and undo takes it back', async () => {
     const original = readFileSync(setOf(broken()))
     const { events, fixed } = await fix()

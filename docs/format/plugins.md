@@ -1,5 +1,7 @@
 # Plug-ins in Live Sets
 
+How a Live Set stores a plug-in in each format, how the same plug-in is recognised across formats, and what an upgrade from VST2 to VST3 has to carry over.
+
 ## Storage
 - **VST2:** `PluginDevice/PluginDesc/VstPluginInfo`
   - fields: `Path`, `PlugName` (often the file name, e.g. `Serum_x64`), `UniqueId` (int32 of the 4CC), `Inputs`, `Outputs`, `NumberOfParameters`, `NumberOfPrograms`, `Flags`, `Version`, `VstVersion`, `IsShellClient`, `Category`
@@ -40,7 +42,7 @@ ids built from the AU codes; the **AU code** (subtype = VST2 id); the name alone
 ## Declared compatibility
 - `moduleinfo.json` (JSON5, so trailing commas must be accepted) has `"Compatibility": [{ "New": "<cid>", "Old": ["<cid>", …] }]`.
   - Check both `Contents/moduleinfo.json` and `Contents/Resources/moduleinfo.json`.
-  - Only 2 of your 69 VST3 bundles have one (Serum2, RoughRider3).
+  - It is rare: of 69 VST3 bundles on one computer, 2 had one (Serum 2, Rough Rider 3).
 - `IPluginCompatibility`: a factory class in category `"Plugin Compatibility Class"`. It is only reachable by loading the binary.
 - `.vstpreset`: `'VST3'` + an int32 version + 32 ASCII hex characters of the class id at offset 8.
 

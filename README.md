@@ -10,6 +10,8 @@ library, all without Live running. Fast, byte-exact, and safe by default.
 > Tested against sets saved by Live itself and on a real 842-set library (read-only round trips
 > of 13,000 Live documents). See [docs/verification.md](docs/verification.md).
 
+New here? Start with the [guide](docs/guide/getting-started.md): from the first scan to an undo.
+
 ## Quick start
 ```sh
 livesaver env                          # what livesaver found: Live, User Library, packs, search roots
@@ -158,6 +160,7 @@ what the command line reports.
 | [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a read-only file system, worker-based parsing, a scan of samples and plug-ins in the page |
 | [`livesaver`](packages/cli) | The command-line tool |
 | [`apps/web`](apps/web) | The web app: Vite, Vue, Nuxt UI (not published) |
+| [`apps/site`](apps/site) | The site: landing page and the docs as pages (Nuxt, static; not published) |
 
 ## Roadmap
 | Milestone | Delivers |
@@ -169,7 +172,7 @@ what the command line reports.
 | ✅ M5 | plug-in inventory and audit (`plugins list`, `plugins audit`) |
 | ✅ M6 | catalog and search (`index`, `find`, `sql`) |
 | ✅ M7 | codemods (`livesaver run`) |
-| 🚧 M8 | web app (samples and plug-ins: scan, review, fix, upgrade, undo, history: done; a site: next), Finder Quick Actions |
+| 🚧 M8 | web app (samples and plug-ins: scan, review, fix, upgrade, undo, history) and a site with guides: done; Finder Quick Actions: next |
 
 ## Development
 ```sh
@@ -181,6 +184,8 @@ bun run check      # biome + typecheck
 bun run test:node  # the built CLI under Node.js
 bun run web        # the web app while working on it, on http://localhost:5173/
 bun run test:web   # the web app in Chromium, WebKit and Firefox (bunx playwright install, once)
+bun run site       # the site (landing page and docs) while working on it
+bun run test:site  # the built site in the three browsers
 ```
 
 ## License

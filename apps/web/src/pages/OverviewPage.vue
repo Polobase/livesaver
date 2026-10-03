@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /** The whole picture after a scan; before the first one, what livesaver does and what it needs. */
+import { nextTick, useTemplateRef, watch } from 'vue'
 import LibrarySetup from '../components/library/LibrarySetup.vue'
 import FixCard from '../components/overview/FixCard.vue'
 import HealthHeadline from '../components/overview/HealthHeadline.vue'
@@ -24,10 +25,20 @@ const engines = useEngineStore()
 const library = useLibraryStore()
 const scans = useScanStore()
 const fix = useFixStore()
+
+// The button that starts the first scan is at the end of a long page: what the scan found is
+// read from its top, not from where that button was.
+const panel = useTemplateRef<{ toTop: () => void }>('panel')
+watch(
+  () => scans.scan !== undefined,
+  (found) => {
+    if (found) void nextTick(() => panel.value?.toTop())
+  },
+)
 </script>
 
 <template>
-  <PagePanel id="overview" title="Overview">
+  <PagePanel id="overview" ref="panel" title="Overview">
     <template #actions>
       <ReportsMenu v-if="scans.scan" :reports="scans.scan.samples.reports" />
       <ScanButton />

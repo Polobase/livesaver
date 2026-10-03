@@ -53,7 +53,7 @@ beforeEach(async () => {
   server = await startWeb({
     assets: false,
     config,
-    force: true,
+    liveRunning: () => false,
     version: '1.2.3',
     plugins: async () => ({ inventory: new Inventory([]), catalog: CATALOG }),
     reveal: async (path) => {

@@ -38,6 +38,7 @@ for (const [name, type] of ENGINES) {
     let samples: string
     let problems: string[]
     let outside: string[]
+    let live = false
 
     beforeAll(async () => {
       tmp = tempDir()
@@ -51,7 +52,13 @@ for (const [name, type] of ENGINES) {
         config,
         JSON.stringify({ appResources: '', vendorLibraries: [], searchRoots: [samples] }),
       )
-      server = await startWeb({ assets: DIST, config, force: true, plugins: noPlugins })
+      server = await startWeb({
+        assets: DIST,
+        config,
+        // No set of the copies is open in any Live; a test says when "Live runs".
+        liveRunning: () => live,
+        plugins: noPlugins,
+      })
       browser = await type.launch()
       ;({ page, problems, outside } = await watch(browser, server.url))
       await page.goto(server.url)
@@ -124,8 +131,14 @@ for (const [name, type] of ENGINES) {
     }, 30_000)
 
     test('the scan runs on this computer and lists the projects, each with its fix', async () => {
+      // The button is at the end of a page that has to be scrolled; the result is shown from its top.
+      await page.getByTestId('scan-library').scrollIntoViewIfNeeded()
+      const scrolled = () =>
+        page.evaluate(() => document.querySelector('main section[aria-label=Overview]')?.scrollTop)
+      expect(await scrolled()).toBeGreaterThan(0)
       await page.getByTestId('scan-library').click()
       await rescanned('3 sets in 3 projects')
+      expect(await scrolled()).toBe(0)
       expect(await page.locator('#headline').innerText()).toBe('2 of 5 sets are complete')
       expect(await page.getByTestId('facts').innerText()).toContain('on this computer')
       await goTo('Samples')
@@ -167,6 +180,26 @@ for (const [name, type] of ENGINES) {
       expect(await textOf(ready)).toContain('Ableton Live is closed')
       expect(await textOf(ready)).toMatch(/The copies need 2\.0 MB; [\d.]+ [GMT]B are free/)
       expect(await barriers(page)).toEqual([])
+      await dialog.getByRole('button', { name: 'Cancel' }).click()
+      await dialog.waitFor({ state: 'hidden' })
+      expect(onDisk()).toEqual([false, false, false])
+    }, 30_000)
+
+    test('while Live runs, the review does not let a fix start', async () => {
+      live = true
+      await page.getByRole('button', { name: 'Fix Other Project' }).click()
+      const dialog = page.getByRole('dialog')
+      await dialog.getByTestId('review-continue').click()
+      const ready = dialog.getByTestId('review-ready')
+      await ready.getByText('Ableton Live is running').waitFor()
+      expect(await textOf(ready)).toContain('Quit it first, so that no open set gets overwritten.')
+      expect(await dialog.getByRole('button', { name: 'Fix 1 set' }).isDisabled()).toBe(true)
+      expect(await barriers(page)).toEqual([])
+      // Live was quit: the page is told to look again, and the fix can start.
+      live = false
+      await ready.getByRole('button', { name: 'Check again' }).click()
+      await ready.getByText('Ableton Live is closed').waitFor()
+      expect(await dialog.getByRole('button', { name: 'Fix 1 set' }).isEnabled()).toBe(true)
       await dialog.getByRole('button', { name: 'Cancel' }).click()
       await dialog.waitFor({ state: 'hidden' })
       expect(onDisk()).toEqual([false, false, false])

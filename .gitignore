@@ -13,3 +13,10 @@ bench/out/
 # Personal files that must not be published
 fixtures/local/
 CLAUDE.local.md
+
+# The site (Nuxt): what it generates. `dist` is a link it makes to its output (a link is not
+# a folder, so `dist/` above does not cover it).
+.nuxt/
+.output/
+.data/
+apps/site/dist

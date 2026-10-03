@@ -6,7 +6,6 @@
  * like `livesaver plugins upgrade --apply`.
  */
 import { basename } from 'node:path'
-import { liveIsRunning } from '@livesaver/node'
 import { auditSets, pluginsView, type SetUpgrade, upgradeView } from '@livesaver/ops'
 import { derivedTarget, KNOWN } from '@livesaver/plugins'
 import { collectRun } from '../commands/doctor.js'
@@ -14,6 +13,7 @@ import { loadPluginSources, upgradablePlugins, upgradeRun } from '../commands/pl
 import { acquireLock } from '../state.js'
 import {
   LIVE_RUNNING,
+  liveRuns,
   message,
   prepare,
   progress,
@@ -165,7 +165,7 @@ export async function webUpgrade(
   try {
     const targets = targetsOf(request)
     const wanted = wantedPlugins(request)
-    if (!settings.force && liveIsRunning()) throw new Error(LIVE_RUNNING)
+    if (liveRuns(settings)) throw new Error(LIVE_RUNNING)
     const { catalog } = await sources(settings)
     release = acquireLock()
     emit({ type: 'phase', phase: 'upgrading' })

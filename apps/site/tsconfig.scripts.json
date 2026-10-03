@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["bun"],
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["*.ts", "test/**/*.ts", "e2e/**/*.ts", "app/utils/*.ts"],
+  "exclude": ["nuxt.config.ts", "content.config.ts"]
+}

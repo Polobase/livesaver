@@ -96,7 +96,7 @@ for (const [name, type] of ENGINES) {
       server = await startWeb({
         assets: DIST,
         config,
-        force: true,
+        liveRunning: () => false,
         plugins: async () => ({ inventory: INVENTORY, catalog: CATALOG }),
       })
       browser = await type.launch()

@@ -3,6 +3,7 @@
 import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
 import { bytes, count, plural } from '../../lib/format'
+import { GET_LIVESAVER } from '../../lib/links'
 import { planOf } from '../../lib/plan'
 import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
@@ -65,10 +66,13 @@ const counts = computed(() => props.scan.samples.counts)
           data-testid="review"
           @click="fix.open()"
         />
-        <p v-else class="text-sm text-muted" data-testid="no-fix">
-          This page only reads. To fix, run <code class="text-xs">livesaver web</code> on your
-          computer: it opens this app with livesaver behind it, which can write, back up and undo.
-        </p>
+        <div v-else class="space-y-2" data-testid="no-fix">
+          <p class="text-sm text-muted">
+            This page only reads. To fix, run <code class="text-xs">livesaver web</code> on your
+            computer: it opens this app with livesaver behind it, which can write, back up and undo.
+          </p>
+          <UButton v-bind="GET_LIVESAVER" size="sm" color="neutral" variant="subtle" />
+        </div>
         <p
           v-if="scans.stale && engines.capabilities.fix"
           class="mt-2 text-sm text-muted"

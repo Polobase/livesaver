@@ -74,7 +74,7 @@ could neither keep a journal for an undo nor see that Live is running.
 | `POST /api/upgrade/plan` | `plugins upgrade` as a dry run: what converts to VST3, and what blocks the rest |
 | `POST /api/fix` | `collect --apply` over all projects, or over one (`only`); `certainOnly` leaves uncertain matches out |
 | `POST /api/upgrade` | `plugins upgrade --apply`, of all plug-ins or of chosen ones, in all projects or in one |
-| `POST /api/undo` | `undo` of a run |
+| `POST /api/undo` | `undo` of a run; an undo that is refused (Live runs, there is no such run) is an answer that says why, like a fix that fails |
 | `GET /api/status` | whether Live is running, what runs right now and how far it is, and (`?path=`) the free space where a folder lies |
 | `GET /api/runs`, `/api/runs/<run>`, `/api/runs/<run>/reports/<file>` | the history: every run with what it did (as `livesaver runs`), its steps, its report files |
 | `POST /api/reveal` | shows a file in Finder |
@@ -259,7 +259,7 @@ there.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
   review, fix, undo, the history, a page that is opened again) against both engines; the app's
   own sums and words (states, plans, advice, what a run was and what its undo does).
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 195 tests.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 198 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
@@ -282,6 +282,9 @@ there.
     error in the page; no request to another address; no motion for who asked for less.
   - The tests load the production build: a test runner's `NODE_ENV` would otherwise make Vite
     build Vue's development version.
+  - Whether Live runs is told to the server by each test (`liveRunning`), so the tests do not
+    depend on the machine they run on; told that it runs, the review does not let a fix start,
+    and an undo is refused.
 - `bun run test:node`: the built `livesaver web` under Node.js serves the app it ships with.
 - On a real library (876 sets, 138,662 indexed files), read-only:
   - A scan in the app takes 13 s and shows the numbers of the command line: what `doctor`

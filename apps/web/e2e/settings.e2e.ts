@@ -45,7 +45,7 @@ for (const [name, type] of ENGINES) {
     const settings = () => ({
       assets: DIST,
       config,
-      force: true,
+      liveRunning: () => false,
       plugins: noPlugins,
       reveal: async (path: string) => {
         revealed.push(path)

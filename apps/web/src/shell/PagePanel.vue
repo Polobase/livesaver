@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /** A page of the app: its title bar with the sidebar switch, and its content. */
+import { useTemplateRef } from 'vue'
 import ScrollRegion from '../components/common/ScrollRegion.vue'
 import PageNotices from './PageNotices.vue'
 
@@ -12,6 +13,10 @@ defineProps<{
    */
   flush?: boolean
 }>()
+
+const content = useTemplateRef<{ $el?: HTMLElement }>('content')
+/** Back to the top of the page's content: for when it became something else to read. */
+defineExpose({ toTop: () => content.value?.$el?.scrollTo({ top: 0 }) })
 </script>
 
 <template>
@@ -30,7 +35,12 @@ defineProps<{
       <div v-if="flush" class="page-in flex min-h-0 flex-1 flex-col overflow-hidden">
         <slot />
       </div>
-      <ScrollRegion v-else :label="title" class="page-in flex flex-col gap-4 p-4 sm:gap-6 sm:p-6">
+      <ScrollRegion
+        v-else
+        ref="content"
+        :label="title"
+        class="page-in flex flex-col gap-4 p-4 sm:gap-6 sm:p-6"
+      >
         <slot />
       </ScrollRegion>
     </main>

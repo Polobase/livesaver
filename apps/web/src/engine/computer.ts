@@ -224,8 +224,10 @@ export class ComputerEngine implements Engine {
     return this.ended(await this.stream('/api/upgrade', body, onProgress), 'upgraded').upgraded
   }
 
-  undo(run: string): Promise<Undone> {
-    return this.json<WebUndone>('/api/undo', { run })
+  async undo(run: string): Promise<Undone> {
+    const answer = await this.json<WebUndone | { problem: string }>('/api/undo', { run })
+    if ('problem' in answer) throw new RunFailed(answer.problem)
+    return answer
   }
 
   runs(): Promise<readonly Run[]> {

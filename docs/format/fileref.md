@@ -84,7 +84,7 @@ Source: Mattijs Kneppers (maxdevtools author) on the Cycling '74 forum, confirme
 | 6 | User Library | User Library |
 | 7 | built-in content (`<Live.app>/Contents/App-Resources/Builtin`) | Builtin |
 
-Counts on your library (917 sets): 3 = 296,399; 1 = 289,371; 5 = 262,209; 0 = 56,934; 6 = 17,519; 2 = 398; 7 = 385.
+Counts in one real library (917 sets): 3 = 296,399; 1 = 289,371; 5 = 262,209; 0 = 56,934; 6 = 17,519; 2 = 398; 7 = 385.
 
 `FileRef/Type` is 1 in every Windows-saved ref and 2 in every macOS-saved ref seen so far. That suggests it records the saving OS, but this is unverified.
 

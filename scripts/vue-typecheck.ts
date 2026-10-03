@@ -3,12 +3,14 @@
  * Node.js: under Bun it cannot read `.vue` files and reports errors that are none. So this looks
  * for a real Node; on a machine with Bun only it says so and skips, and CI does the check.
  *
- * Usage (in a workspace): bun ../../scripts/vue-typecheck.ts [tsconfig.json]
+ * Usage (in a workspace): bun ../../scripts/vue-typecheck.ts [tsconfig.json | --build]
+ * `--build`: the workspace's tsconfig only refers to others (a Nuxt app), which are all checked.
  */
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-const tsconfig = process.argv[2] ?? 'tsconfig.json'
+const asked = process.argv[2] ?? 'tsconfig.json'
+const args = asked === '--build' ? ['--build', '--noEmit'] : ['--noEmit', '-p', asked]
 const vueTsc = join(process.cwd(), 'node_modules', 'vue-tsc', 'bin', 'vue-tsc.js')
 if (!existsSync(vueTsc)) {
   console.error(`vue-tsc is not installed in ${process.cwd()}`)
@@ -33,7 +35,7 @@ if (!node) {
   console.log(`${note} (CI checks them.)`)
   process.exit(0)
 }
-const run = Bun.spawnSync([node, vueTsc, '--noEmit', '-p', tsconfig], {
+const run = Bun.spawnSync([node, vueTsc, ...args], {
   stdout: 'inherit',
   stderr: 'inherit',
 })

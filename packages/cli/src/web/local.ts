@@ -36,8 +36,11 @@ export interface WebSettings {
   /** Config file in place of ~/.config/livesaver/config.json. */
   readonly config?: string
   readonly version?: string
-  /** Write even while Live is running (for tests on copies; the page never asks for it). */
-  readonly force?: boolean
+  /**
+   * Whether Ableton Live runs, in place of asking the system. Tests on copies say no: what they
+   * write is open in no Live, whether one runs on the machine or not.
+   */
+  readonly liveRunning?: () => boolean
   /** What is installed and what Live knows, in place of looking it up on this computer. */
   readonly plugins?: () => Promise<PluginSources>
   /** Shows a file or folder in the system's file manager, in place of asking the system. */
@@ -46,6 +49,10 @@ export interface WebSettings {
 
 export const LIVE_RUNNING =
   'Ableton Live is running. Quit it first, so that no open set gets overwritten.'
+
+/** Whether Live runs: nothing is written while it does. */
+export const liveRuns = (settings: WebSettings = {}): boolean =>
+  (settings.liveRunning ?? liveIsRunning)()
 
 /** The folders and options of the last check, which the page starts with next time. */
 interface Remembered extends WebRequest {}
@@ -340,7 +347,7 @@ export async function webFix(
   let started = ''
   try {
     const { targets, flags, vendorLibraries } = prepare(request, settings)
-    if (!settings.force && liveIsRunning()) throw new Error(LIVE_RUNNING)
+    if (liveRuns(settings)) throw new Error(LIVE_RUNNING)
     release = acquireLock()
     emit({ type: 'phase', phase: 'indexing' })
     const { result, run } = await collectRun(
@@ -379,7 +386,7 @@ export async function webUndo(run: string, settings: WebSettings = {}): Promise<
   const dir = join(runsDir(), run)
   if (!/^\w[\w.-]*$/.test(run) || !existsSync(join(dir, 'journal.jsonl')))
     throw new Error(`This is not a run that changed anything: ${run}`)
-  if (!settings.force && liveIsRunning()) throw new Error(LIVE_RUNNING)
+  if (liveRuns(settings)) throw new Error(LIVE_RUNNING)
   const release = acquireLock()
   try {
     const config = await resolveConfig(settings.config ? { config: settings.config } : {})

@@ -9,6 +9,7 @@ import UpgradeTab from '../components/plugins/UpgradeTab.vue'
 import UsesTab from '../components/plugins/UsesTab.vue'
 import ScanButton from '../components/scan/ScanButton.vue'
 import ScanProgress from '../components/scan/ScanProgress.vue'
+import { GET_LIVESAVER } from '../lib/links'
 import PagePanel from '../shell/PagePanel.vue'
 import { useEngineStore } from '../stores/engine'
 import { usePluginsStore } from '../stores/plugins'
@@ -91,6 +92,7 @@ function toUpgrade(): void {
             icon="i-lucide-plug"
             title="What is installed is not known here"
             description="A page in a browser cannot see the plug-ins of your computer. Run “livesaver web”: it opens this app with livesaver behind it, which reads Live's plug-in database and the plug-in folders."
+            :actions="[{ ...GET_LIVESAVER, color: 'neutral', variant: 'subtle' }]"
           />
         </div>
       </template>

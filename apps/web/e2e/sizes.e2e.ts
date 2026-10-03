@@ -117,7 +117,12 @@ for (const [name, type] of ENGINES) {
         config,
         JSON.stringify({ appResources: '', vendorLibraries: [], searchRoots: [demo.samples] }),
       )
-      server = await startWeb({ assets: DIST, config, force: true, plugins: noPlugins })
+      server = await startWeb({
+        assets: DIST,
+        config,
+        liveRunning: () => false,
+        plugins: noPlugins,
+      })
       const headers = { 'x-livesaver-token': server.token, 'Content-Type': 'application/json' }
       const scanned = await fetch(`${server.url}api/scan`, {
         method: 'POST',

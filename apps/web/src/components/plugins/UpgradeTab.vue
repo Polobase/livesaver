@@ -6,6 +6,7 @@
 import type { UpgradeSetRow } from '@livesaver/ops'
 import { computed, onMounted, ref, watch } from 'vue'
 import { count, plural, when } from '../../lib/format'
+import { GET_LIVESAVER } from '../../lib/links'
 import { type Filter, narrow } from '../../lib/search'
 import { blockerLines, upgradeSum } from '../../lib/upgrade'
 import { useEngineStore } from '../../stores/engine'
@@ -99,6 +100,7 @@ const why = (row: UpgradeSetRow) =>
         icon="i-lucide-circle-arrow-up"
         title="Upgrading needs livesaver on your computer"
         description="Switching a set from a VST2 plug-in to its VST3 rewrites the set, and needs to know which VST3 plug-ins Live has. Run “livesaver web” on your computer: it opens this app with livesaver behind it, which can write, back up and undo."
+        :actions="[{ ...GET_LIVESAVER, color: 'neutral', variant: 'subtle' }]"
       />
     </div>
 

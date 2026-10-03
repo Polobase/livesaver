@@ -10,6 +10,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 - `bun run test:node`: the built CLI under Node.js (after `build`)
 - `bun run web`: the web app while working on it (Vite's development server on `http://localhost:5173/`, with livesaver's API behind it: Fix and Undo there write for real)
 - `bun run test:web`: the built web app in Playwright's Chromium, WebKit and Firefox (`bunx playwright install chromium webkit firefox` in `apps/web`, once)
+- `bun run site`: the site (landing page and docs) while working on it, on `http://localhost:3000/`; `bun run site:build` builds its static files; `bun run test:site` tests the built site in the three browsers
 - `bench/`: performance measurements only (see `bench/README.md`)
 - CLI tests outside the real library: set `LIVESAVER_HOME` (run folders) and `LIVESAVER_TRASH_DIR` (undo's Trash).
 
@@ -25,6 +26,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 | `@livesaver/web` | browser host: uploaded/dropped/picked folders as a read-only file system, gzip, hash, worker-based parsing, and the scan (samples and plug-ins) that runs in a page | browser |
 | `livesaver` (packages/cli) | the CLI; `livesaver web` serves the web app and checks, fixes and undoes for it (`src/web/`) | Node/Bun |
 | `livesaver-web` (apps/web) | the web app: Vite, Vue, Nuxt UI; with livesaver behind it it scans and fixes, on its own it scans in workers, read-only (private). `.vue` files are type-checked by `vue-tsc` under Node.js (TypeScript 6 in this workspace) | browser |
+| `livesaver-site` (apps/site) | the site: landing page, and the docs of `docs/` as pages (Nuxt, static; private) | build |
 | `@livesaver/test-kit` | fixture builders (private) | tests |
 
 ## Hard rules
@@ -42,6 +44,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 9. **English only**, everywhere: code, comments, docs, CLI output, reports, default tag names, file names and test data. No second language and no `--lang` option; users rename tags, decisions and stars in their config file.
 
 ## Where knowledge lives
+- `docs/guide/`: the user guides: plain Markdown that reads well on GitHub and that the site shows; their pictures (`docs/guide/images`) are taken by `apps/site/screenshots.ts` from a made-up library
 - `docs/format/`: file-format facts (FileRef formats, RelativePathType, CRC, versions, plug-ins, Finder metadata, Live's databases)
 - `docs/verification.md`: what is tested and measured, and how
 - `docs/codemods.md`: writing codemods

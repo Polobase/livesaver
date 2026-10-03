@@ -1,0 +1,37 @@
+{
+  "name": "livesaver-site",
+  "version": "0.0.0",
+  "private": true,
+  "description": "livesaver's site: what it does, the guides and the format notes. Built as static files for GitHub Pages.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "bunx --bun nuxi dev",
+    "generate": "bun build.ts",
+    "serve": "bun serve.ts",
+    "screenshots": "bun screenshots.ts",
+    "typecheck": "tsc -p tsconfig.scripts.json && bunx --bun nuxi prepare --logLevel silent && bun ../../scripts/vue-typecheck.ts --build",
+    "test": "bun test ./test",
+    "test:e2e": "bun test ./e2e/*.e2e.ts"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@iconify-json/lucide": "^1.2.139",
+    "@iconify-json/simple-icons": "^1.2.60",
+    "@nuxt/content": "^3.16.1",
+    "@nuxt/ui": "^4.11.3",
+    "nuxt": "^4.5.2",
+    "tailwindcss": "^4.3.3",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@livesaver/plugins": "workspace:*",
+    "@livesaver/test-kit": "workspace:*",
+    "livesaver": "workspace:*",
+    "playwright": "1.63.0",
+    "typescript": "~6.0.3",
+    "vue-tsc": "^3.3.12"
+  }
+}

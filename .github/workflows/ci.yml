@@ -49,6 +49,9 @@ jobs:
         working-directory: apps/web
       - name: Test the web app in browsers
         run: bun run test:web
+      # The site, built for the path GitHub Pages serves it at, with the app beside it.
+      - name: Test the site in browsers
+        run: bun run test:site
 
   node:
     needs: bun

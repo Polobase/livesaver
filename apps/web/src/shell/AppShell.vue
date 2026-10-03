@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ReviewSheet from '../components/fix/ReviewSheet.vue'
 import UpgradeSheet from '../components/plugins/UpgradeSheet.vue'
 import { bytes, plural } from '../lib/format'
+import { GUIDE } from '../lib/links'
 import { useEngineStore } from '../stores/engine'
 import { useFixStore } from '../stores/fix'
 import { useHistoryStore } from '../stores/history'
@@ -177,6 +178,7 @@ const actions = computed<CommandPaletteItem[]>(() => [
       shortcutsOpen.value = true
     },
   },
+  { label: 'Guide', icon: 'i-lucide-book-open', to: GUIDE.start, target: '_blank' },
 ])
 
 const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
@@ -256,6 +258,16 @@ defineShortcuts({
             </span>
           </UTooltip>
           <div class="flex shrink-0 items-center">
+            <UTooltip text="The guide (opens the site)">
+              <UButton
+                :to="GUIDE.start"
+                target="_blank"
+                icon="i-lucide-book-open"
+                color="neutral"
+                variant="ghost"
+                aria-label="Guide"
+              />
+            </UTooltip>
             <UTooltip text="Keyboard shortcuts" :kbds="['?']">
               <UButton
                 icon="i-lucide-keyboard"

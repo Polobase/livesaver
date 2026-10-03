@@ -1,0 +1,47 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+@import "@fontsource-variable/inter";
+
+@theme static {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* The accent is ink, as in the app: its hues are kept for the states of sets and samples. */
+:root {
+  --ui-primary: var(--ui-color-neutral-950);
+  --ui-radius: 0.375rem;
+  --status-fine: #0ca30c;
+  --status-fixable: #2a78d6;
+  --status-missing: #d03b3b;
+}
+
+.dark {
+  --ui-primary: white;
+  --status-fixable: #3987e5;
+}
+
+/*
+ * Code keeps the hues of its theme, but no part of it is dimmer than can be read on the ground
+ * of a code block: a theme's comments are, for many eyes.
+ */
+html:not(.dark) body .shiki span {
+  color: oklch(from var(--shiki-default) min(l, 0.52) c h);
+}
+
+html.dark body .shiki span {
+  color: oklch(from var(--shiki-dark) max(l, 0.74) c h);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    /* biome-ignore-start lint/complexity/noImportantStyles: must override the library's classes */
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+    /* biome-ignore-end lint/complexity/noImportantStyles: must override the library's classes */
+  }
+}

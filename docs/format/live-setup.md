@@ -1,5 +1,7 @@
 # Live installation and library locations (macOS)
 
+Where Live keeps its app resources, its library folders and its own databases on a Mac, and how livesaver finds them without being told.
+
 ## App
 - `/Applications/Ableton Live <n> <Edition>.app`
   - version in `Contents/Info.plist` → `CFBundleShortVersionString`, e.g. `12.4.6 (2026-09-10_0de5c8fa9a)`

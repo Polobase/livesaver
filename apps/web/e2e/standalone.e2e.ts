@@ -333,6 +333,14 @@ for (const [name, type] of ENGINES) {
     test('what only livesaver can do is explained, or not offered', async () => {
       await goTo('History')
       expect(await textOf(page.getByTestId('no-history'))).toContain('There is no history here')
+      // What needs livesaver says how to get it: a link to the guide, in a tab of its own.
+      const guide = page
+        .getByTestId('no-history')
+        .getByRole('link', { name: 'How to get livesaver' })
+      expect([await guide.getAttribute('href'), await guide.getAttribute('target')]).toEqual([
+        'https://polobase.github.io/livesaver/docs/guide/getting-started/#install-livesaver-on-your-mac',
+        '_blank',
+      ])
       expect(await page.getByTestId('all-runs').count()).toBe(0)
       await goTo('Settings')
       // No settings of its own to go back to, and nothing of this computer it could have found.

@@ -55,7 +55,7 @@ let samples: string
 let revealed: string[]
 let settings: {
   config: string
-  force: true
+  liveRunning: () => boolean
   plugins: () => Promise<{ inventory: Inventory; catalog: Catalog }>
   reveal: (path: string) => Promise<void>
 }
@@ -74,7 +74,7 @@ beforeEach(() => {
   revealed = []
   settings = {
     config,
-    force: true,
+    liveRunning: () => false,
     plugins: async () => ({ inventory: INVENTORY, catalog: CATALOG }),
     reveal: async (path) => {
       revealed.push(path)
