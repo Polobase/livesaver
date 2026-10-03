@@ -34,11 +34,20 @@ const site = computed(() => window.location.origin)
     <template #body>
       <div class="space-y-4 text-sm" data-testid="where-dialog">
         <template v-if="state === 'alone'">
-          <p>
+          <p v-if="engines.capabilities.fix" data-testid="where-writing">
+            The page reads the folders you give it, and fixes samples in the project folders you
+            chose for editing (an experiment you switched on in the Settings). It scans samples and
+            plug-ins, and shows everything a scan finds.
+          </p>
+          <p v-else>
             The page reads the folders you give it and changes nothing. It scans samples and
             plug-ins, and shows everything a scan finds.
           </p>
-          <p>
+          <p v-if="engines.capabilities.fix">
+            Without the limits of a page, and to upgrade plug-ins and see which are installed, the
+            app needs livesaver on your computer:
+          </p>
+          <p v-else>
             To fix, to undo, and to see which plug-ins are installed, the app needs livesaver on
             your computer:
           </p>

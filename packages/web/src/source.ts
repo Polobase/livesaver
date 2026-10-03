@@ -55,6 +55,27 @@ export function folderFromHandle(handle: DirectoryHandleLike): FolderSource {
 }
 
 /**
+ * The folders of a drop as handles (Chromium): what a page needs to write into them, once its
+ * user allows that. Call it inside the `drop` handler: the items are only readable while the
+ * event is being handled, so every handle is asked for before the first `await`.
+ */
+export function handlesFromDrop(items: DataTransferItemList): Promise<FolderSource[]> {
+  const asked: Promise<{ kind?: string } | null>[] = []
+  for (const item of items) {
+    const handed = item as DataTransferItem & {
+      getAsFileSystemHandle?: () => Promise<{ kind?: string } | null>
+    }
+    if (item.kind === 'file' && handed.getAsFileSystemHandle)
+      asked.push(handed.getAsFileSystemHandle())
+  }
+  return Promise.all(asked).then((handles) =>
+    handles
+      .filter((handle): handle is DirectoryHandleLike => handle?.kind === 'directory')
+      .map(folderFromHandle),
+  )
+}
+
+/**
  * The folders of a folder upload. Each file's `webkitRelativePath` starts with the name of the
  * folder that was chosen.
  */

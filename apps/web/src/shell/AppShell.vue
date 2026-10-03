@@ -6,6 +6,7 @@ import ReviewSheet from '../components/fix/ReviewSheet.vue'
 import UpgradeSheet from '../components/plugins/UpgradeSheet.vue'
 import { bytes, plural } from '../lib/format'
 import { GUIDE } from '../lib/links'
+import { TAKEN_OUT } from '../lib/runs'
 import { useEngineStore } from '../stores/engine'
 import { useFixStore } from '../stores/fix'
 import { useHistoryStore } from '../stores/history'
@@ -81,7 +82,7 @@ watch(
   (undone) => {
     if (!undone || !elsewhere()) return
     toast.add({
-      title: `Undone: ${plural(undone.restored, 'set')} restored, ${plural(undone.trashed, 'file')} moved to the Trash`,
+      title: `Undone: ${plural(undone.restored, 'set')} restored, ${plural(undone.trashed, 'file')} ${TAKEN_OUT[engine.kind]}`,
       icon: 'i-lucide-undo-2',
       ...(undone.changedSince.length + undone.problems.length
         ? { description: 'Not everything could be taken back: the Overview says what was left.' }
@@ -133,7 +134,9 @@ const where = computed(() =>
     : {
         label: 'In this browser',
         icon: 'i-lucide-globe',
-        note: 'The page reads the folders you give it and changes nothing. Nothing leaves this computer.',
+        note: engine.capabilities.fix
+          ? 'The page reads the folders you give it, and fixes in those you chose for editing. Nothing leaves this computer.'
+          : 'The page reads the folders you give it and changes nothing. Nothing leaves this computer.',
       },
 )
 const whereOpen = ref(false)

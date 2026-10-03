@@ -8,11 +8,13 @@ import { planOf } from '../../lib/plan'
 import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
 import { useScanStore } from '../../stores/scan'
+import { useWritingStore } from '../../stores/writing'
 
 const props = defineProps<{ scan: Scan }>()
 const engines = useEngineStore()
 const fix = useFixStore()
 const scans = useScanStore()
+const writing = useWritingStore()
 const plan = computed(() => planOf(props.scan, undefined, false))
 const counts = computed(() => props.scan.samples.counts)
 </script>
@@ -72,6 +74,12 @@ const counts = computed(() => props.scan.samples.counts)
             computer: it opens this app with livesaver behind it, which can write, back up and undo.
           </p>
           <UButton v-bind="GET_LIVESAVER" size="sm" color="neutral" variant="subtle" />
+          <p v-if="writing.possible" class="text-sm text-muted" data-testid="can-write-here">
+            Your browser can also let this page fix on its own, as an experiment with limits.
+            <RouterLink to="/settings" class="underline underline-offset-2"
+              >Switch it on in the Settings</RouterLink
+            >.
+          </p>
         </div>
         <p
           v-if="scans.stale && engines.capabilities.fix"

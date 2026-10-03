@@ -12,6 +12,7 @@ import {
   runLook,
   startedAt,
   undoLines,
+  undoneLabel,
 } from '../src/lib/runs.js'
 
 const run = (extra: Partial<Run> = {}): Run => ({
@@ -189,6 +190,20 @@ describe('what an undo of a run does', () => {
     expect(undoLines(run({ command: 'reorg', sets: 0, files: 0, renames: 2 }))[0]).toBe(
       '2 files or folders that were moved go back to where they were.',
     )
+  })
+
+  test('a page has no Trash: what its undo takes out goes to a hidden folder, and is said so', () => {
+    expect(undoLines(run({ sets: 1, files: 1 }), 'browser')[1]).toBe(
+      '1 copied file is moved to the hidden folder “.livesaver-trash” of the project folder, unless another set uses it by now.',
+    )
+    expect([undoneLabel('trashed'), undoneLabel('trashed', 'browser')]).toEqual([
+      'moved to the Trash',
+      'moved to the hidden folder “.livesaver-trash” of the project folder',
+    ])
+    expect([undoneLabel('restored', 'browser'), undoneLabel('something-new')]).toEqual([
+      'restored',
+      'something-new',
+    ])
   })
 })
 

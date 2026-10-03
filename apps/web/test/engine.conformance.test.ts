@@ -1,129 +1,34 @@
 /**
  * One contract, two engines. Every scenario here runs against livesaver on this computer (a real
  * server on a temporary copy of the fixtures) and against the browser's engine (on this thread,
- * with folders as a page gets them), so a screen that works with one works with the other.
+ * with folders as a page gets them), so a screen that works with one works with the other. The
+ * browser's engine runs twice: as it is unless its user says otherwise, reading only, and with
+ * fixing switched on, over a project folder it was given for editing.
  * What only one of them can do is tested below, and that the other refuses it.
  */
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { describe, expect, test } from 'bun:test'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { type Catalog, type CatalogEntry, Inventory } from '@livesaver/plugins'
-import { copyFixtures, tempDir, uploadedFolder, writeFile } from '@livesaver/test-kit'
-import { localEngineWorker } from '@livesaver/web'
-import { startWeb, type WebServer } from 'livesaver'
+import { uploadedFolder, writeFile } from '@livesaver/test-kit'
 import {
-  BrowserEngine,
   type Capabilities,
   ComputerEngine,
-  type Engine,
-  folderAt,
   type Progress,
   RunFailed,
-  type Scan,
   type ScanRequest,
   Unreachable,
   Unsupported,
 } from '../src/engine/index.js'
+import { OPTIONS, shown, useLibrary } from './engine-setup.js'
 
-const MASSIVE_VST3 = '5653544e694d616d6173736976650000'
-const SERUM_VST3 = '56535458667358736572756d00000000'
-const CATALOG: Catalog = new Map<string, CatalogEntry>([
-  [MASSIVE_VST3, { devIdentifier: `device:vst3:instr:${MASSIVE_VST3}`, name: 'Massive' }],
-  [SERUM_VST3, { devIdentifier: `device:vst3:instr:${SERUM_VST3}`, name: 'Serum' }],
-])
-
-let tmp: { path: string; cleanup: () => void }
-let projects: string
-let samples: string
-let server: WebServer
-let revealed: string[]
-const saved = { home: process.env.LIVESAVER_HOME, trash: process.env.LIVESAVER_TRASH_DIR }
-
-beforeEach(async () => {
-  tmp = tempDir()
-  ;({ projects, samples } = copyFixtures(tmp.path))
-  process.env.LIVESAVER_HOME = join(tmp.path, 'home')
-  process.env.LIVESAVER_TRASH_DIR = join(tmp.path, 'trash')
-  const config = join(tmp.path, 'config.json')
-  writeFileSync(
-    config,
-    JSON.stringify({ appResources: '', vendorLibraries: [], searchRoots: [samples] }),
-  )
-  revealed = []
-  server = await startWeb({
-    assets: false,
-    config,
-    liveRunning: () => false,
-    version: '1.2.3',
-    plugins: async () => ({ inventory: new Inventory([]), catalog: CATALOG }),
-    reveal: async (path) => {
-      revealed.push(path)
-    },
-  })
-})
-afterEach(async () => {
-  await server.close()
-  tmp.cleanup()
-  for (const [key, value] of [
-    ['LIVESAVER_HOME', saved.home],
-    ['LIVESAVER_TRASH_DIR', saved.trash],
-  ] as const) {
-    if (value === undefined) delete process.env[key]
-    else process.env[key] = value
-  }
-})
-
-interface Setup {
-  readonly engine: Engine
-  readonly request: ScanRequest
-}
-
-const OPTIONS = { packLimitMB: 50, matchLibraryPath: false }
-
-function computer(): Setup {
-  const engine = new ComputerEngine({ token: server.token, base: server.url })
-  return {
-    engine,
-    request: { projects: [folderAt(projects)], search: [folderAt(samples)], options: OPTIONS },
-  }
-}
-
-function browser(): Setup & { readonly engine: BrowserEngine } {
-  const engine = new BrowserEngine({ spawn: () => localEngineWorker({ cores: 4 }) })
-  return {
-    engine,
-    request: {
-      projects: [engine.add(uploadedFolder(projects), 'projects')],
-      search: [engine.add(uploadedFolder(samples), 'search')],
-      options: OPTIONS,
-    },
-  }
-}
+const lib = useLibrary()
+const { computer, browser, editing } = lib
 
 const ENGINES = [
   ['on this computer', computer],
   ['in the browser', browser],
+  ['in the browser, with a folder to edit', editing],
 ] as const
-
-/** What a scan puts on the screen, without what an engine may see differently (where things lie). */
-function shown(scan: Scan) {
-  const s = scan.samples
-  return {
-    totals: [s.projects, s.completeProjects, s.sets, s.completeSets, s.changingSets],
-    counts: s.counts,
-    copies: [s.copyFiles, s.copyBytes, s.uncertain],
-    certain: s.certain,
-    projects: s.projectRows.map(({ root: _root, ...row }) => row),
-    sets: s.setRows,
-    changes: s.changes.map(({ source: _source, ...change }) => change),
-    missing: s.missing.map(({ candidates: _candidates, ...row }) => row),
-    reports: Object.keys(s.reports).sort(),
-    plugins: scan.plugins.uses
-      .map((use) => [use.name, use.format, use.code, use.instances, use.sets, use.projects])
-      .sort(),
-    pluginTotals: [scan.plugins.sets, scan.plugins.projects, scan.plugins.counts.used],
-  }
-}
 
 for (const [where, setup] of ENGINES) {
   describe(`the engine ${where}`, () => {
@@ -190,12 +95,14 @@ for (const [where, setup] of ENGINES) {
       await engine.start()
       const folders = { projects: request.projects }
       const asked: Record<keyof Capabilities, (() => Promise<unknown>)[]> = {
-        paths: [() => engine.folders(tmp.path)],
-        fix: [() => engine.fix({ ...request, only: [join(projects, 'Fixed Path Project')] })],
+        paths: [() => engine.folders(lib.now.tmp.path)],
+        fix: [
+          () => engine.fix({ ...request, only: [join(lib.now.projects, 'Fixed Path Project')] }),
+        ],
         upgrade: [() => engine.planUpgrade(folders)],
         undo: [() => engine.undo('no-such-run')],
         history: [() => engine.run('no-such-run'), () => engine.report('no-such-run', 'x.csv')],
-        reveal: [() => engine.reveal(projects)],
+        reveal: [() => engine.reveal(lib.now.projects)],
         installedPlugins: [],
         liveStatus: [],
         keepsScan: [],
@@ -231,24 +138,26 @@ describe('only livesaver on this computer', () => {
   test('keeps the scan for a page that is opened again', async () => {
     const { engine, request } = computer()
     const scan = await engine.scan(request)
-    const again = new ComputerEngine({ token: server.token, base: server.url })
+    const again = new ComputerEngine({ token: lib.now.server.token, base: lib.now.server.url })
     const start = await again.start()
     expect(start.version).toBe('1.2.3')
     expect(start.last?.scan).toEqual(scan)
     expect(start.last?.request).toEqual(request)
     // The folders of the scan are what the app starts with from now on.
     expect(start.projects).toEqual(request.projects)
-    expect(start.search.map((folder) => [folder.path, folder.exists])).toEqual([[samples, true]])
+    expect(start.search.map((folder) => [folder.path, folder.exists])).toEqual([
+      [lib.now.samples, true],
+    ])
     expect(again.capabilities.reveal).toBe(true)
     // Where things are on this computer; and the folders are those of the scan until a reset.
     expect(start.found).toMatchObject({
-      config: join(tmp.path, 'config.json'),
-      state: join(tmp.path, 'home'),
+      config: join(lib.now.tmp.path, 'config.json'),
+      state: join(lib.now.tmp.path, 'home'),
       remembered: true,
     })
     const reset = await again.reset()
     expect([reset.projects, reset.found?.remembered]).toEqual([[], false])
-    expect(reset.search.map((folder) => folder.path)).toEqual([samples])
+    expect(reset.search.map((folder) => folder.path)).toEqual([lib.now.samples])
     // The scan is of the folders it names, whatever the app starts with: it is kept.
     expect(reset.last?.request).toEqual(request)
   })
@@ -268,44 +177,19 @@ describe('only livesaver on this computer', () => {
     expect((await engine.start()).last?.upgrade).toEqual(plan)
   })
 
-  test('fixes, with the uncertain matches or without, and takes it back', async () => {
-    const { engine, request } = computer()
-    const scan = await engine.scan(request)
-    const set = join(projects, 'Brokenpath Project', 'Brokenpath.als')
-    const before = readFileSync(set)
-    const project = scan.samples.projectRows.find((row) => row.changingSets > 0)
-    const progress: Progress[] = []
-    const fixed = await engine.fix(
-      { ...request, only: [project?.root as string], certainOnly: true },
-      (event) => progress.push(event),
-    )
-    expect([fixed.sets, fixed.files, fixed.bytes, fixed.errors]).toEqual([1, 1, 2000324, []])
-    expect(progress.some((event) => event.type === 'phase' && event.phase === 'fixing')).toBe(true)
-    expect(readFileSync(set)).not.toEqual(before)
-    // What was scanned is no longer true, so it is not kept.
-    expect((await engine.start()).last).toBeUndefined()
-
-    const [run] = await engine.runs()
-    expect(run).toMatchObject({ id: fixed.run, command: 'collect', state: 'applied', sets: 1 })
-    expect(run?.record?.options).toMatchObject({ certainOnly: true })
-    const detail = await engine.run(fixed.run)
-    expect(detail.steps.map((step) => step.op)).toEqual(['copy', 'write-set'])
-    expect(await engine.report(fixed.run, 'changes.csv')).toContain('1.wav')
+  test('shows a file in the file manager, and says how much room there is', async () => {
+    const { engine } = computer()
+    const set = join(lib.now.projects, 'Brokenpath Project', 'Brokenpath.als')
     await engine.reveal(set)
-    expect(revealed).toEqual([set])
+    expect(lib.now.revealed).toEqual([set])
     // Before a fix the page says whether the copies fit: free space where the projects lie.
-    expect((await engine.status(projects)).freeBytes).toBeGreaterThan(1_000_000)
+    expect((await engine.status(lib.now.projects)).freeBytes).toBeGreaterThan(1_000_000)
     expect((await engine.status()).freeBytes).toBeUndefined()
-
-    const undone = await engine.undo(fixed.run)
-    expect([undone.restored, undone.trashed, undone.problems]).toEqual([1, 2, []])
-    expect(readFileSync(set)).toEqual(before)
-    expect((await engine.runs())[0]).toMatchObject({ state: 'undone', canUndo: false })
   })
 
   test('upgrades plug-ins and takes it back', async () => {
     const { engine, request } = computer()
-    const set = join(projects, 'VST2toVST3 Project', 'VST2toVST3.als')
+    const set = join(lib.now.projects, 'VST2toVST3 Project', 'VST2toVST3.als')
     const before = readFileSync(set)
     const upgraded = await engine.upgrade({ projects: request.projects, plugins: ['Serum'] })
     expect([upgraded.sets, upgraded.errors]).toEqual([1, []])
@@ -317,29 +201,19 @@ describe('only livesaver on this computer', () => {
     expect(readFileSync(set)).toEqual(before)
   })
 
-  test('a fix that fails says why, and a run that wrote something says which', async () => {
-    const { engine, request } = computer()
-    const failed = await engine
-      .fix({ ...request, only: [tmp.path] })
-      .catch((error: unknown) => error as RunFailed)
-    expect(failed).toBeInstanceOf(RunFailed)
-    expect((failed as RunFailed).message).toContain('not in a project folder that was checked')
-    expect((failed as RunFailed).run).toBe('')
-  })
-
   test('lists the folders of a folder, and says so when livesaver is gone', async () => {
     const { engine } = computer()
-    const listing = await engine.folders(tmp.path)
+    const listing = await engine.folders(lib.now.tmp.path)
     // `home` is livesaver's own folder, which is there once it runs.
     expect(listing.folders.map((folder) => folder.name)).toEqual(['home', 'projects', 'samples'])
-    expect(engine.folders(join(tmp.path, 'gone'))).rejects.toBeInstanceOf(RunFailed)
+    expect(engine.folders(join(lib.now.tmp.path, 'gone'))).rejects.toBeInstanceOf(RunFailed)
     // A page of an earlier start has a token this livesaver does not know; one whose livesaver
     // was stopped gets no answer. Both are the engine being gone, not a run that failed.
-    const lost = new ComputerEngine({ token: 'wrong', base: server.url })
+    const lost = new ComputerEngine({ token: 'wrong', base: lib.now.server.url })
     const stale = await lost.start().catch((error: unknown) => error)
     expect(stale).toBeInstanceOf(Unreachable)
     expect((stale as Error).message).toBe('This page is from an earlier start of livesaver.')
-    await server.close()
+    await lib.now.server.close()
     const gone = await engine.status().catch((error: unknown) => error)
     expect(gone).toBeInstanceOf(Unreachable)
     expect((gone as Error).message).toBe('livesaver on this computer does not answer.')
@@ -349,10 +223,10 @@ describe('only livesaver on this computer', () => {
 describe('only the browser', () => {
   test('is handed folders: what they hold is seen at once, where they lie is found by the scan', async () => {
     const { engine } = browser()
-    writeFile(join(tmp.path, 'Ableton', 'User Library', 'Samples', 'a.wav'), 'RIFF')
-    writeFile(join(tmp.path, 'Shared', 'Drum Library', 'Samples', 'b.wav'), 'RIFF')
-    const ableton = engine.add(uploadedFolder(join(tmp.path, 'Ableton')), 'search')
-    const shared = engine.add(uploadedFolder(join(tmp.path, 'Shared')), 'search')
+    writeFile(join(lib.now.tmp.path, 'Ableton', 'User Library', 'Samples', 'a.wav'), 'RIFF')
+    writeFile(join(lib.now.tmp.path, 'Shared', 'Drum Library', 'Samples', 'b.wav'), 'RIFF')
+    const ableton = engine.add(uploadedFolder(join(lib.now.tmp.path, 'Ableton')), 'search')
+    const shared = engine.add(uploadedFolder(join(lib.now.tmp.path, 'Shared')), 'search')
     expect([ableton.name, ableton.holds, ableton.vendor, ableton.path]).toEqual([
       'Ableton',
       ['User Library'],
@@ -361,9 +235,11 @@ describe('only the browser', () => {
     ])
     // A folder named like a vendor's is taken to hold installed libraries, in the search only.
     expect(shared.vendor).toBe(true)
-    expect(engine.add(uploadedFolder(join(tmp.path, 'Shared')), 'projects').vendor).toBe(false)
+    expect(engine.add(uploadedFolder(join(lib.now.tmp.path, 'Shared')), 'projects').vendor).toBe(
+      false,
+    )
 
-    const project = engine.add(uploadedFolder(projects), 'projects')
+    const project = engine.add(uploadedFolder(lib.now.projects), 'projects')
     const progress: Progress[] = []
     const scan = await engine.scan(
       { projects: [project], search: [ableton, shared], options: OPTIONS },
@@ -389,6 +265,6 @@ describe('only the browser', () => {
     await stopped.catch(() => {})
     engine.remove((request.projects[0] as ScanRequest['projects'][number]).id)
     expect(engine.scan(request)).rejects.toThrow('The folder "projects" has to be added again.')
-    expect(existsSync(join(tmp.path, 'home', 'runs'))).toBe(false)
+    expect(existsSync(join(lib.now.tmp.path, 'home', 'runs'))).toBe(false)
   })
 })

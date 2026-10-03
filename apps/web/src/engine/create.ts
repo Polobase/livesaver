@@ -7,6 +7,7 @@ import type { EngineWorker } from '@livesaver/web'
 import { BrowserEngine } from './browser.js'
 import { ComputerEngine, localToken } from './computer.js'
 import { clearPairing, type Pairing, readPairing, takePairing } from './pairing.js'
+import { browserState, canWriteHere, writingSwitchedOn } from './storage.js'
 import type { Engine } from './types.js'
 
 /** The tab's own store; a browser may keep a page from it (private modes do). */
@@ -42,5 +43,7 @@ export function createEngine(): Engine {
       new Worker(new URL('./engine.worker.ts', import.meta.url), {
         type: 'module',
       }) as unknown as EngineWorker,
+    ...(canWriteHere() ? { state: browserState } : {}),
+    writing: writingSwitchedOn,
   })
 }

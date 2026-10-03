@@ -12,7 +12,7 @@ import {
   STATE_NOTE,
   STEP_LABEL,
   startedAt,
-  UNDONE_LABEL,
+  undoneLabel,
 } from '../../lib/runs'
 import { useEngineStore } from '../../stores/engine'
 import { useHistoryStore } from '../../stores/history'
@@ -250,7 +250,7 @@ async function reveal(path: string): Promise<void> {
                     !step.finished
                       ? 'did not finish'
                       : step.undone
-                        ? (UNDONE_LABEL[step.undone] ?? step.undone)
+                        ? undoneLabel(step.undone, engines.kind)
                         : ''
                   }}
                 </span>

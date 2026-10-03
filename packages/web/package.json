@@ -1,7 +1,7 @@
 {
   "name": "@livesaver/web",
   "version": "0.0.0",
-  "description": "Browser host for livesaver: folders a page was given (folder upload, drag and drop, File System Access API) as a read-only file system, gzip, hashing, worker-based set parsing, and a scan of samples and plug-ins that runs in the page.",
+  "description": "Browser host for livesaver: folders a page was given (folder upload, drag and drop, File System Access API) as a file system, gzip, hashing, worker-based set parsing, a scan of samples and plug-ins that runs in the page, and a fix through folder handles.",
   "type": "module",
   "sideEffects": false,
   "license": "MIT",

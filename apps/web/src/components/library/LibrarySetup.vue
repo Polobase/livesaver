@@ -4,12 +4,14 @@ import { computed } from 'vue'
 import { useEngineStore } from '../../stores/engine'
 import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
+import { useWritingStore } from '../../stores/writing'
 import FolderList from './FolderList.vue'
 import ScanOptions from './ScanOptions.vue'
 
 const engines = useEngineStore()
 const library = useLibraryStore()
 const scans = useScanStore()
+const writing = useWritingStore()
 const onComputer = computed(() => engines.capabilities.paths)
 </script>
 
@@ -19,7 +21,11 @@ const onComputer = computed(() => engines.capabilities.paths)
       <FolderList
         kind="projects"
         title="Projects"
-        hint="Folders with your Live projects. Every set in them is scanned."
+        :hint="
+          writing.on
+            ? 'Folders with your Live projects. Every set in them is scanned. Your browser asks whether this page may edit a folder: a fix writes into it.'
+            : 'Folders with your Live projects. Every set in them is scanned.'
+        "
         :disabled="scans.running"
       >
         <div
@@ -80,6 +86,11 @@ const onComputer = computed(() => engines.capabilities.paths)
     <p v-if="!onComputer" class="text-sm text-muted">
       Your browser may ask whether to "upload" a folder. Nothing is uploaded: the files are only
       read by this page, on your computer.
+      <template v-if="writing.on">
+        A project folder is chosen for editing instead, and your browser hides files with some names
+        in it (a “/” as Finder shows it, or a space at the start or end of the name): samples named
+        like that count as missing.
+      </template>
     </p>
     <ScanOptions :disabled="scans.running" />
   </div>

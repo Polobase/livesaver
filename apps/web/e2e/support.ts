@@ -93,6 +93,22 @@ export async function giveFolder(page: Page, input: string, folder: string): Pro
 }
 
 /**
+ * Drops a folder of the disk on an element, as a drag from the file manager does. Only Chromium
+ * lets a test do that (through its debugging protocol).
+ */
+export async function dropFolder(page: Page, target: Locator, folder: string): Promise<void> {
+  await target.scrollIntoViewIfNeeded()
+  const box = await target.boundingBox()
+  if (!box) throw new Error('nothing to drop on')
+  const at = { x: box.x + box.width / 2, y: box.y + 16 }
+  const data = { items: [], files: [folder], dragOperationsMask: 1 }
+  const session = await page.context().newCDPSession(page)
+  for (const kind of ['dragEnter', 'dragOver', 'drop'] as const)
+    await session.send('Input.dispatchDragEvent', { type: kind, ...at, data })
+  await session.detach()
+}
+
+/**
  * Presses the button that closes a dialog, and sees it closed. A press that falls into the
  * moment a dialog rearranges itself is lost, as it would be for a person, who presses again.
  */

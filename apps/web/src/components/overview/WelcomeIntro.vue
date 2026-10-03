@@ -31,7 +31,11 @@ const STEPS = [
       Find the samples your sets have lost, collect the ones that lie outside their project, and see
       what is still missing and where it came from.
       <template v-if="engines.kind === 'browser'">
-        This page reads the folders you give it, on your computer; it changes nothing.
+        This page reads the folders you give it, on your computer{{
+          engines.capabilities.fix
+            ? '; it changes nothing until you have reviewed a fix.'
+            : '; it changes nothing.'
+        }}
       </template>
     </p>
     <ol class="mt-6 grid gap-4 sm:grid-cols-3">

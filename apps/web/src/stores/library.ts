@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { BrowserEngine } from '../engine/browser.js'
 import type {
+  FolderAccess,
   FolderListing,
   KnownFolder,
   LocatedFolder,
@@ -55,11 +56,36 @@ export const useLibraryStore = defineStore('library', () => {
     ]
   }
 
-  /** Adds folders the browser handed over (uploaded or dropped); the engine keeps their files. */
+  /**
+   * Adds folders the browser handed over (uploaded, dropped, or chosen for editing); the engine
+   * keeps their files.
+   */
   function addSources(kind: FolderKind, sources: readonly FolderSource[]): void {
     const engine = engines.engine() as BrowserEngine
     const folders = list(kind)
-    folders.value = [...folders.value, ...sources.map((source) => engine.add(source, kind))]
+    const added = sources.map((source) => engine.add(source, kind))
+    folders.value = [...folders.value, ...added]
+    // What the page may do in a folder behind a handle, the browser says when asked.
+    for (const folder of added) if (folder.access === 'ask') void access(folder.id)
+  }
+
+  const set = (id: string, access: FolderAccess) => update(id, { access })
+
+  /** Asks the browser what the page may do in a folder, and notes it. */
+  async function access(id: string): Promise<FolderAccess> {
+    const now = await (engines.engine() as BrowserEngine).access(id)
+    set(id, now)
+    return now
+  }
+
+  /**
+   * Asks the user of the browser to let the page edit a folder. To be called from a click: a
+   * browser asks its user only then.
+   */
+  async function allowEditing(id: string): Promise<FolderAccess> {
+    const now = await (engines.engine() as BrowserEngine).allowEditing(id)
+    set(id, now)
+    return now
   }
 
   function remove(kind: FolderKind, id: string): void {
@@ -68,7 +94,10 @@ export const useLibraryStore = defineStore('library', () => {
     if (engines.kind === 'browser') (engines.engine() as BrowserEngine).remove(id)
   }
 
-  function update(id: string, change: Partial<Pick<KnownFolder, 'vendor' | 'path'>>): void {
+  function update(
+    id: string,
+    change: Partial<Pick<KnownFolder, 'vendor' | 'path' | 'access'>>,
+  ): void {
     for (const folders of [projects, search])
       folders.value = folders.value.map((folder) =>
         folder.id === id ? { ...folder, ...change } : folder,
@@ -101,6 +130,8 @@ export const useLibraryStore = defineStore('library', () => {
     init,
     addPath,
     addSources,
+    access,
+    allowEditing,
     remove,
     update,
     request,

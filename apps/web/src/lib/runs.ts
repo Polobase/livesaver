@@ -1,7 +1,16 @@
 /** A run of the history in the app's words: what it was, what it did, what became of it. */
 import type { RunState } from '@livesaver/ops'
-import type { Run } from '../engine/types.js'
+import type { EngineKind, Run } from '../engine/types.js'
 import { bytes, count, dayName, plural } from './format.js'
+
+/**
+ * Where an undo puts the copies it takes out of a project: the Trash, or, in a browser (a page
+ * has no Trash), a hidden folder of the project folder.
+ */
+export const TAKEN_OUT: Readonly<Record<EngineKind, string>> = {
+  computer: 'moved to the Trash',
+  browser: 'moved to the hidden folder “.livesaver-trash” of the project folder',
+}
 
 export interface RunLook {
   /** What the run was, as a headline. */
@@ -187,13 +196,13 @@ export function outcomeFacts(run: Run): RunFact[] {
 }
 
 /** What an undo of a run does, line by line, to read before it is done. */
-export function undoLines(run: Run): string[] {
+export function undoLines(run: Run, where: EngineKind = 'computer'): string[] {
   return [
     run.sets
       ? `${plural(run.sets, 'set goes', 'sets go')} back to what ${run.sets === 1 ? 'it was' : 'they were'} before the run, from the originals livesaver kept.`
       : '',
     run.files
-      ? `${plural(run.files, 'copied file is', 'copied files are')} moved to the Trash, unless another set uses ${run.files === 1 ? 'it' : 'them'} by now.`
+      ? `${plural(run.files, 'copied file is', 'copied files are')} ${TAKEN_OUT[where]}, unless another set uses ${run.files === 1 ? 'it' : 'them'} by now.`
       : '',
     run.renames
       ? `${plural(run.renames, 'file or folder that was moved goes', 'files or folders that were moved go')} back to where ${run.renames === 1 ? 'it was' : 'they were'}.`
@@ -218,12 +227,15 @@ export const STEP_LABEL: Readonly<Record<string, string>> = {
   'replace-file': 'File of livesaver replaced',
 }
 
-export const UNDONE_LABEL: Readonly<Record<string, string>> = {
+const UNDONE: Readonly<Record<string, string>> = {
   restored: 'restored',
-  trashed: 'moved to the Trash',
   'renamed-back': 'moved back',
   'changed-since': 'changed since, left alone',
 }
+
+/** What became of a step that was taken back, in words. */
+export const undoneLabel = (result: string, where: EngineKind = 'computer'): string =>
+  result === 'trashed' ? TAKEN_OUT[where] : (UNDONE[result] ?? result)
 
 /** When a run started: as it wrote it down, else as its folder is named (local time). */
 export function startedAt(run: Run): Date | undefined {

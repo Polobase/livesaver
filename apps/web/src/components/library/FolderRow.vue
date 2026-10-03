@@ -6,11 +6,28 @@ import { count } from '../../lib/format'
 import { LIVE_CONTENT } from '../../lib/library'
 import { useEngineStore } from '../../stores/engine'
 import { type FolderKind, useLibraryStore } from '../../stores/library'
+import { useWritingStore } from '../../stores/writing'
 import RevealLink from '../common/RevealLink.vue'
 
 const props = defineProps<{ folder: KnownFolder; kind: FolderKind; disabled?: boolean }>()
 const engines = useEngineStore()
 const library = useLibraryStore()
+const writing = useWritingStore()
+/** With fixing in the browser switched on: whether the page may write into a project folder. */
+const access = computed(() =>
+  writing.on && props.kind === 'projects' ? (props.folder.access ?? 'read') : undefined,
+)
+const refused = ref('')
+/** The browser asks its user, in answer to this click. */
+async function allow(): Promise<void> {
+  refused.value = ''
+  try {
+    if ((await library.allowEditing(props.folder.id)) !== 'edit')
+      refused.value = 'Your browser did not allow it.'
+  } catch (error) {
+    refused.value = (error as Error).message
+  }
+}
 
 const HOW: Record<LocatedFolder['how'], string> = {
   typed: 'as typed',
@@ -75,6 +92,33 @@ const canMark = computed(
           :label="editing ? 'Done' : place ? 'Change path' : 'Set path'"
           @click="editing = !editing"
         />
+      </div>
+      <div
+        v-if="access"
+        class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted"
+        data-testid="folder-access"
+      >
+        <template v-if="access === 'edit'">
+          <UIcon name="i-lucide-pencil" class="size-3.5 shrink-0" />
+          This page may edit it: it can be fixed here.
+        </template>
+        <template v-else-if="access === 'ask'">
+          <UIcon name="i-lucide-eye" class="size-3.5 shrink-0" />
+          Can only be read so far.
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="subtle"
+            label="Allow editing"
+            :disabled="disabled"
+            @click="allow"
+          />
+          <span v-if="refused" role="alert">{{ refused }}</span>
+        </template>
+        <template v-else>
+          <UIcon name="i-lucide-eye" class="size-3.5 shrink-0" />
+          Added to be read only. To fix in it, remove it and add it again with “Add folder”.
+        </template>
       </div>
       <UInput
         v-if="editing"

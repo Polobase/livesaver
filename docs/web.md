@@ -151,7 +151,7 @@ it:
 |---|---|---|
 | what it is | livesaver on this computer, over the requests above | the browser: a worker over the folders the page was handed (`scanInWorker`, `serveEngine` in `@livesaver/web`) |
 | folders | by their paths | uploaded or dropped; where they lie is worked out |
-| can | everything | scan |
+| can | everything | scan; and, switched on by its user in Chrome or Edge, fix samples, undo, and keep a history (see [Fixing in a browser](#fixing-in-a-browser)) |
 | plug-ins | with what is installed | which are used, and where; installed or not is `unknown` |
 
 What an engine cannot do is in its `capabilities`, and asking for it fails as `Unsupported`, so
@@ -159,7 +159,10 @@ a screen shows and explains it instead of hiding it. An engine that is gone (liv
 stopped, or started again, which gives its page a new token) fails as `Unreachable`; the app
 notices that in one place, whichever screen asked. One suite of tests
 (`apps/web/test/engine.conformance.test.ts`) runs the same scenarios against both, and demands
-that both show the same for the same library.
+that both show the same for the same library. The browser's engine runs in it twice: reading
+only, and with fixing switched on over a project folder that can be edited. The engines that
+write (livesaver, and the browser with fixing switched on) share the scenario of a fix and its
+undo (`engine.writing.test.ts`).
 
 ## How it is built
 - **The page** (Vue, Pinia, Nuxt UI in Vue mode, Tailwind) holds the state in stores (engine,
@@ -195,9 +198,9 @@ A page gets a folder in one of three ways (`packages/web/src/source.ts`):
 
 `WebFs` mounts these folders at absolute paths and implements the read-only `FsRead` port.
 
-**The page takes uploads and drops, not handles.** A handle is convenient (no "upload" question,
-nothing listed up front) and the only way a page could ever write, but Chromium does not show
-everything through it:
+**The page takes uploads and drops, not handles**, with one exception: a project folder that is
+to be fixed in the page (below). A handle is convenient (no "upload" question, nothing listed
+up front) and the only way a page can write, but Chromium does not show everything through it:
 - Entries with names it considers unsafe are left out without a word: a name with a `:` (which
   Finder shows as `/`, as in a sample folder "Claps/Snares"), a name that starts or ends with a
   space (" (Freeze).wav" and the like occur in real projects), `desktop.ini` and a few more. In
@@ -206,8 +209,10 @@ everything through it:
 - No handle is given for a folder in `/Applications` (where Live's `App-Resources` lies), nor for
   the home, Documents or Desktop folder itself.
 
-Uploads and drops show every file. `@livesaver/web` still reads handles (`folderFromHandle`) for
-callers who accept that.
+Uploads and drops show every file. In a real project folder (299 projects, 46,507 files) a
+handle hides 118 files: 36 samples, their analysis files, and Finder's icon files; no set and
+no folder. So a handle is acceptable there, with that said to the user; sample folders stay
+uploads and drops.
 
 **Files are fetched lazily.** For an uploaded folder even reading a file's size costs a round
 trip to the browser (about 60 µs), and sending a `File` object to a worker about 30 µs: touching
@@ -217,6 +222,52 @@ over 876 sets). `FsRead.kind` answers "file or directory?" from the listing alon
 that the existence checks of the 104,000 references need. A dropped folder is only listed, too
 (about 2 s for 100,000 files): fetching each of its files (`FileSystemFileEntry.file()`) costs
 about 180 µs, most of a minute for a library.
+
+## Fixing in a browser
+Off unless the user switches it on in the Settings (kept in the browser's `localStorage`), after
+a dialog that lists the limits below and wants a tick. Only where the browser has
+`showDirectoryPicker` and a private file system for the page (Chrome, Edge).
+
+- **The same pipeline as `collect --apply`.** `fixFolders` (`packages/web/src/engine/fix.ts`)
+  runs `doctor` with the command line's `applyWriter`, over a host whose write port
+  (`WebFsWrite`, `packages/web/src/write.ts`) writes through the handles of the project folders.
+  Sample folders are never written to. A file appears when its stream is closed (the browser
+  writes a swap file and moves it into place), so there is no half-written set or copy.
+- **A project folder is chosen for editing**: the folder dialog with `readwrite`, or a drop,
+  whose handle can only be read until the user allows more (the browser asks in answer to a
+  click). The page says for every project folder what it may do in it.
+- **The run is kept in the page's own storage** (the origin's private file system, in a folder
+  `livesaver`): the journal, written ahead and flushed line by line, the original of every
+  rewritten set, the reports, and what was asked (`run.json`), named and laid out as the command
+  line's run folders. The History reads it from there, also after a reload. The browser is asked
+  to keep the storage when the disk gets full.
+- **Undo is the command line's `undoRun`** over the same ports. It needs the folder the run
+  changed among the folders the page has, at the same path, and refuses before it touches
+  anything if a path of the journal lies elsewhere. A page has no Trash: copies that an undo
+  takes out are moved to `.livesaver-trash/<time>/…` in the project folder, which a scan skips
+  like every hidden folder.
+- **One run that writes at a time**, across the tabs of the page (Web Locks); a scan does not
+  start while one runs.
+- **Places must be known.** A fix writes absolute paths into the sets: of the project, and of a
+  pack that keeps its large files and Max devices. A project folder, or a folder with the
+  Factory Packs or Live's content, that was placed at a stand-in path refuses the fix; the
+  review says so before, and shows where it takes the project folders to lie.
+- **A set that changed since it was read is not written.** A file behind a handle is fetched
+  anew when its state is asked, so a set that Live saved between the reading and the writing is
+  noticed (size and time), as on the command line.
+
+What a page cannot do, and says before the switch goes on:
+
+| | On this computer | In a browser |
+|---|---|---|
+| Live is running | checked, and a fix refuses | cannot be seen: the user confirms it in every review |
+| Finder tags and comment of a rewritten set | kept (the file is replaced through a clone) | lost: the browser's write makes a new file |
+| time of a copied sample | that of its source | that of the copying (the set says the same) |
+| what an undo takes out | the Trash | a hidden folder in the project folder |
+| free space | checked | unknown |
+| names with `:`, or a space at an end | seen and written | hidden from the page, and a file cannot be made with such a name: the set is left alone, with the reason |
+| what an undo needs | livesaver's state folder | the browser's storage for the site: cleared with the site's data |
+| plug-ins | upgrade, with undo | not at all: a page does not see what is installed |
 
 ## Where a folder lies on disk
 A browser never tells a page a folder's path, but sets store absolute paths, and those are
@@ -264,8 +315,9 @@ opt-in rule is switched on while no folder is marked, the page says that it will
 there.
 
 ## On its own: what differs from the command line
-- Read-only: nothing is collected or rewritten, and patched sets are only counted, not scanned
-  strictly (`quickPlan`).
+- A scan is read-only: nothing is collected or rewritten, and patched sets are only counted,
+  not scanned strictly (`quickPlan`). (A fix in the browser scans every set it writes strictly,
+  like the command line.)
 - Plug-ins: which are used and where, not whether they are installed (a page cannot see that).
 - Only the given folders are seen. The command line sees the whole disk.
 - Symbolic links are not seen: a browser leaves them out of a dropped folder. The command line
@@ -275,7 +327,11 @@ there.
 - `packages/web/test`: `WebFs` over fake handles, uploads and listings; a `doctor` run over the
   browser host equals a run over the Node host on the fixtures; the scan (locating, Ableton's
   folders, the Live app given as a folder, the remap table, the plug-ins, the shaped result);
-  and the conversation between the page and the engine's worker.
+  and the conversation between the page and the engine's worker. Writing through handles
+  (`WebFsWrite`) over folders in memory that behave like a browser's; a fix through them
+  against the command line's pipeline on the same fixtures (the same references in the set,
+  the same files with the same content), its run in the page's storage, its undo byte for
+  byte, and what it refuses.
 - `packages/cli/test`: what the page asks of this computer, on temporary copies of the fixtures:
   a check, a scan, a fix of all, of some and of one project, with and without the uncertain
   matches, an upgrade of plug-ins, undo, the history and its reports, and that the server
@@ -283,7 +339,7 @@ there.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
   review, fix, undo, the history, a page that is opened again) against both engines; the app's
   own sums and words (states, plans, advice, what a run was and what its undo does).
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 210 tests.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 219 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
@@ -298,6 +354,16 @@ there.
     downloaded, a step shown in Finder, an undo that asks first and is then seen everywhere.
   - The settings: what livesaver found, a folder shown in Finder, the reset to the command
     line's settings; what every page says when livesaver is gone, or was started again.
+  - Fixing in the page (Chromium): the switch and its dialog, a folder that can only be read,
+    a folder of the disk that is dropped (read through its handle at once, and refused for
+    editing by the test browser, which the page says), a fix after the review, compared with
+    what `livesaver collect --apply` writes on the same projects on disk (the same references,
+    the same copies, the same backup), the history, the undo, a reload. WebKit and Firefox say
+    that they cannot. No test browser lets a page write to a folder of the disk without a
+    person saying yes (the headless one refuses, the full one waits for its prompt), and the
+    folder dialog cannot be driven: the project folder that is fixed in this test lies in the
+    browser's private file system, behind the same handles. **Writing to a folder of the disk
+    through a browser's permission is not covered by a test**; it is tried by hand.
   - A library of real size (299 projects, 876 sets, 9,305 planned changes, 2,243 missing
     samples, 199 plug-ins; made up from a small real scan): a table builds fewer than 80 rows,
     scrolls to its end without a frame of half a second, and is sorted and searched at once.

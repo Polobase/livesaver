@@ -13,6 +13,7 @@ import { useScanStore } from '../../stores/scan'
 import ScrollRegion from '../common/ScrollRegion.vue'
 import RescanStatus from '../scan/RescanStatus.vue'
 import ScanProgress from '../scan/ScanProgress.vue'
+import ReadyInBrowser from './ReadyInBrowser.vue'
 
 const engines = useEngineStore()
 const fix = useFixStore()
@@ -30,11 +31,19 @@ const open = computed({
     if (!value) fix.close()
   },
 })
-// A review starts at its first step, each time.
+/**
+ * livesaver on the computer sees for itself whether everything is ready. A page sees less: it
+ * asks its user (see `ReadyInBrowser`), and says here what came of it.
+ */
+const onComputer = computed(() => engines.capabilities.liveStatus)
+const pageReady = ref(false)
+// A review starts at its first step, each time, and with nothing confirmed.
 watch(
   () => fix.review !== undefined,
   (isOpen) => {
-    if (isOpen) step.value = 0
+    if (!isOpen) return
+    step.value = 0
+    pageReady.value = false
   },
 )
 
@@ -60,7 +69,9 @@ const scope = computed(() => {
 const liveRunning = computed(() => fix.status?.liveRunning ?? false)
 const room = computed(() => (plan.value ? fits(plan.value, fix.status?.freeBytes) : undefined))
 const ready = computed(
-  () => Boolean(plan.value && plan.value.sets > 0) && !liveRunning.value && room.value !== false,
+  () =>
+    Boolean(plan.value && plan.value.sets > 0) &&
+    (onComputer.value ? !liveRunning.value && room.value !== false : pageReady.value),
 )
 const done = computed(() => !fix.running && (fix.fixed !== undefined || fix.failure !== undefined))
 
@@ -154,7 +165,9 @@ async function apply(): Promise<void> {
             </li>
             <li class="flex gap-2">
               <UIcon name="i-lucide-undo-2" class="mt-0.5 size-4 shrink-0" />
-              The whole fix can be undone afterwards.
+              The whole fix can be undone afterwards<template v-if="!onComputer"
+                >, in this browser</template
+              >.
             </li>
             <li v-if="plan.missing" class="flex gap-2">
               <UIcon name="i-lucide-triangle-alert" class="mt-0.5 size-4 shrink-0" />
@@ -170,7 +183,12 @@ async function apply(): Promise<void> {
         </div>
 
         <!-- 2. Ready? -->
-        <ul v-if="step === 1 && plan" class="space-y-3" data-testid="review-ready">
+        <ReadyInBrowser
+          v-if="step === 1 && plan && !onComputer"
+          v-model:ready="pageReady"
+          :plan="plan"
+        />
+        <ul v-else-if="step === 1 && plan" class="space-y-3" data-testid="review-ready">
           <li class="flex gap-3">
             <UIcon
               :name="liveRunning ? 'i-lucide-circle-x' : 'i-lucide-circle-check'"

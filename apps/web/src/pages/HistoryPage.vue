@@ -7,7 +7,7 @@ import UndoConfirm from '../components/history/UndoConfirm.vue'
 import type { Run } from '../engine/types'
 import { count, plural } from '../lib/format'
 import { GET_LIVESAVER } from '../lib/links'
-import { byDay, changedSomething } from '../lib/runs'
+import { byDay, changedSomething, TAKEN_OUT } from '../lib/runs'
 import PagePanel from '../shell/PagePanel.vue'
 import { useEngineStore } from '../stores/engine'
 import { useHistoryStore } from '../stores/history'
@@ -57,7 +57,7 @@ async function undo(run: Run): Promise<void> {
         v-if="!engines.capabilities.history"
         icon="i-lucide-history"
         title="There is no history here"
-        description="A page in a browser changes nothing, so there is nothing to keep and nothing to undo. With “livesaver web” on your computer, every fix and every upgrade is listed here, with its reports and its undo."
+        description="A page in a browser that only reads changes nothing, so there is nothing to keep and nothing to undo. With “livesaver web” on your computer, every fix and every upgrade is listed here, with its reports and its undo."
         :actions="[{ ...GET_LIVESAVER, color: 'neutral', variant: 'subtle' }]"
         class="my-12"
         data-testid="no-history"
@@ -88,7 +88,8 @@ async function undo(run: Run): Promise<void> {
           <template #title>
             Undone: {{ plural(history.undone.result.restored, 'set') }} restored,
             {{ plural(history.undone.result.trashed, 'file') }}
-            moved to the Trash<template v-if="history.undone.result.kept"
+            {{ TAKEN_OUT[engines.kind]
+            }}<template v-if="history.undone.result.kept"
               >, {{ plural(history.undone.result.kept, 'file') }} kept (used by a set by
               now)</template
             >.
@@ -135,8 +136,12 @@ async function undo(run: Run): Promise<void> {
         />
         <template v-else>
           <p class="text-sm text-muted" data-testid="history-intro">
-            What livesaver changed on this computer, the newest first. A run can be undone as long
-            as its sets were not changed since.
+            What livesaver changed
+            {{ engines.kind === 'browser' ? 'from this browser' : 'on this computer' }}, the newest
+            first. A run can be undone as long as its sets were not changed since.
+            <template v-if="engines.kind === 'browser'">
+              To undo, this page needs the project folder of the run, added for editing.
+            </template>
             <template v-if="!everything && quiet">
               {{ plural(quiet, 'more run') }}
               only planned or reported.

@@ -238,6 +238,7 @@ export class ComputerEngine implements Engine {
     return this.ended(await this.stream('/api/upgrade', body, onProgress), 'upgraded').upgraded
   }
 
+  // (livesaver finds the folders of a run by their paths: the library is not needed.)
   async undo(run: string): Promise<Undone> {
     const answer = await this.json<WebUndone | { problem: string }>('/api/undo', { run })
     if ('problem' in answer) throw new RunFailed(answer.problem)

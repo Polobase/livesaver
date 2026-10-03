@@ -1,15 +1,21 @@
 /**
- * The page side of a scan: sends the folders to the engine's worker, hands it the files it asks
- * for, and passes on what it reports.
+ * The page side of the engine: sends the folders of a request to the engine's worker, hands it
+ * the files it asks for, and passes on what it reports.
  */
 import type {
+  BrowserFixed,
   BrowserScan,
+  BrowserUndone,
+  FixEvent,
+  FixRequest,
   FolderInput,
   FromEngine,
   ScanEvent,
   ScanRequest,
   ToEngine,
+  UndoRequest,
   WireFolder,
+  WireRequest,
 } from './protocol.js'
 
 /** The part of a `Worker` the client uses. */
@@ -28,28 +34,43 @@ export function wireFolder(folder: FolderInput): WireFolder {
   return { ...folder, source: { kind: 'listing', name: source.name, paths } }
 }
 
-export interface RunningScan {
-  /** Settles with the scan; rejects with what the page should show if it failed or was stopped. */
-  readonly result: Promise<BrowserScan>
-  stop(): void
+const wireRequest = (request: ScanRequest): WireRequest => ({
+  projects: request.projects.map(wireFolder),
+  search: request.search.map(wireFolder),
+  options: request.options,
+})
+
+/** A run that failed. `run`: it wrote something before it failed, which can be undone. */
+export class EngineFailure extends Error {
+  readonly run: string
+
+  constructor(message: string, run = '') {
+    super(message)
+    this.name = 'EngineFailure'
+    this.run = run
+  }
 }
 
+type Outcome<T> = { readonly value: T } | undefined
+
 /**
- * Scan in a worker of its own, which is given up afterwards: its memory (every set that was
- * read) goes with it.
+ * One run in a worker of its own, which is given up afterwards: its memory (every set that was
+ * read) goes with it. `done` says what an event ends the run with, if it does.
  */
-export function scanInWorker(
+function runInWorker<T>(
   spawn: () => EngineWorker,
   request: ScanRequest,
-  onEvent: (event: ScanEvent) => void,
-): RunningScan {
+  message: ToEngine,
+  what: string,
+  done: (event: FromEngine) => Outcome<T>,
+): { result: Promise<T>; stop: () => void } {
   const worker = spawn()
   const folders = [...request.projects, ...request.search]
   let stop = () => {}
-  const result = new Promise<BrowserScan>((resolve, reject) => {
+  const result = new Promise<T>((resolve, reject) => {
     stop = () => {
       worker.terminate()
-      reject(new Error('The scan was stopped.'))
+      reject(new Error(`The ${what} was stopped.`))
     }
     worker.onmessage = ({ data }) => {
       if (data.type === 'open') {
@@ -62,22 +83,71 @@ export function scanInWorker(
         else reply(source?.kind === 'files' ? source.files[data.index]?.file : undefined)
         return
       }
-      onEvent(data)
-      if (data.type !== 'scanned' && data.type !== 'failed') return
-      worker.terminate()
-      if (data.type === 'scanned') resolve(data.scan)
-      else reject(new Error(data.message))
+      // A failure is an event like the others to whoever listens, and the end of the run.
+      const outcome = done(data)
+      if (data.type === 'failed') {
+        worker.terminate()
+        reject(new EngineFailure(data.message, 'run' in data ? data.run : ''))
+      } else if (outcome) {
+        worker.terminate()
+        resolve(outcome.value)
+      }
     }
     worker.onerror = (event) => {
       worker.terminate()
-      reject(new Error(event.message || 'The scan stopped unexpectedly.'))
+      reject(new Error(event.message || `The ${what} stopped unexpectedly.`))
     }
-    worker.postMessage({
-      type: 'scan',
-      projects: request.projects.map(wireFolder),
-      search: request.search.map(wireFolder),
-      options: request.options,
-    })
+    worker.postMessage(message)
   })
   return { result, stop: () => stop() }
+}
+
+export interface RunningScan {
+  /** Settles with the scan; rejects with what the page should show if it failed or was stopped. */
+  readonly result: Promise<BrowserScan>
+  stop(): void
+}
+
+/** A scan in a worker of its own. */
+export function scanInWorker(
+  spawn: () => EngineWorker,
+  request: ScanRequest,
+  onEvent: (event: ScanEvent) => void,
+): RunningScan {
+  return runInWorker(spawn, request, { type: 'scan', ...wireRequest(request) }, 'scan', (event) => {
+    onEvent(event as ScanEvent)
+    return event.type === 'scanned' ? { value: event.scan } : undefined
+  })
+}
+
+/**
+ * A fix in a worker of its own. It cannot be stopped: what it began, it ends. Rejects with an
+ * `EngineFailure`, which names the run if something was written before it failed.
+ */
+export function fixInWorker(
+  spawn: () => EngineWorker,
+  request: FixRequest,
+  onEvent: (event: FixEvent) => void,
+): Promise<BrowserFixed> {
+  const message: ToEngine = {
+    type: 'fix',
+    ...wireRequest(request),
+    ...(request.only ? { only: request.only } : {}),
+    ...(request.certainOnly ? { certainOnly: true } : {}),
+  }
+  return runInWorker(spawn, request, message, 'fix', (event) => {
+    onEvent(event as FixEvent)
+    return event.type === 'fixed' ? { value: event.fixed } : undefined
+  }).result
+}
+
+/** An undo in a worker of its own. */
+export function undoInWorker(
+  spawn: () => EngineWorker,
+  request: UndoRequest,
+): Promise<BrowserUndone> {
+  const message: ToEngine = { type: 'undo', ...wireRequest(request), run: request.run }
+  return runInWorker(spawn, request, message, 'undo', (event) =>
+    event.type === 'undone' ? { value: event.undone } : undefined,
+  ).result
 }

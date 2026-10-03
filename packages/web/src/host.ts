@@ -4,6 +4,7 @@
  */
 import { type Codec, type HashPort, type Host, Sha1 } from '@livesaver/core'
 import { type Mount, WebFs } from './fs.js'
+import { WebFsWrite, type WritableMount } from './write.js'
 
 async function through(data: Uint8Array, transform: TransformStream): Promise<Uint8Array> {
   const stream = new Blob([data as Uint8Array<ArrayBuffer>]).stream().pipeThrough(transform)
@@ -52,7 +53,19 @@ export interface WebHost extends Host {
   readonly fs: WebFs
 }
 
-/** A read-only host over the folders a page was given. */
-export function createWebHost(mounts: readonly Mount[]): WebHost {
-  return { fs: new WebFs(mounts), codec: webCodec, hash: webHash }
+/**
+ * A host over the folders a page was given: read-only, unless some of them were given for
+ * editing (`writable`: folders behind handles with write permission, at their mount paths).
+ */
+export function createWebHost(
+  mounts: readonly Mount[],
+  writable: readonly WritableMount[] = [],
+): WebHost {
+  const fs = new WebFs(mounts)
+  return {
+    fs,
+    codec: webCodec,
+    hash: webHash,
+    ...(writable.length ? { write: new WebFsWrite(fs, writable) } : {}),
+  }
 }

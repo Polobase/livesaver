@@ -3,6 +3,7 @@
 import { computed, ref } from 'vue'
 import RevealLink from '../components/common/RevealLink.vue'
 import LibrarySetup from '../components/library/LibrarySetup.vue'
+import WritingSwitch from '../components/library/WritingSwitch.vue'
 import ScanButton from '../components/scan/ScanButton.vue'
 import { disconnect } from '../engine/create'
 import PagePanel from '../shell/PagePanel.vue'
@@ -96,6 +97,8 @@ const found = computed(() => {
         </div>
       </section>
 
+      <WritingSwitch v-if="engines.kind === 'browser'" />
+
       <section aria-labelledby="appearance-title">
         <h2 id="appearance-title" class="text-lg font-semibold text-highlighted">Appearance</h2>
         <div class="mt-3 flex items-center gap-3">
@@ -142,7 +145,9 @@ const found = computed(() => {
           <dd>
             {{
               engines.kind !== 'computer'
-                ? 'in this browser, on its own: it reads the folders you give it and changes nothing'
+                ? engines.capabilities.fix
+                  ? 'in this browser, on its own: it reads the folders you give it, and fixes in those you chose for editing'
+                  : 'in this browser, on its own: it reads the folders you give it and changes nothing'
                 : engines.paired
                   ? 'in this page, connected to livesaver on this computer: it reads and writes your files'
                   : 'on this computer, with livesaver behind it: it reads and writes your files'

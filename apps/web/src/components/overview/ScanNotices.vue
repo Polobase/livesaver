@@ -6,14 +6,28 @@
 import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
 import { bytes, count, plural, when } from '../../lib/format'
+import { hiddenFromPage } from '../../lib/ready'
+import { TAKEN_OUT } from '../../lib/runs'
 import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
+import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
 
 const props = defineProps<{ scan: Scan }>()
 const engines = useEngineStore()
 const fix = useFixStore()
+const library = useLibraryStore()
 const scans = useScanStore()
+/**
+ * Missing samples a browser may have hidden: a project folder that was chosen for editing shows
+ * a page no file with certain names (see `hiddenFromPage`).
+ */
+const hidden = computed(() =>
+  engines.kind === 'browser' &&
+  library.projects.some((folder) => folder.access === 'edit' || folder.access === 'ask')
+    ? props.scan.samples.missing.filter((row) => hiddenFromPage(row.name))
+    : [],
+)
 
 const busy = computed(() => scans.running || fix.running || fix.undoing)
 const some = (items: readonly string[], limit = 5) =>
@@ -110,7 +124,8 @@ const liveAdvice = computed(() =>
       <template #title>
         Undone: {{ plural(fix.undone.restored, 'set') }} restored,
         {{ plural(fix.undone.trashed, 'file') }}
-        moved to the Trash<template v-if="fix.undone.kept"
+        {{ TAKEN_OUT[engines.kind]
+        }}<template v-if="fix.undone.kept"
           >, {{ plural(fix.undone.kept, 'file') }} kept (used by a set by now)</template
         >.
       </template>
@@ -175,6 +190,17 @@ const liveAdvice = computed(() =>
       :description="`Samples of Live's Core Library cannot be found, and content that Live moved between versions is not recognised. ${liveAdvice}`"
       role="note"
       data-testid="no-live-content"
+    />
+
+    <UAlert
+      v-if="hidden.length"
+      color="neutral"
+      variant="outline"
+      icon="i-lucide-eye-off"
+      :title="`${plural(hidden.length, 'missing sample has a name', 'missing samples have names')} your browser hides from a page`"
+      :description="`For example “${hidden[0]?.name}”. In a project folder that was chosen for editing, a browser shows a page no file with a “/” in its name (as Finder shows it) or with a space at its start or end. ${hidden.length === 1 ? 'This sample' : 'These samples'} may well be where the sets expect ${hidden.length === 1 ? 'it' : 'them'}: livesaver on your computer sees ${hidden.length === 1 ? 'it' : 'them'}.`"
+      role="note"
+      data-testid="hidden-names"
     />
 
     <UAlert

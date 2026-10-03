@@ -6,16 +6,27 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { cpSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Inventory } from '@livesaver/plugins'
-import { copyFixtures, readSet, tempDir, uploadedFolder, writeFile } from '@livesaver/test-kit'
-import { localEngineWorker } from '@livesaver/web'
+import {
+  copyFixtures,
+  MemoryDirectory,
+  memoryFiles,
+  memoryFolder,
+  readSet,
+  tempDir,
+  uploadedFolder,
+  writeFile,
+} from '@livesaver/test-kit'
+import { folderFromHandle, localEngineWorker } from '@livesaver/web'
 import { startWeb, type WebServer } from 'livesaver'
 import { createPinia, setActivePinia } from 'pinia'
 import { BrowserEngine, ComputerEngine } from '../src/engine/index.js'
+import { writingSwitchedOn } from '../src/engine/storage.js'
 import { useEngineStore } from '../src/stores/engine.js'
 import { useFixStore } from '../src/stores/fix.js'
 import { useHistoryStore } from '../src/stores/history.js'
 import { useLibraryStore } from '../src/stores/library.js'
 import { useScanStore } from '../src/stores/scan.js'
+import { useWritingStore } from '../src/stores/writing.js'
 
 let tmp: { path: string; cleanup: () => void }
 let projects: string
@@ -308,5 +319,131 @@ describe('in the browser', () => {
     library.remove('search', search?.id as string)
     library.remove('projects', project?.id as string)
     expect(library.canScan).toBe(false)
+  })
+})
+
+describe('in a browser that lets a page edit folders', () => {
+  /** What Chrome and Edge give a page, as far as the app asks for it. */
+  const browser = globalThis as unknown as Record<string, unknown>
+  const kept = new Map<string, string>()
+  const before = { picker: browser.showDirectoryPicker, storage: browser.localStorage }
+  const hadStorage = Object.getOwnPropertyDescriptor(navigator, 'storage')
+  beforeEach(() => {
+    kept.clear()
+    browser.showDirectoryPicker = async () => new MemoryDirectory('chosen')
+    browser.localStorage = {
+      getItem: (key: string) => kept.get(key) ?? null,
+      setItem: (key: string, value: string) => void kept.set(key, value),
+      removeItem: (key: string) => void kept.delete(key),
+    }
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: { getDirectory: async () => new MemoryDirectory('') },
+    })
+  })
+  afterEach(() => {
+    browser.showDirectoryPicker = before.picker
+    browser.localStorage = before.storage
+    if (hadStorage) Object.defineProperty(navigator, 'storage', hadStorage)
+    else delete (navigator as { storage?: unknown }).storage
+  })
+
+  test('fixing is off until it is switched on; then a folder chosen for editing is fixed, and the fix taken back', async () => {
+    setActivePinia(createPinia())
+    const folder = memoryFolder(projects)
+    const state = new MemoryDirectory('')
+    const storage = async () => state
+    const engines = useEngineStore()
+    engines.use(
+      new BrowserEngine({
+        spawn: () => localEngineWorker({ cores: 4, state: storage }),
+        state: storage,
+        writing: writingSwitchedOn,
+      }),
+    )
+    await engines.load()
+    const library = useLibraryStore()
+    const scans = useScanStore()
+    const fix = useFixStore()
+    const history = useHistoryStore()
+    const writing = useWritingStore()
+    expect([writing.possible, writing.on]).toEqual([true, false])
+    expect(engines.capabilities).toMatchObject({ fix: false, undo: false, history: false })
+
+    await writing.set(true)
+    expect([writing.on, kept.get('livesaver:fix-in-browser')]).toEqual([true, 'on'])
+    expect(engines.capabilities).toMatchObject({ fix: true, undo: true, history: true })
+    expect([history.loaded, history.runs]).toEqual([true, []])
+
+    library.addSources('projects', [folderFromHandle(folder)])
+    library.addSources('search', [uploadedFolder(samples)])
+    // What the page may do in the folder is asked of the browser, and noted.
+    expect(library.projects[0]?.access).toBe('ask')
+    expect(await library.access(library.projects[0]?.id as string)).toBe('edit')
+    expect(library.projects[0]?.access).toBe('edit')
+    expect(library.search[0]?.access).toBe('read')
+
+    expect(await scans.run()).toBe(true)
+    expect(scans.scan?.samples.changingSets).toBe(2)
+    fix.open()
+    expect(await fix.apply()).toBe(true)
+    expect(fix.fixed).toMatchObject({ sets: 2, files: 2, errors: [] })
+    const set = () => memoryFiles(folder).get('Brokenpath Project/Brokenpath.als')
+    expect(set()?.writes).toBe(1)
+    // The scan was renewed through the same folder: nothing is left to fix.
+    expect(scans.scan?.samples.changingSets).toBe(0)
+    expect(history.runs.map((run) => [run.state, run.sets, run.files])).toEqual([['applied', 2, 2]])
+    expect(fix.last?.id).toBe(fix.fixed?.run as string)
+
+    // The undo is handed the folders the page has: the run's folder is among them.
+    expect(await fix.undo(fix.fixed?.run as string)).toBe(true)
+    expect(fix.undone).toMatchObject({ restored: 2, trashed: 4, problems: [] })
+    expect(set()?.writes).toBe(2)
+    expect(scans.scan?.samples.changingSets).toBe(2)
+    expect(history.runs[0]).toMatchObject({ state: 'undone', canUndo: false })
+
+    // Switched off, the page only reads again, and shows no runs; they are kept.
+    await writing.set(false)
+    expect([writing.on, kept.has('livesaver:fix-in-browser')]).toEqual([false, false])
+    expect([engines.capabilities.fix, history.runs]).toEqual([false, []])
+    await writing.set(true)
+    expect(history.runs.length).toBe(1)
+  })
+
+  test('an undo without the folder of its run says what the page needs', async () => {
+    setActivePinia(createPinia())
+    kept.set('livesaver:fix-in-browser', 'on')
+    const state = new MemoryDirectory('')
+    const storage = async () => state
+    const engine = () =>
+      new BrowserEngine({
+        spawn: () => localEngineWorker({ cores: 4, state: storage }),
+        state: storage,
+        writing: writingSwitchedOn,
+      })
+    const engines = useEngineStore()
+    engines.use(engine())
+    await engines.load()
+    const library = useLibraryStore()
+    const scans = useScanStore()
+    const fix = useFixStore()
+    library.addSources('projects', [folderFromHandle(memoryFolder(projects))])
+    library.addSources('search', [uploadedFolder(samples)])
+    await scans.run()
+    fix.open()
+    expect(await fix.apply()).toBe(true)
+
+    // The page is loaded again: it has its runs, and none of its folders.
+    setActivePinia(createPinia())
+    const again = useEngineStore()
+    again.use(engine())
+    await again.load()
+    const history = useHistoryStore()
+    await history.refresh()
+    expect(history.runs.map((run) => run.state)).toEqual(['applied'])
+    expect(await history.takeBack(history.runs[0]?.id as string)).toBe(false)
+    expect(history.problem).toBe(
+      'The undo failed: To take this run back, the page needs the project folder it changed: add it again, for editing, and undo then.',
+    )
   })
 })

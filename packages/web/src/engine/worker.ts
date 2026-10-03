@@ -1,9 +1,11 @@
 /**
- * The worker side of a scan: one scan per message, so the page stays responsive while sets are
- * checked. The files of uploaded folders stay with the page; each is asked for when first read.
+ * The worker side of the engine: one run per message (a scan, a fix, an undo), so the page stays
+ * responsive while sets are read and written. The files of uploaded folders stay with the page;
+ * each is asked for when first read.
  */
 import type { ParseWorker } from '../parser.js'
-import type { FolderInput, FromEngine, ToEngine, WireFolder } from './protocol.js'
+import { fixFolders, type StateFolder, undoFolders, type WriteEngineOptions } from './fix.js'
+import type { FolderInput, FromEngine, ToEngine, WireFolder, WireRequest } from './protocol.js'
 import { scanFolders } from './scan.js'
 
 /** The part of a worker's global scope the engine needs. */
@@ -16,9 +18,13 @@ export interface EngineWorkerOptions {
   /** Starts a parse worker; left out where a worker cannot start workers (older Safari). */
   readonly spawn?: () => ParseWorker
   readonly cores: number
+  /** The page's own storage, for the runs of a fix; without it the engine only reads. */
+  readonly state?: StateFolder
+  /** See `WriteEngineOptions`. */
+  readonly exclusive?: WriteEngineOptions['exclusive']
 }
 
-/** Run inside a worker: answers `scan` messages with the events of the scan. */
+/** Run inside a worker: answers each request with the events of its run. */
 export function serveEngine(scope: EngineScope, options: EngineWorkerOptions): void {
   const waiting = new Map<number, (file: File | undefined) => void>()
   let requests = 0
@@ -34,6 +40,12 @@ export function serveEngine(scope: EngineScope, options: EngineWorkerOptions): v
       })
     return { ...wire, source: { ...source, open } }
   }
+  const folders = (wire: WireRequest) => ({
+    projects: wire.projects.map(folder),
+    search: wire.search.map(folder),
+    options: wire.options,
+  })
+  const emit = (event: FromEngine) => scope.postMessage(event)
 
   scope.onmessage = ({ data }) => {
     if (data.type === 'file') {
@@ -41,14 +53,26 @@ export function serveEngine(scope: EngineScope, options: EngineWorkerOptions): v
       waiting.delete(data.request)
       return
     }
-    void scanFolders(
-      {
-        projects: data.projects.map(folder),
-        search: data.search.map(folder),
-        options: data.options,
-      },
-      (event) => scope.postMessage(event),
-      options,
-    )
+    if (data.type === 'scan') {
+      void scanFolders(folders(data), emit, options)
+      return
+    }
+    const { state } = options
+    if (!state) {
+      emit({ type: 'failed', message: 'This page has no storage of its own to keep an undo in.' })
+      return
+    }
+    const writing = { ...options, state }
+    if (data.type === 'fix') {
+      void fixFolders(
+        {
+          ...folders(data),
+          ...(data.only ? { only: data.only } : {}),
+          ...(data.certainOnly ? { certainOnly: true } : {}),
+        },
+        emit,
+        writing,
+      )
+    } else void undoFolders({ ...folders(data), run: data.run }, emit, writing)
   }
 }

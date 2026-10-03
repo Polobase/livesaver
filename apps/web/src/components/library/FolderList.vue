@@ -2,21 +2,27 @@
 /**
  * The project folders, or the sample folders. On this computer a folder is added by its path; in
  * a browser it is handed over, through the folder upload or by a drop. The browser's own folder
- * picker (File System Access API) is not used: its handles hide files with certain names.
+ * dialog (File System Access API) is used for one thing only, a project folder that is to be
+ * fixed in the page: only its handles can write, but they hide files with certain names.
  */
-import { foldersFromDrop, foldersFromFiles } from '@livesaver/web'
+import { foldersFromDrop, foldersFromFiles, handlesFromDrop } from '@livesaver/web'
 import { computed, ref, useTemplateRef } from 'vue'
+import { pickFolderToEdit } from '../../engine/storage'
 import type { FolderListing } from '../../engine/types'
 import { count } from '../../lib/format'
 import { useEngineStore } from '../../stores/engine'
 import { type FolderKind, useLibraryStore } from '../../stores/library'
+import { useWritingStore } from '../../stores/writing'
 import FolderBrowser from './FolderBrowser.vue'
 import FolderRow from './FolderRow.vue'
 
 const props = defineProps<{ kind: FolderKind; title: string; hint: string; disabled?: boolean }>()
 const engines = useEngineStore()
 const library = useLibraryStore()
+const writing = useWritingStore()
 const folders = computed(() => (props.kind === 'projects' ? library.projects : library.search))
+/** With fixing in the browser switched on, a project folder is handed over to be edited. */
+const forEditing = computed(() => props.kind === 'projects' && writing.on)
 
 // --- on this computer: by path
 const browsing = ref(false)
@@ -34,8 +40,17 @@ const reading = ref<number>()
 const listing = ref(false)
 const problem = ref('')
 
-function pick(): void {
+async function pick(): Promise<void> {
   problem.value = ''
+  if (forEditing.value) {
+    try {
+      const chosen = await pickFolderToEdit()
+      if (chosen) library.addSources(props.kind, [chosen])
+    } catch (error) {
+      problem.value = `The folder could not be opened: ${(error as Error).message || String(error)}`
+    }
+    return
+  }
   // The browser lists every file of the folder before it hands them over, and reports nothing
   // meanwhile: seconds for a large folder.
   listing.value = true
@@ -55,9 +70,12 @@ async function drop(event: DragEvent): Promise<void> {
   problem.value = ''
   reading.value = 0
   try {
-    const dropped = await foldersFromDrop(event.dataTransfer.items, (files) => {
-      reading.value = files
-    })
+    // (Both read the drop before anything is waited for: it cannot be read later.)
+    const dropped = await (forEditing.value
+      ? handlesFromDrop(event.dataTransfer.items)
+      : foldersFromDrop(event.dataTransfer.items, (files) => {
+          reading.value = files
+        }))
     library.addSources(props.kind, dropped)
   } catch (error) {
     problem.value = `The folder could not be read: ${(error as Error).message || String(error)}`
@@ -68,7 +86,9 @@ async function drop(event: DragEvent): Promise<void> {
 
 const waiting = computed(() =>
   reading.value !== undefined
-    ? `listing… ${count(reading.value)} files`
+    ? forEditing.value
+      ? 'taking the folder…'
+      : `listing… ${count(reading.value)} files`
     : listing.value
       ? 'a large folder takes a few seconds to appear…'
       : 'or drop a folder here',

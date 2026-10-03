@@ -29,6 +29,8 @@ interface FileNode {
   readonly kind: 'file'
   readonly open: () => Promise<File | undefined>
   file?: Promise<File | undefined>
+  /** Behind a handle: the file can be fetched again, as it is by then. */
+  readonly live?: boolean
 }
 
 interface DirNode {
@@ -103,7 +105,8 @@ function rootOf(source: FolderSource): DirNode {
   return treeOf(source.paths, (i) => ({ kind: 'file', open: () => open(i) }))
 }
 
-function statOf(file: File): FileStat {
+/** What a page knows of a file it was handed. */
+export function statOf(file: File): FileStat {
   const modified = file.lastModified
   const ns = BigInt(Math.round(modified)) * 1_000_000n
   return {
@@ -154,7 +157,7 @@ export class WebFs implements FsRead {
             entry.name,
             handle.kind === 'directory'
               ? { kind: 'dir', handle }
-              : { kind: 'file', open: () => handle.getFile() },
+              : { kind: 'file', open: () => handle.getFile(), live: true },
           )
           keys.set(nameKey(entry.name), entry.name)
         }
@@ -192,6 +195,36 @@ export class WebFs implements FsRead {
     return node
   }
 
+  /**
+   * What was listed in the folder of `path` is no longer what is there (something was written):
+   * the folder is listed again when it is next looked into. Only folders behind a handle are
+   * listed on demand; an upload or a drop is a listing that was made once, and cannot change.
+   */
+  forget(path: string): void {
+    const parts = posix.splitPath(posix.normpath(path))
+    // The deepest folder on the way to `path` that was listed so far: the folder that holds
+    // `path`, or, where folders were made on the way, the last one that was there before.
+    let dir: DirNode | undefined
+    let key = ''
+    for (const part of parts.slice(0, -1)) {
+      key = key ? `${key}/${nameKey(part)}` : nameKey(part)
+      const mounted = this.mounts.get(key)
+      if (mounted) {
+        dir = mounted
+        continue
+      }
+      if (!dir) continue // above the folders that were given
+      const name: string | undefined = dir.children?.has(part) ? part : dir.keys?.get(nameKey(part))
+      const child: Node | undefined = name === undefined ? undefined : dir.children?.get(name)
+      if (child?.kind !== 'dir') break
+      dir = child
+    }
+    if (!dir?.handle) return
+    dir.children = undefined
+    dir.keys = undefined
+    dir.loading = undefined
+  }
+
   private async fileOf(node: FileNode): Promise<File | undefined> {
     if (!node.file) {
       this.usage.opened++
@@ -215,6 +248,9 @@ export class WebFs implements FsRead {
     const node = await this.resolve(path)
     if (!node) return undefined
     if (node.kind === 'dir') return DIRECTORY
+    // Behind a handle a file is fetched as it is now, not as it was when it was first read:
+    // this is how a set that was saved in the meantime is noticed before it is rewritten.
+    if (node.live) node.file = undefined
     const file = await this.fileOf(node)
     return file ? statOf(file) : undefined
   }

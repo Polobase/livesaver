@@ -140,7 +140,7 @@ export interface Upgraded {
 
 export interface Undone {
   readonly restored: number
-  /** Copied files moved to the Trash. */
+  /** Copied files moved to the Trash (in a browser: to a hidden folder of the project folder). */
   readonly trashed: number
   /** Copied files that stay: another set uses them by now. */
   readonly kept: number
@@ -185,6 +185,13 @@ export interface FolderListing {
   readonly holds: readonly string[]
 }
 
+/**
+ * What a page may do in a folder a browser handed it: only `read` it (an upload, a drop), `edit`
+ * it (a folder chosen for editing), or `ask` its user for that (a handle that may only read so
+ * far).
+ */
+export type FolderAccess = 'read' | 'ask' | 'edit'
+
 /** A sample folder as the app starts with it. */
 export interface KnownFolder extends LibraryFolder {
   /** Which of Ableton's own folders it holds, by their names. */
@@ -192,6 +199,8 @@ export interface KnownFolder extends LibraryFolder {
   readonly exists: boolean
   /** How many files it has, where the browser listed them when it handed the folder over. */
   readonly files?: number
+  /** In a browser: what the page may do in it. On this computer livesaver reads and writes. */
+  readonly access?: FolderAccess
 }
 
 /** Where things are on this computer, as livesaver found them. */
@@ -277,7 +286,11 @@ export interface Engine {
   planUpgrade(request: UpgradeRequest, onProgress?: OnProgress): Promise<UpgradeView>
   fix(request: FixRequest, onProgress?: OnProgress): Promise<Fixed>
   upgrade(request: UpgradeRequest, onProgress?: OnProgress): Promise<Upgraded>
-  undo(run: string): Promise<Undone>
+  /**
+   * Takes a run back. `library`: the folders the app has now. A browser needs the folder the run
+   * changed among them; livesaver on this computer finds it by its path.
+   */
+  undo(run: string, library?: ScanRequest): Promise<Undone>
   /** Every run, the newest first. */
   runs(): Promise<readonly Run[]>
   run(id: string): Promise<RunDetail>

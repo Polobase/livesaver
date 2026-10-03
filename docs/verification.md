@@ -22,7 +22,10 @@ writes runs on temporary copies.
   `process.stdout` had been looked at; the command line writes through the stream instead.)
 - `bun run test:web` runs the built web app in a headless browser: on its own (read-only), and
   with livesaver behind it, where it fixes one project, undoes, and fixes all on temporary
-  copies, upgrades plug-ins, and undoes runs from the history. A scan of the size of a real
+  copies, upgrades plug-ins, and undoes runs from the history. Fixing in the page itself
+  (Chromium) is compared with `livesaver collect --apply` on the same projects; its folder lies
+  in the browser's private file system, since no test browser lets a page write to the disk
+  without a person (see [web.md](web.md#how-it-is-tested)). A scan of the size of a real
   library (9,305 planned changes) must stay quick in its tables. On a real library its report
   files are byte-identical to the command line's (see [web.md](web.md)).
 

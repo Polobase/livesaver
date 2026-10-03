@@ -7,6 +7,7 @@ import { projectHealth, setHealth, tally } from '../src/lib/health.js'
 import { requestKey, wantedOf } from '../src/lib/library.js'
 import { FREE_SPACE_MARGIN, fits, planOf } from '../src/lib/plan.js'
 import { advance, starting } from '../src/lib/progress.js'
+import { hiddenFromPage, isReady, pageReadiness } from '../src/lib/ready.js'
 import { adviceFor } from '../src/lib/words.js'
 
 const set = (extra: Partial<SetRow> & { missing?: number } = {}): SetRow => ({
@@ -199,5 +200,99 @@ describe('advice for missing samples', () => {
       text: 'as it came',
       addFolder: false,
     })
+  })
+})
+
+describe('what a fix in a browser needs before it starts', () => {
+  const folder = (id: string, extra: object = {}) => ({
+    id,
+    name: id,
+    path: '',
+    vendor: false,
+    holds: [] as string[],
+    exists: true,
+    ...extra,
+  })
+  const scanned = {
+    projects: [folder('Projects'), folder('Old Projects')],
+    search: [folder('Samples'), folder('Ableton'), folder('Live')],
+    options: { packLimitMB: 50, matchLibraryPath: false },
+  }
+  const placed = (how: Record<string, 'typed' | 'found' | 'unknown'>) => ({
+    folders: Object.entries(how).map(([id, value]) => ({ id, path: `/${id}`, how: value })),
+  })
+
+  test('the page may edit every project folder, and knows where the folders lie that sets will name', () => {
+    const library = {
+      projects: [
+        folder('Projects', { access: 'edit' }),
+        folder('Old Projects', { access: 'edit' }),
+      ],
+      search: [
+        folder('Samples'),
+        folder('Ableton', { holds: ['User Library', 'Factory Packs'] }),
+        folder('Live', { holds: ["Live's own content"] }),
+      ],
+    }
+    const all = placed({
+      Projects: 'found',
+      'Old Projects': 'typed',
+      // A plain sample folder needs no place: its files are copied, and no set names it.
+      Samples: 'unknown',
+      Ableton: 'typed',
+      Live: 'found',
+    })
+    const ready = pageReadiness(scanned, all, library)
+    expect(ready).toEqual({
+      ask: [],
+      readOnly: [],
+      unplaced: [],
+      // Where the project folders lie is shown, to be looked at: a fix writes it into the sets.
+      places: [
+        { id: 'Projects', name: 'Projects', path: '/Projects', how: 'found' },
+        { id: 'Old Projects', name: 'Old Projects', path: '/Old Projects', how: 'typed' },
+      ],
+    })
+    expect(isReady(ready)).toBe(true)
+
+    // A project folder, the packs and Live's own content are named in sets: they need a place.
+    const nowhere = placed({
+      Projects: 'unknown',
+      'Old Projects': 'found',
+      Samples: 'unknown',
+      Ableton: 'unknown',
+      Live: 'unknown',
+    })
+    expect(pageReadiness(scanned, nowhere, library).unplaced).toEqual([
+      'Projects',
+      'Ableton',
+      'Live',
+    ])
+    expect(isReady(pageReadiness(scanned, nowhere, library))).toBe(false)
+  })
+
+  test('a project folder that can only be read is to be allowed, or added again', () => {
+    const library = {
+      // One was dropped (the browser can be asked), one uploaded; a folder that was removed
+      // since the scan is not there to be edited at all.
+      projects: [folder('Projects', { access: 'ask' })],
+      search: [],
+    }
+    const ready = pageReadiness(scanned, placed({ Projects: 'found' }), library)
+    expect(ready.ask).toEqual([{ id: 'Projects', name: 'Projects' }])
+    expect(ready.readOnly).toEqual(['Old Projects'])
+    expect(isReady(ready)).toBe(false)
+    const uploaded = { projects: [folder('Projects', { access: 'read' })], search: [] }
+    expect(pageReadiness(scanned, placed({}), uploaded).readOnly).toEqual([
+      'Projects',
+      'Old Projects',
+    ])
+  })
+
+  test('names a browser hides from a page, in a folder that was chosen for editing', () => {
+    const hidden = ['Claps:Snares.wav', 'Claps/Snares.wav', ' Kick.wav', 'Kick.wav ', 'a?b.aif']
+    const shown = ['Kick 1.wav', '.hidden.wav', 'Kick-01 (Take 2).wav', 'Ünïcödé – kick.wav']
+    expect(hidden.filter(hiddenFromPage)).toEqual(hidden)
+    expect(shown.filter(hiddenFromPage)).toEqual([])
   })
 })

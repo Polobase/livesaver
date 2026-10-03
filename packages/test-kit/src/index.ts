@@ -316,3 +316,4 @@ export function snapshot(dir: string): Record<string, [number, string]> {
 export * from './browser.js'
 export * from './builders.js'
 export * from './demo.js'
+export * from './memory-folder.js'

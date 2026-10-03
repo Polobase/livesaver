@@ -10,6 +10,7 @@ import {
   posix,
   REL_PROJECT,
   type RemapTable,
+  type SetParser,
 } from '@livesaver/core'
 import {
   auditSets,
@@ -25,10 +26,11 @@ import {
 } from '@livesaver/ops'
 import { Inventory } from '@livesaver/plugins'
 import { type Mount, WebFs } from '../fs.js'
-import { createWebHost } from '../host.js'
+import { createWebHost, type WebHost } from '../host.js'
 import { locateFolder, type ProjectAnchor } from '../locate.js'
 import { createWorkerParser, defaultWorkerCount, type ParseWorker } from '../parser.js'
 import type { FolderSource } from '../source.js'
+import type { WritableMount } from '../write.js'
 import { APP_RESOURCES_IN } from './ableton.js'
 import type { FolderInput, LocatedFolder, ScanEvent, ScanRequest } from './protocol.js'
 
@@ -201,6 +203,73 @@ export interface ScanEngineOptions {
   readonly cores: number
 }
 
+/** The folders of a request as livesaver works on them: placed, mounted, and Ableton's found. */
+export interface Prepared {
+  readonly folders: readonly LocatedFolder[]
+  readonly mounts: readonly Mount[]
+  readonly host: WebHost
+  readonly probe: Probe
+  /** The project folders, at the paths they were placed at. */
+  readonly targets: readonly string[]
+  /** Where samples are looked for (of the Live app's folder, only its Core Library). */
+  readonly searchRoots: readonly string[]
+  readonly config: EnvConfig
+  readonly parser: SetParser
+}
+
+/**
+ * Places and mounts the folders of a request. `writable`: more mounts (the page's own storage),
+ * and which of the folders the page may write to; without it the host is read-only.
+ */
+export async function prepare(
+  request: ScanRequest,
+  options: ScanEngineOptions,
+  writable?: {
+    readonly extra: readonly (Mount & WritableMount)[]
+    readonly folders: (mounts: readonly Mount[]) => readonly WritableMount[]
+  },
+  onLocated: (folders: readonly LocatedFolder[]) => void = () => {},
+): Promise<Prepared> {
+  const inputs = [...request.projects, ...request.search]
+  const folders = await locate(request)
+  onLocated(folders)
+  const mounts = inputs.map((f, i) => ({
+    path: (folders[i] as LocatedFolder).path,
+    source: f.source,
+  }))
+  const host = writable
+    ? createWebHost(
+        [...mounts, ...writable.extra],
+        [...writable.folders(mounts), ...writable.extra],
+      )
+    : createWebHost(mounts)
+  const probe = new Probe(host.fs, host.hash)
+  const targets = mounts.slice(0, request.projects.length).map((m) => m.path)
+  const vendor = mounts.filter((_, i) => (inputs[i] as FolderInput).vendor).map((m) => m.path)
+  const { config, liveFolder } = await ableton(host.fs, mounts, vendor)
+  const parser = options.spawn
+    ? createWorkerParser({
+        host,
+        spawn: options.spawn,
+        workers: defaultWorkerCount(options.cores),
+      })
+    : inProcessParser(host)
+  return {
+    folders,
+    mounts,
+    host,
+    probe,
+    targets,
+    // Of the Live app's own folder only the Core Library holds samples to relink to; the rest
+    // (built-in devices, lessons, Max) is Live's business.
+    searchRoots: mounts.map((m) =>
+      m.path === liveFolder ? posix.join(config.appResources, 'Core Library') : m.path,
+    ),
+    config,
+    parser,
+  }
+}
+
 export async function scanFolders(
   request: ScanRequest,
   emit: (event: ScanEvent) => void,
@@ -217,35 +286,17 @@ export async function scanFolders(
   }
   try {
     enter('locating')
-    const inputs = [...request.projects, ...request.search]
-    const folders = await locate(request)
-    emit({ type: 'located', folders })
-
-    const mounts = inputs.map((f, i) => ({
-      path: (folders[i] as LocatedFolder).path,
-      source: f.source,
-    }))
-    const host = createWebHost(mounts)
-    const probe = new Probe(host.fs, host.hash)
-    const targets = mounts.slice(0, request.projects.length).map((m) => m.path)
-    const vendor = mounts.filter((_, i) => (inputs[i] as FolderInput).vendor).map((m) => m.path)
-    const { config, liveFolder } = await ableton(host.fs, mounts, vendor)
-    const parser = options.spawn
-      ? createWorkerParser({
-          host,
-          spawn: options.spawn,
-          workers: defaultWorkerCount(options.cores),
-        })
-      : inProcessParser(host)
+    const { folders, host, probe, targets, searchRoots, config, parser } = await prepare(
+      request,
+      options,
+      undefined,
+      (located) => emit({ type: 'located', folders: located }),
+    )
 
     enter('indexing')
     const result = await doctor(host, {
       targets,
-      // Of the Live app's own folder only the Core Library holds samples to relink to; the rest
-      // (built-in devices, lessons, Max) is Live's business.
-      searchRoots: mounts.map((m) =>
-        m.path === liveFolder ? posix.join(config.appResources, 'Core Library') : m.path,
-      ),
+      searchRoots,
       env: config,
       packCopyLimit: Math.trunc(request.options.packLimitMB * 1_000_000),
       matchLibraryPath: request.options.matchLibraryPath,

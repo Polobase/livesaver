@@ -77,6 +77,11 @@ export const useEngineStore = defineStore('engine', () => {
     }
   }
 
+  /** What the engine can do may follow a setting (fixing in the browser): it is asked again. */
+  function refresh(): void {
+    if (current.value) capabilities.value = current.value.capabilities
+  }
+
   /** Back to the engine's own settings: what it starts with then. Rejects if it cannot. */
   async function reset(): Promise<Start> {
     start.value = await engine().reset()
@@ -87,5 +92,17 @@ export const useEngineStore = defineStore('engine', () => {
   /** The page came from elsewhere and was connected to livesaver on this computer. */
   const paired = computed(() => current.value?.paired ?? false)
 
-  return { engine, start, problem, loading, load, reset, use, kind, paired, capabilities }
+  return {
+    engine,
+    start,
+    problem,
+    loading,
+    load,
+    refresh,
+    reset,
+    use,
+    kind,
+    paired,
+    capabilities,
+  }
 })

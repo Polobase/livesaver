@@ -7,7 +7,9 @@ import { computed } from 'vue'
 import type { Run } from '../../engine/types'
 import { moment } from '../../lib/format'
 import { runLook, startedAt, undoLines } from '../../lib/runs'
+import { useEngineStore } from '../../stores/engine'
 
+const engines = useEngineStore()
 const props = defineProps<{ run?: Run }>()
 const emit = defineEmits<{ close: []; confirm: [run: Run] }>()
 const open = computed({
@@ -32,13 +34,15 @@ const about = computed(() => {
   >
     <template v-if="run" #body>
       <ul class="space-y-2 text-sm" data-testid="undo-lines">
-        <li v-for="line in undoLines(run)" :key="line" class="flex gap-2">
+        <li v-for="line in undoLines(run, engines.kind)" :key="line" class="flex gap-2">
           <UIcon name="i-lucide-undo-2" class="mt-0.5 size-4 shrink-0 text-muted" />
           {{ line }}
         </li>
       </ul>
       <p class="mt-4 text-sm text-muted">
-        Ableton Live has to be closed. An undo cannot be undone: to have the fix again, fix again.
+        Ableton Live has to be closed<template v-if="!engines.capabilities.liveStatus"
+          >, and this page cannot see whether it is: quit it first</template
+        >. An undo cannot be undone: to have the fix again, fix again.
       </p>
     </template>
     <template #footer>

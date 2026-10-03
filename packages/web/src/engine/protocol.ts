@@ -38,13 +38,21 @@ export interface WireFolder extends Omit<FolderInput, 'source'> {
   readonly source: WireSource
 }
 
+/** The folders and options of a request, as they travel to the engine's worker. */
+export interface WireRequest {
+  readonly projects: readonly WireFolder[]
+  readonly search: readonly WireFolder[]
+  readonly options: ScanOptions
+}
+
 export type ToEngine =
-  | {
-      readonly type: 'scan'
-      readonly projects: readonly WireFolder[]
-      readonly search: readonly WireFolder[]
-      readonly options: ScanOptions
-    }
+  | ({ readonly type: 'scan' } & WireRequest)
+  | ({
+      readonly type: 'fix'
+      readonly only?: readonly string[]
+      readonly certainOnly?: boolean
+    } & WireRequest)
+  | ({ readonly type: 'undo'; readonly run: string } & WireRequest)
   /** The answer to an `open` event. */
   | { readonly type: 'file'; readonly request: number; readonly file: File | undefined }
 
@@ -80,9 +88,8 @@ export interface BrowserScan {
   }
 }
 
-export type ScanEvent =
-  | { readonly type: 'phase'; readonly phase: ScanPhase }
-  | { readonly type: 'located'; readonly folders: readonly LocatedFolder[] }
+/** How far a run is. */
+export type ProgressEvent =
   | { readonly type: 'indexed'; readonly files: number }
   | {
       readonly type: 'progress'
@@ -90,12 +97,63 @@ export type ScanEvent =
       readonly total: number
       readonly name: string
     }
+
+export type ScanEvent =
+  | { readonly type: 'phase'; readonly phase: ScanPhase }
+  | { readonly type: 'located'; readonly folders: readonly LocatedFolder[] }
+  | ProgressEvent
   | { readonly type: 'scanned'; readonly scan: BrowserScan }
   | { readonly type: 'failed'; readonly message: string }
 
-/** What the engine's worker posts: the events of a scan, and its requests for files. */
+/** A fix of the projects that were scanned, or of some of them. */
+export interface FixRequest extends ScanRequest {
+  /** The project folders to fix, as the scan placed them; without it, every project. */
+  readonly only?: readonly string[]
+  /** Leave uncertain matches out: their samples stay missing. */
+  readonly certainOnly?: boolean
+}
+
+/** Taking a run back: the folders the page has now, the run's among them. */
+export interface UndoRequest extends ScanRequest {
+  readonly run: string
+}
+
+export interface BrowserFixed {
+  /** The run, to undo it. */
+  readonly run: string
+  readonly sets: number
+  readonly files: number
+  readonly bytes: number
+  /** Sets that were not written, with the reason. */
+  readonly errors: readonly { readonly set: string; readonly error: string }[]
+}
+
+export interface BrowserUndone {
+  readonly restored: number
+  /** Copied files taken out of their projects (to the hidden folder that stands for a Trash). */
+  readonly trashed: number
+  /** Copied files that stay: another set uses them by now. */
+  readonly kept: number
+  readonly changedSince: readonly string[]
+  readonly problems: readonly string[]
+}
+
+export type FixEvent =
+  | { readonly type: 'phase'; readonly phase: ScanPhase | 'fixing' }
+  | ProgressEvent
+  | { readonly type: 'fixed'; readonly fixed: BrowserFixed }
+  /** `run`: it wrote something before it failed, which can be undone. */
+  | { readonly type: 'failed'; readonly message: string; readonly run?: string }
+
+export type UndoEvent =
+  | { readonly type: 'undone'; readonly undone: BrowserUndone }
+  | { readonly type: 'failed'; readonly message: string }
+
+/** What the engine's worker posts: the events of a run, and its requests for files. */
 export type FromEngine =
   | ScanEvent
+  | FixEvent
+  | UndoEvent
   /** The engine needs a file of an uploaded folder (answered with a `file` message). */
   | {
       readonly type: 'open'

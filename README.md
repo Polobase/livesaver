@@ -127,7 +127,9 @@ anything.
 your computer (where the browser allows a site to reach it; Safari does not).
 
 The same app also runs without livesaver behind it, on its own in a browser (Chrome, Safari,
-Firefox). Then you choose or drop the folders and it scans them by itself, read-only. A browser
+Firefox). Then you choose or drop the folders and it scans them by itself, read-only. (In Chrome
+and Edge it can also fix in a project folder you let it edit: an experiment with limits, off
+until you switch it on. See [In the browser](docs/guide/browser.md).) A browser
 does not tell a page where a folder lies on disk: livesaver works that out for project folders
 from the sets themselves. Drop the Ableton Live app on the page as well: it holds the Core
 Library and Live's own list of content it moved between versions, and with it the page reports
@@ -162,7 +164,7 @@ what the command line reports.
 | [`@livesaver/plugins`](packages/plugins) | Plug-in identity and inventory (installed, native or Rosetta), byte-exact VST2→VST3 conversion |
 | [`@livesaver/catalog`](packages/catalog) | Catalog of sets, plug-ins and samples in SQLite (FTS5), incremental indexing, the `find` language |
 | [`@livesaver/node`](packages/node) | Node.js/Bun host: file system, gzip, worker threads, Finder tags and comments, Live setup discovery |
-| [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a read-only file system, worker-based parsing, a scan of samples and plug-ins in the page |
+| [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a file system, worker-based parsing, a scan of samples and plug-ins in the page, and a fix through folder handles |
 | [`livesaver`](packages/cli) | The command-line tool |
 | [`apps/web`](apps/web) | The web app: Vite, Vue, Nuxt UI (not published) |
 | [`apps/site`](apps/site) | The site: landing page and the docs as pages (Nuxt, static; not published) |

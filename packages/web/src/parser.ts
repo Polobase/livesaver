@@ -14,7 +14,7 @@ import {
   pluginUsesOf,
   type SetParser,
 } from '@livesaver/core'
-import type { WebFs } from './fs.js'
+import { statOf, type WebFs } from './fs.js'
 import { webCodec } from './host.js'
 
 interface ParseRequest {
@@ -88,7 +88,7 @@ export function createWorkerParser(options: WorkerParserOptions): SetParser {
 
   const pending = new Map<
     number,
-    { resolve: (p: ParsedSet) => void; path: string; worker: number }
+    { resolve: (p: ParsedSet) => void; path: string; worker: number; file: File }
   >()
   const load = new Array<number>(options.workers).fill(0)
   let nextId = 0
@@ -96,19 +96,19 @@ export function createWorkerParser(options: WorkerParserOptions): SetParser {
 
   const workers = Array.from({ length: options.workers }, (_, w) => {
     const worker = options.spawn()
-    worker.onmessage = async ({ data: reply }: MessageEvent<ParseReply>) => {
+    worker.onmessage = ({ data: reply }: MessageEvent<ParseReply>) => {
       const job = pending.get(reply.id)
       if (!job) return
       pending.delete(reply.id)
       load[w] = (load[w] as number) - 1
       if (!reply.ok) return job.resolve({ ok: false, error: reply.error })
-      const stat = await host.fs.stat(job.path)
       job.resolve({
         ok: true,
         doc: documentFromXml(new Uint8Array(reply.xml), reply.gzipped, false),
         refs: reply.refs,
         ...(reply.plugins ? { plugins: reply.plugins } : {}),
-        ...(stat ? { stat } : {}),
+        // Of the very file that was parsed: a set saved since then is another one.
+        stat: statOf(job.file),
       })
     }
     worker.onerror = () => {
@@ -138,7 +138,7 @@ export function createWorkerParser(options: WorkerParserOptions): SetParser {
       const w = pick()
       const id = nextId++
       return new Promise<ParsedSet>((resolve) => {
-        pending.set(id, { resolve, path, worker: w })
+        pending.set(id, { resolve, path, worker: w, file })
         workers[w]?.postMessage({ id, file } satisfies ParseRequest)
       })
     },

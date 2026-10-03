@@ -3,10 +3,12 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { Run, RunDetail, Undone } from '../engine/types.js'
 import { useEngineStore } from './engine.js'
+import { useLibraryStore } from './library.js'
 import { useScanStore } from './scan.js'
 
 export const useHistoryStore = defineStore('history', () => {
   const engines = useEngineStore()
+  const library = useLibraryStore()
   const scans = useScanStore()
   /** Every run, the newest first (none before the first look, or where there is no history). */
   const runs = shallowRef<readonly Run[]>([])
@@ -18,7 +20,11 @@ export const useHistoryStore = defineStore('history', () => {
   const undone = shallowRef<{ run: string; result: Undone }>()
 
   async function refresh(): Promise<void> {
-    if (!engines.capabilities.history) return
+    if (!engines.capabilities.history) {
+      // (Fixing in the browser was switched off: its runs are no longer shown.)
+      runs.value = []
+      return
+    }
     try {
       runs.value = await engines.engine().runs()
       problem.value = ''
@@ -48,7 +54,8 @@ export const useHistoryStore = defineStore('history', () => {
       // A scan that still runs (the one after a fix) is waited for: livesaver does one thing
       // at a time.
       await scans.idle()
-      return await engines.engine().undo(id)
+      // A browser needs the folder the run changed among those the page has now.
+      return await engines.engine().undo(id, library.request)
     } finally {
       await refresh()
       undoing.value = ''

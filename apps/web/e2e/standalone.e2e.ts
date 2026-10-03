@@ -10,7 +10,16 @@ import { copyFixtures, tempDir, writeFile } from '@livesaver/test-kit'
 import type { Browser, Locator, Page } from 'playwright'
 import { build } from '../build.js'
 import { serve } from '../serve.js'
-import { barriers, ENGINES, giveFolder, PATIENCE, textOf, textsOf, watch } from './support.js'
+import {
+  barriers,
+  dropFolder,
+  ENGINES,
+  giveFolder,
+  PATIENCE,
+  textOf,
+  textsOf,
+  watch,
+} from './support.js'
 
 let server: { url: string; stop: () => void }
 
@@ -60,18 +69,7 @@ for (const [name, type] of ENGINES) {
       )
     const rows = () => page.locator('table tbody tr[data-slot=tr]')
 
-    /** Drops a folder from disk on an element, as a drag from the file manager does. */
-    const drop = async (target: Locator, folder: string) => {
-      await target.scrollIntoViewIfNeeded()
-      const box = await target.boundingBox()
-      if (!box) throw new Error('nothing to drop on')
-      const at = { x: box.x + box.width / 2, y: box.y + 16 }
-      const data = { items: [], files: [folder], dragOperationsMask: 1 }
-      const session = await page.context().newCDPSession(page)
-      for (const kind of ['dragEnter', 'dragOver', 'drop'] as const)
-        await session.send('Input.dispatchDragEvent', { type: kind, ...at, data })
-      await session.detach()
-    }
+    const drop = (target: Locator, folder: string) => dropFolder(page, target, folder)
     /** Only Chromium lets a test drop a folder (through its debugging protocol). */
     const withDrops = name === 'Chromium' ? test : test.skip
 
