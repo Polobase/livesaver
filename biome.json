@@ -8,8 +8,21 @@
       "!fixtures",
       "!bench/results",
       "!bench/out",
-      "!**/*.generated.ts"
+      "!**/*.generated.ts",
+      "!**/auto-imports.d.ts",
+      "!**/components.d.ts"
     ]
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "html": {
+    "experimentalFullSupportEnabled": true,
+    "formatter": {
+      "enabled": true
+    }
   },
   "formatter": {
     "enabled": true,
@@ -41,7 +54,8 @@
         "packages/plugins/src/**",
         "packages/catalog/src/**",
         "packages/web/src/**",
-        "apps/web/src/**"
+        "apps/web/src/**",
+        "apps/web-next/src/**"
       ],
       "linter": {
         "rules": {

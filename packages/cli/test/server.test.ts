@@ -113,6 +113,22 @@ test('only the page that was served may ask: token, address and origin must be i
   expect((await ask('/api/fix', { method: 'POST', body: {} })).status).toBe(403)
 })
 
+test('a development server may stand in front: its address is allowed, the token still needed', async () => {
+  const front = 'http://localhost:5174'
+  const api = await startWeb({ assets: false, origins: [front] })
+  const get = (headers: Record<string, string>) =>
+    fetch(`${api.url}api/info`, { headers }).then((answer) => answer.status)
+  try {
+    expect(await get({ [TOKEN_HEADER]: api.token, origin: front })).toBe(200)
+    expect(await get({ origin: front })).toBe(403)
+    expect(await get({ [TOKEN_HEADER]: api.token, origin: 'http://localhost:9999' })).toBe(403)
+    // It serves no page itself.
+    expect((await fetch(api.url)).status).toBe(404)
+  } finally {
+    await api.close()
+  }
+})
+
 test('a page that goes away in the middle of a run does not stop the server', async () => {
   const request = {
     projects: [projects],

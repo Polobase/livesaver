@@ -29,6 +29,10 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.2'
+      # The `.vue` files are type-checked by vue-tsc, which only runs under Node.js.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - run: bun install --frozen-lockfile
 
       # Build before check: each package's typecheck also runs `tsc -p tsconfig.build.json --noEmit`,
@@ -39,8 +43,12 @@ jobs:
         run: bun run check
       - name: Test
         run: bun test
-      # The built web app in the runner's own Chrome, headless.
-      - name: Test the web app in a browser
+      # The current web app in the runner's own Chrome; the new one in Playwright's Chromium,
+      # WebKit and Firefox.
+      - name: Install the test browsers
+        run: bunx playwright install --with-deps chromium webkit firefox
+        working-directory: apps/web-next
+      - name: Test the web apps in browsers
         run: bun run test:web
 
   node:

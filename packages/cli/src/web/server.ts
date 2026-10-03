@@ -21,8 +21,13 @@ import {
 export interface WebServerOptions extends WebSettings {
   /** 0 = any free port. */
   readonly port?: number
-  /** The folder with the built page; found next to this file if not given. */
-  readonly assets?: string
+  /** The folder with the built page; found next to this file if not given. `false`: no page. */
+  readonly assets?: string | false
+  /**
+   * Other addresses a page may come from, e.g. `http://localhost:5174` when a development
+   * server serves the page and passes its requests on. They need the token all the same.
+   */
+  readonly origins?: readonly string[]
   /** Called before the page is served, e.g. to rebuild it after a change. */
   readonly beforePage?: () => Promise<void>
 }
@@ -75,7 +80,7 @@ async function body(req: IncomingMessage): Promise<unknown> {
 }
 
 export async function startWeb(options: WebServerOptions = {}): Promise<WebServer> {
-  const assets = options.assets ?? findAssets()
+  const assets = options.assets === false ? '' : (options.assets ?? findAssets())
   const token = randomBytes(24).toString('hex')
   let port = options.port ?? 0
   /** One run at a time: a check reads what a fix writes. */
@@ -88,7 +93,9 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
     return (
       req.headers[TOKEN_HEADER] === token &&
       hosts.includes(req.headers.host ?? '') &&
-      (origin === undefined || hosts.some((host) => origin === `http://${host}`))
+      (origin === undefined ||
+        hosts.some((host) => origin === `http://${host}`) ||
+        (options.origins ?? []).includes(origin))
     )
   }
 
@@ -147,6 +154,7 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
   }
 
   const page = async (res: ServerResponse, pathname: string) => {
+    if (!assets) return send(res, 404, 'not found', 'text/plain')
     const name = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1))
     const path = normalize(join(assets, name))
     if (!path.startsWith(assets + sep)) return send(res, 404, 'not found', 'text/plain')
