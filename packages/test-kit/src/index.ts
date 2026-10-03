@@ -313,4 +313,5 @@ export function snapshot(dir: string): Record<string, [number, string]> {
   walk(dir)
   return out
 }
+export * from './browser.js'
 export * from './builders.js'

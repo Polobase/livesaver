@@ -32,6 +32,8 @@ export interface DoctorOptions {
   readonly matchLibraryPath?: boolean
   readonly writer?: Writer
   readonly keepXml?: boolean
+  /** Dry runs skip the strict scan of patched sets (see `ProcessOptions`). */
+  readonly quickPlan?: boolean
   readonly onEvent?: (event: DoctorEvent) => void
   /** Reads sets ahead of the (ordered) decisions; defaults to parsing in-process. */
   readonly parser?: SetParser
@@ -130,6 +132,7 @@ export async function doctor(host: Host, options: DoctorOptions): Promise<Doctor
     pending.delete(i)
     const result = await processSet(setPath, project, host, {
       keepXml: options.keepXml ?? false,
+      quickPlan: options.quickPlan ?? false,
       parsed,
     })
     if (cache) {

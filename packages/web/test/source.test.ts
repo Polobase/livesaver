@@ -1,0 +1,124 @@
+/** Folders as a drop hands them over: listed through the entries API, files fetched when read. */
+import { afterEach, beforeEach, expect, test } from 'bun:test'
+import { readdirSync, readFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { copyFixtures, tempDir, uploadedFolder, writeFile } from '@livesaver/test-kit'
+import { type FolderSource, foldersFromDrop, WebFs } from '../src/index.js'
+
+let tmp: { path: string; cleanup: () => void }
+let samples: string
+beforeEach(() => {
+  tmp = tempDir()
+  samples = copyFixtures(tmp.path).samples
+})
+afterEach(() => tmp.cleanup())
+
+/** Calls of `file()`: a file must only be fetched when it is read. */
+let fetched: string[] = []
+beforeEach(() => {
+  fetched = []
+})
+
+/** A file or folder as the entries API shows it; folders are listed two entries at a time. */
+function entryOf(path: string, isDirectory: boolean): unknown {
+  const name = basename(path)
+  if (!isDirectory) {
+    return {
+      isDirectory: false,
+      name,
+      file: (done: (file: File) => void) => {
+        fetched.push(name)
+        done(new File([readFileSync(path)], name))
+      },
+    }
+  }
+  return {
+    isDirectory: true,
+    name,
+    createReader() {
+      const entries = readdirSync(path, { withFileTypes: true }).map((e) =>
+        entryOf(join(path, e.name), e.isDirectory()),
+      )
+      return { readEntries: (done: (batch: unknown[]) => void) => done(entries.splice(0, 2)) }
+    },
+  }
+}
+
+interface Item {
+  kind: string
+  webkitGetAsEntry: () => unknown
+}
+
+const folder = (dir: string): Item => ({ kind: 'file', webkitGetAsEntry: () => entryOf(dir, true) })
+
+const drop = (items: Item[], onFiles?: (count: number) => void) =>
+  foldersFromDrop(items as unknown as DataTransferItemList, onFiles)
+
+const listing = (source: FolderSource | undefined) => {
+  if (source?.kind !== 'listing') throw new Error('expected a listing')
+  return source
+}
+
+test('a dropped folder is listed: every file with its path, no file fetched', async () => {
+  // Names a directory handle would hide: a ':' (shown as '/' by Finder), a leading space.
+  writeFile(join(samples, 'Claps:Snares', ' clap.wav'), 'RIFF')
+  const counts: number[] = []
+  const [source, ...more] = await drop([folder(samples)], (count) => counts.push(count))
+  expect(more).toEqual([])
+  expect(source?.name).toBe('samples')
+  const expected = uploadedFolder(samples).files.map((f) => f.path)
+  expect(expected).toContain('Claps:Snares/ clap.wav')
+  expect([...listing(source).paths].sort()).toEqual(expected.sort())
+  expect(counts.at(-1)).toBe(expected.length)
+  expect(counts).toEqual([...counts].sort((a, b) => a - b))
+  expect(fetched).toEqual([])
+})
+
+test('a file of a dropped folder is fetched when it is read', async () => {
+  const [source] = await drop([folder(samples)])
+  const { paths, open } = listing(source)
+  const kick = await open(paths.indexOf('Lib1/Kick/1.wav'))
+  expect(kick?.size).toBe(readFileSync(join(samples, 'Lib1', 'Kick', '1.wav')).length)
+  expect(fetched).toEqual(['1.wav'])
+  expect(await open(paths.length)).toBeUndefined()
+
+  const fs = new WebFs([{ path: '/samples', source: listing(source) }])
+  expect((await fs.stat('/samples/Lib2/Kick/1.wav'))?.size).toBe(
+    readFileSync(join(samples, 'Lib2', 'Kick', '1.wav')).length,
+  )
+  expect(await fs.kind('/samples/Lib1/Kick/1.wav.asd')).toBe('file')
+  expect(fetched).toEqual(['1.wav', '1.wav'])
+})
+
+test('a file that is gone when it is read is like a file that is not there', async () => {
+  const gone = {
+    isDirectory: true,
+    name: 'folder',
+    createReader() {
+      const entries = [
+        {
+          isDirectory: false,
+          name: 'gone.wav',
+          file: (_done: unknown, failed: (error: Error) => void) => failed(new Error('gone')),
+        },
+      ]
+      return { readEntries: (done: (batch: unknown[]) => void) => done(entries.splice(0, 2)) }
+    },
+  }
+  const [source] = await drop([{ kind: 'file', webkitGetAsEntry: () => gone }])
+  expect(await listing(source).open(0)).toBeUndefined()
+  const fs = new WebFs([{ path: '/folder', source: listing(source) }])
+  expect(await fs.stat('/folder/gone.wav')).toBeUndefined()
+})
+
+test('several folders can be dropped at once; dropped files and text are not folders', async () => {
+  const wav = join(samples, 'Lib1', 'Kick', '1.wav')
+  const sources = await drop([
+    { kind: 'string', webkitGetAsEntry: () => null },
+    folder(join(samples, 'Lib1')),
+    { kind: 'file', webkitGetAsEntry: () => entryOf(wav, false) },
+    folder(join(samples, 'Lib2')),
+  ])
+  expect(sources.map((s) => `${s.kind} ${s.name}`)).toEqual(['listing Lib1', 'listing Lib2'])
+  expect([...listing(sources[0]).paths].sort()).toEqual(['Kick/1.wav', 'Kick/1.wav.asd'])
+})

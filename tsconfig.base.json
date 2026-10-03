@@ -23,7 +23,8 @@
       "@livesaver/test-kit": ["./packages/test-kit/src/index.ts"],
       "livesaver": ["./packages/cli/src/index.ts"],
       "@livesaver/plugins": ["./packages/plugins/src/index.ts"],
-      "@livesaver/catalog": ["./packages/catalog/src/index.ts"]
+      "@livesaver/catalog": ["./packages/catalog/src/index.ts"],
+      "@livesaver/web": ["./packages/web/src/index.ts"]
     }
   }
 }

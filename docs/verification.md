@@ -16,6 +16,8 @@ writes runs on temporary copies.
 - **Property tests** for the XML scanner and patcher: random edits are applied, written and read
   back; an empty patch round-trips byte-identically.
 - `bun run test:node` runs the built CLI under Node.js (collect + undo, status + undo).
+- `bun run test:web` runs the built web app in a headless browser; on a real library its report
+  files are byte-identical to the command line's (see [web.md](web.md)).
 
 ## Corpus round trip
 `LIVESAVER_CORPUS=<folder> bun test corpus` (read-only): every Live document below the folder,

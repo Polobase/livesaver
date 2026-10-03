@@ -39,7 +39,9 @@
         "packages/core/src/**",
         "packages/ops/src/**",
         "packages/plugins/src/**",
-        "packages/catalog/src/**"
+        "packages/catalog/src/**",
+        "packages/web/src/**",
+        "apps/web/src/**"
       ],
       "linter": {
         "rules": {
@@ -88,7 +90,7 @@
       }
     },
     {
-      "includes": ["packages/*/test/**"],
+      "includes": ["packages/*/test/**", "apps/*/test/**", "apps/*/e2e/**"],
       "linter": {
         "rules": {
           "nursery": {

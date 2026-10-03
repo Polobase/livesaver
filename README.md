@@ -4,8 +4,9 @@
 Save* across hundreds of projects, move VST2 plug-ins to VST3, audit plug-ins, and search your whole
 library, all without Live running. Fast, byte-exact, and safe by default.
 
-> Status: **0.1.0 in preparation** (milestones M0–M7 done): `doctor`, `collect [--apply]`, `undo`,
-> `plugins upgrade|list|audit`, `status`, `reorg`, `move`, `index`, `find`, `sql`, `run`.
+> Status: **0.1.0 in preparation** (milestones M0–M7 done, M8 begun): `doctor`, `collect [--apply]`,
+> `undo`, `plugins upgrade|list|audit`, `status`, `reorg`, `move`, `index`, `find`, `sql`, `run`,
+> and a web app that checks your projects in the browser.
 > Tested against sets saved by Live itself and on a real 842-set library (read-only round trips
 > of 13,000 Live documents). See [docs/verification.md](docs/verification.md).
 
@@ -100,6 +101,18 @@ your Live setup):
 }
 ```
 
+### In the browser
+`bun run web` serves the web app on `http://127.0.0.1:5173/`. Add your project folders and the
+folders to search (choose them or drop them on the page: the files are only read by the page, on
+your computer), and it checks every set like `doctor` does: what is complete, what can be
+collected or repaired, what is missing and where it came from, with the same report files to
+download. It never writes.
+
+A browser does not tell a page where a folder lies on disk. livesaver works that out for project
+folders from the sets themselves; a path can also be typed. Given Live's `App-Resources` folder,
+the page reads Live's own list of content it moved between versions, and then reports exactly
+what the command line reports.
+
 ## Why livesaver
 - **Byte-exact edits.** Only the bytes that must change do change; everything else in a Live Set
   stays identical. Nothing is ever re-serialized.
@@ -117,7 +130,7 @@ your Live setup):
   - Nothing is ever deleted.
 - **Fast.** Reference search runs at ~10 GB/s, sets are parsed on all cores, complete sets are
   cached, and copies are APFS clones (no extra disk space, under Bun).
-- **Library-first.** A typed API for Node.js and Bun (browser support planned), a CLI, and JSON output.
+- **Library-first.** A typed API for Node.js, Bun and the browser, a CLI, and JSON output.
 
 ## Packages
 | Package | What it does |
@@ -128,7 +141,9 @@ your Live setup):
 | [`@livesaver/plugins`](packages/plugins) | Plug-in identity and inventory (installed, native or Rosetta), byte-exact VST2→VST3 conversion |
 | [`@livesaver/catalog`](packages/catalog) | Catalog of sets, plug-ins and samples in SQLite (FTS5), incremental indexing, the `find` language |
 | [`@livesaver/node`](packages/node) | Node.js/Bun host: file system, gzip, worker threads, Finder tags and comments, Live setup discovery |
+| [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a read-only file system, worker-based parsing |
 | [`livesaver`](packages/cli) | The command-line tool |
+| [`apps/web`](apps/web) | The web app (not published) |
 
 ## Roadmap
 | Milestone | Delivers |
@@ -140,7 +155,7 @@ your Live setup):
 | ✅ M5 | plug-in inventory and audit (`plugins list`, `plugins audit`) |
 | ✅ M6 | catalog and search (`index`, `find`, `sql`) |
 | ✅ M7 | codemods (`livesaver run`) |
-| M8 | web app, Finder Quick Actions |
+| 🚧 M8 | web app (read-only check: done), Finder Quick Actions |
 
 ## Development
 ```sh
@@ -150,6 +165,8 @@ bun run build      # tsc, dependency order
 bun test           # unit, property and end-to-end tests
 bun run check      # biome + typecheck
 bun run test:node  # the built CLI under Node.js
+bun run web        # the web app on http://127.0.0.1:5173/
+bun run test:web   # the web app in a real browser (needs a Chromium-based browser)
 ```
 
 ## License

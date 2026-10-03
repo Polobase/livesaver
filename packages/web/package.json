@@ -1,0 +1,50 @@
+{
+  "name": "@livesaver/web",
+  "version": "0.0.0",
+  "description": "Browser host for livesaver: folders a page was given (folder upload, drag and drop, File System Access API) as a read-only file system, gzip, hashing and worker-based set parsing.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Manuel Haller Polo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polobase/livesaver.git",
+    "directory": "packages/web"
+  },
+  "homepage": "https://github.com/Polobase/livesaver/tree/main/packages/web#readme",
+  "bugs": {
+    "url": "https://github.com/Polobase/livesaver/issues"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.build.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@livesaver/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@livesaver/node": "workspace:*",
+    "@livesaver/ops": "workspace:*",
+    "@livesaver/test-kit": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "ableton",
+    "ableton-live",
+    "browser",
+    "file-system-access"
+  ]
+}

@@ -33,7 +33,11 @@ import {
   wantedLocation,
 } from './collect.js'
 import { isInside } from './env.js'
+import { mapLimited } from './file-index.js'
 import { checkOf, classify, methodText, resolveExisting, type Status } from './match.js'
+
+/** References whose files are read at the same time before a set's decisions are made. */
+const READ_AHEAD = 16
 
 export class VerifyError extends Error {
   constructor(message: string) {
@@ -80,7 +84,12 @@ export async function processSet(
   }
 
   const setDir = posix.dirname(setPath)
-  const ids = RelPathIds.of(doc)
+  // Found by scanning the whole document, so only when a reference really gets rewritten.
+  let relIds: RelPathIds | undefined
+  const ids = () => {
+    relIds ??= RelPathIds.of(doc)
+    return relIds
+  }
   const edits: Edit[] = []
   const stale: [FileRef[], string][] = []
   const decide = (ref: FileRef, status: Status, extra: Partial<Decision> = {}) =>
@@ -96,6 +105,18 @@ export async function processSet(
       stale: false,
       ...extra,
     })
+  // Choosing a replacement reads files (fingerprints, sometimes whole samples). The decisions
+  // below are made one by one, in order; the reading for them is started here for many
+  // references at once, so a file system with slow round trips (a browser, a network drive) is
+  // not waited for one file at a time. Nothing is decided here: the probe and the project keep
+  // what was read, and a failure shows up at its reference below.
+  await mapLimited([...groups.values()], READ_AHEAD, async (same) => {
+    const ref = same[0] as FileRef
+    if (!ref.name) return
+    try {
+      if (!(await resolveExisting(ref, setDir, root, env, probe))) await project.choose(ref)
+    } catch {}
+  })
   try {
     for (const same of groups.values()) {
       const ref = same[0] as FileRef
@@ -173,7 +194,7 @@ export async function processSet(
       result.counts[status]++
       const lastModDate = await lastMod(dst, source || dst, probe)
       for (const r of same)
-        edits.push(...(await refEdits(doc, r, dst, root, setDir, env, ids, lastModDate)))
+        edits.push(...(await refEdits(doc, r, dst, root, setDir, env, ids(), lastModDate)))
       const oldPath = ref.path || ref.hintPath || ref.relPath
       result.changes.push({
         action,
@@ -193,7 +214,7 @@ export async function processSet(
     if (edits.length === 0) return result
     for (const [same, existing] of stale) {
       for (const r of same)
-        edits.push(...(await refEdits(doc, r, existing, root, setDir, env, ids, undefined)))
+        edits.push(...(await refEdits(doc, r, existing, root, setDir, env, ids(), undefined)))
       const ref = same[0] as FileRef
       result.changes.push({
         action: 'path-updated',
@@ -211,7 +232,7 @@ export async function processSet(
     const p = patchDoc(doc.xml)
     for (const e of edits) p.replaceRange(e.start, e.end, e.text)
     const newXml = p.apply()
-    await verify(newXml, doc, refs, setDir, project)
+    await verify(newXml, doc, refs, setDir, project, options.quickPlan ?? false)
     if (options.keepXml) {
       result.newXml = newXml
       result.edits = p.edits()
@@ -245,10 +266,13 @@ async function verify(
   oldRefs: readonly FileRef[],
   setDir: string,
   project: Project,
+  quickPlan: boolean,
 ) {
   let newDoc: LiveDoc
   try {
-    newDoc = documentFromXml(newXml, doc.gzipped, true, doc.search)
+    // Strict: every byte of the patched XML is scanned. Only a plan may do without.
+    const strict = project.writer.apply || !quickPlan
+    newDoc = documentFromXml(newXml, doc.gzipped, strict, doc.search)
   } catch (error) {
     throw new VerifyError(`patched XML is not well-formed: ${(error as Error).message}`)
   }

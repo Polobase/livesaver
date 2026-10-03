@@ -1,0 +1,145 @@
+/**
+ * Folders a page was given. Browsers hand them over in three ways, and none reveals where the
+ * folder lies on disk:
+ * - a folder upload (`<input type="file" webkitdirectory>`, every browser): all files at once;
+ * - drag and drop: the entries of the dropped folder, listed here, each file fetched when read;
+ * - the File System Access API (`showDirectoryPicker`, Chromium only): a handle, listed on demand.
+ * Nothing is uploaded anywhere: the files stay on the user's disk and are read in the page.
+ *
+ * A handle is the only one of the three that can also write, but it does not show everything.
+ * Chromium hides entries whose names it considers unsafe: a name with a `:` (which Finder shows
+ * as `/`, as in a folder "Claps/Snares"), a name that starts or ends with a space, `desktop.ini`
+ * and a few more; it also hands out no handle for a folder in `/Applications`. A check that must
+ * see every sample therefore takes uploads and drops.
+ */
+
+/** The part of a `FileSystemDirectoryHandle` livesaver reads. */
+export interface DirectoryHandleLike {
+  readonly kind: 'directory'
+  readonly name: string
+  values(): AsyncIterable<{ readonly kind: 'file' | 'directory'; readonly name: string }>
+}
+
+/** The part of a `FileSystemFileHandle` livesaver reads. */
+export interface FileHandleLike {
+  readonly kind: 'file'
+  readonly name: string
+  getFile(): Promise<File>
+}
+
+/** One file of an uploaded folder; `path` is relative to the folder, '/'-separated. */
+export interface FolderFile {
+  readonly path: string
+  readonly file: File
+}
+
+export type FolderSource =
+  | { readonly kind: 'handle'; readonly name: string; readonly handle: DirectoryHandleLike }
+  | { readonly kind: 'files'; readonly name: string; readonly files: readonly FolderFile[] }
+  /**
+   * A folder known by the paths of its files only (relative to the folder, '/'-separated); a
+   * file is fetched when it is first read. A dropped folder is listed this way: fetching every
+   * file of a large folder up front takes most of a minute. So is an uploaded folder as a worker
+   * gets it: sending hundreds of thousands of `File` objects to a worker takes many seconds.
+   */
+  | {
+      readonly kind: 'listing'
+      readonly name: string
+      readonly paths: readonly string[]
+      readonly open: (index: number) => Promise<File | undefined>
+    }
+
+/** A folder as its handle (see above for what a handle does not show). */
+export function folderFromHandle(handle: DirectoryHandleLike): FolderSource {
+  return { kind: 'handle', name: handle.name, handle }
+}
+
+/**
+ * The folders of a folder upload. Each file's `webkitRelativePath` starts with the name of the
+ * folder that was chosen.
+ */
+export function foldersFromFiles(files: Iterable<File>): FolderSource[] {
+  const folders = new Map<string, FolderFile[]>()
+  for (const file of files) {
+    const relative = file.webkitRelativePath || file.name
+    const cut = relative.indexOf('/')
+    const name = cut < 0 ? '' : relative.slice(0, cut)
+    let list = folders.get(name)
+    if (!list) {
+      list = []
+      folders.set(name, list)
+    }
+    list.push({ path: cut < 0 ? relative : relative.slice(cut + 1), file })
+  }
+  return [...folders].map(([name, list]) => ({ kind: 'files', name, files: list }))
+}
+
+/** Entries are read 100 at a time (Chromium), and a reader is done when it returns none. */
+async function readEntries(dir: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> {
+  const reader = dir.createReader()
+  const all: FileSystemEntry[] = []
+  for (;;) {
+    const batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
+      reader.readEntries(resolve, reject),
+    )
+    if (batch.length === 0) return all
+    all.push(...batch)
+  }
+}
+
+interface Listing {
+  readonly paths: string[]
+  readonly files: FileSystemFileEntry[]
+}
+
+async function listBelow(
+  dir: FileSystemDirectoryEntry,
+  prefix: string,
+  out: Listing,
+  onFiles: (count: number) => void,
+): Promise<void> {
+  const folders: FileSystemDirectoryEntry[] = []
+  for (const entry of await readEntries(dir)) {
+    if (entry.isDirectory) folders.push(entry as FileSystemDirectoryEntry)
+    else {
+      out.paths.push(prefix + entry.name)
+      out.files.push(entry as FileSystemFileEntry)
+    }
+  }
+  onFiles(out.paths.length)
+  for (const folder of folders) await listBelow(folder, `${prefix}${folder.name}/`, out, onFiles)
+}
+
+/**
+ * The folders of a drop, read through the entries API. Call it inside the `drop` handler: the
+ * items are only readable while the event is being handled, so everything is taken from them
+ * before the first `await`. `onFiles` reports the number of files found so far in the folder
+ * that is being listed.
+ */
+export function foldersFromDrop(
+  items: DataTransferItemList,
+  onFiles: (count: number) => void = () => {},
+): Promise<FolderSource[]> {
+  const dropped: FileSystemDirectoryEntry[] = []
+  for (const item of items) {
+    const entry = item.kind === 'file' ? item.webkitGetAsEntry() : null
+    if (entry?.isDirectory) dropped.push(entry as FileSystemDirectoryEntry)
+  }
+  return (async () => {
+    const folders: FolderSource[] = []
+    for (const entry of dropped) {
+      const listing: Listing = { paths: [], files: [] }
+      await listBelow(entry, '', listing, onFiles)
+      const { paths, files } = listing
+      const open = (index: number) =>
+        new Promise<File | undefined>((resolve) => {
+          const file = files[index]
+          // Gone since the folder was listed: the same as a file that is not there.
+          if (file) file.file(resolve, () => resolve(undefined))
+          else resolve(undefined)
+        })
+      folders.push({ kind: 'listing', name: entry.name, paths, open })
+    }
+    return folders
+  })()
+}

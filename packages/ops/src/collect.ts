@@ -364,4 +364,10 @@ export async function refEdits(
 export interface ProcessOptions {
   /** Keep the patched XML on the result (for writing, diffs and tests). */
   readonly keepXml?: boolean
+  /**
+   * In a dry run, only count the references of the patched XML instead of scanning it strictly
+   * (the scan is most of a plan's time where no worker thread does it). A set is never written
+   * without the strict scan.
+   */
+  readonly quickPlan?: boolean
 }

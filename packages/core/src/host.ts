@@ -32,6 +32,11 @@ export interface FsRead {
   stat(path: string): Promise<FileStat | undefined>
   /** `stat` of a symbolic link itself (hosts without links may leave it out). */
   lstat?(path: string): Promise<FileStat | undefined>
+  /**
+   * Whether a path is a file or a directory, for hosts where that is much cheaper than `stat`:
+   * a browser has to fetch a file to learn its size, which existence checks do not need.
+   */
+  kind?(path: string): Promise<'file' | 'directory' | undefined>
   /** Up to `length` bytes starting at `offset`. */
   read(path: string, offset: number, length: number): Promise<Uint8Array>
   readFile(path: string): Promise<Uint8Array>
@@ -53,6 +58,11 @@ export interface Hasher {
 
 export interface HashPort {
   sha1(): Hasher
+  /**
+   * SHA-1 of the parts taken together, for hosts whose fast hash only works on whole buffers and
+   * asynchronously (a browser's `crypto.subtle`). Used for data that is in memory anyway.
+   */
+  sha1Of?(parts: readonly Uint8Array[]): Promise<string>
 }
 
 /**

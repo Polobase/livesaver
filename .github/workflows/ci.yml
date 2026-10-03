@@ -39,6 +39,9 @@ jobs:
         run: bun run check
       - name: Test
         run: bun test
+      # The built web app in the runner's own Chrome, headless.
+      - name: Test the web app in a browser
+        run: bun run test:web
 
   node:
     needs: bun
@@ -76,7 +79,7 @@ jobs:
       - name: publint + arethetypeswrong
         run: |
           failed=0
-          for dir in packages/xml packages/core packages/plugins packages/node packages/ops packages/catalog packages/cli; do
+          for dir in packages/xml packages/core packages/plugins packages/node packages/ops packages/catalog packages/web packages/cli; do
             echo "::group::${dir}"
             bunx publint@0.3.24 --strict "$dir" || failed=1
             (cd "$dir" && bunx @arethetypeswrong/cli@0.18.5 --pack . --profile esm-only --format ascii) || failed=1

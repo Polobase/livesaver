@@ -103,9 +103,16 @@ export {
   type PlistValue,
   parsePlist,
 } from './plist.js'
-export { EMPTY_REMAP, MAX_REMAP_STEPS, type RemapTable, remapKey } from './remap.js'
+export {
+  EMPTY_REMAP,
+  MAX_REMAP_STEPS,
+  parseRemapTable,
+  type RemapTable,
+  remapKey,
+} from './remap.js'
 export { type ByteSearch, type Finder, indexOfBytes, searchBytes } from './search.js'
 export { Sha1 } from './sha1.js'
+export { readSqliteTable, SqliteFormatError, type SqliteTable } from './sqlite-file.js'
 export {
   COMMENT_ATTR,
   decodeComment,

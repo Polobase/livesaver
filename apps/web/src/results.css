@@ -1,0 +1,318 @@
+/* What a check found: stat tiles, the state of the references, bar lists, tables, reports. */
+
+/* --------------------------------------------------------------------------------- stat tiles */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.tile-label,
+.tile-note {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* Proportional figures: equal-width digits look loose at this size. */
+.tile-value {
+  font-size: 28px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+/* ----------------------------------------------------------------------------- reference state */
+
+.health-fine {
+  color: var(--fine);
+}
+
+.health-fixable {
+  color: var(--fixable);
+}
+
+.health-missing {
+  color: var(--missing);
+}
+
+/* One bar, parts of a whole; a gap in the surface colour separates the parts. */
+.stack {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  margin: 14px 0 12px;
+}
+
+.segment {
+  min-width: 3px;
+  flex-basis: 0;
+}
+
+.segment:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.segment:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.segment:only-child {
+  border-radius: 4px;
+}
+
+.segment:hover {
+  filter: brightness(1.12);
+}
+
+.segment-fine {
+  background: var(--fine);
+}
+
+.segment-fixable {
+  background: var(--fixable);
+}
+
+.segment-missing {
+  background: var(--missing);
+}
+
+.legend {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 560px;
+  font-size: 13px;
+}
+
+.legend th {
+  text-align: left;
+  font-weight: 400;
+  padding: 2px 0;
+}
+
+.legend td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 0 2px 16px;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.legend-group th,
+.legend-group td {
+  font-weight: 600;
+  padding-top: 8px;
+}
+
+.legend-group .health {
+  margin-right: 6px;
+}
+
+.legend-detail th {
+  padding-left: 22px;
+  color: var(--ink-2);
+}
+
+.legend-detail td {
+  color: var(--ink-2);
+}
+
+/* ------------------------------------------------------------------------------------ bar list */
+
+.bars {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.bars th {
+  text-align: left;
+  font-weight: 400;
+  padding: 7px 0;
+  min-width: 0;
+}
+
+.bars tbody tr + tr > * {
+  border-top: 1px solid var(--grid);
+}
+
+.bar-kind {
+  color: var(--ink-2);
+  margin-right: 6px;
+}
+
+.bar-kind::after {
+  content: ":";
+}
+
+.bar-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.bar-hint {
+  display: block;
+  color: var(--ink-2);
+}
+
+.bar-track {
+  display: block;
+  margin-top: 5px;
+  height: 6px;
+}
+
+/* Thin, square at the baseline, rounded at the data end. */
+.bar {
+  display: block;
+  height: 100%;
+  background: var(--series);
+  border-radius: 0 4px 4px 0;
+}
+
+.bars tbody tr:hover .bar {
+  filter: brightness(1.12);
+}
+
+.bar-value,
+.bar-projects {
+  vertical-align: top;
+  text-align: right;
+  white-space: nowrap;
+  padding: 7px 0 7px 16px;
+  font-variant-numeric: tabular-nums;
+  width: 1%;
+}
+
+.bar-value {
+  font-weight: 600;
+}
+
+.bar-projects {
+  color: var(--ink-2);
+}
+
+/* --------------------------------------------------------------------------------------- tables */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--grid);
+  margin-bottom: 14px;
+}
+
+.tab {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  padding: 6px 10px 8px;
+  margin-bottom: -1px;
+  color: var(--ink-2);
+}
+
+.tab.selected {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tab-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  font-weight: 400;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.filters input[type="search"] {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.data th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  padding: 6px 12px 6px 0;
+  border-bottom: 1px solid var(--axis);
+}
+
+.data td {
+  padding: 6px 12px 6px 0;
+  border-bottom: 1px solid var(--grid);
+  vertical-align: top;
+}
+
+.data tbody tr:hover {
+  background: var(--wash);
+}
+
+.data .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.zero {
+  color: var(--ink-2);
+  opacity: 0.45;
+}
+
+.path {
+  display: block;
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.state {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 16px 0 4px;
+}
+
+/* -------------------------------------------------------------------------------------- reports */
+
+.downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.file-name {
+  font-size: 12px;
+  color: var(--ink-2);
+}
