@@ -1,23 +1,30 @@
 <script setup lang="ts">
 import type { CommandPaletteGroup, CommandPaletteItem, NavigationMenuItem } from '@nuxt/ui'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onErrorCaptured, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ReviewSheet from '../components/fix/ReviewSheet.vue'
 import UpgradeSheet from '../components/plugins/UpgradeSheet.vue'
+import { bytes, plural } from '../lib/format'
 import { useEngineStore } from '../stores/engine'
 import { useFixStore } from '../stores/fix'
+import { useHistoryStore } from '../stores/history'
 import { useLibraryStore } from '../stores/library'
 import { usePluginsStore } from '../stores/plugins'
 import { useScanStore } from '../stores/scan'
 import AppLogo from './AppLogo.vue'
 import { PLACES, type Place, SETTINGS } from './navigation'
+import ShortcutsHelp from './ShortcutsHelp.vue'
+import { shortcutsOpen } from './shortcuts'
 
 const router = useRouter()
+const route = useRoute()
+const toast = useToast()
 const engine = useEngineStore()
 const library = useLibraryStore()
 const scans = useScanStore()
 const fix = useFixStore()
 const plugins = usePluginsStore()
+const history = useHistoryStore()
 
 /** What the engine starts with: its folders, the scan it kept, the last fix that can be undone. */
 onMounted(async () => {
@@ -26,7 +33,78 @@ onMounted(async () => {
   library.init(engine.start)
   scans.restore(engine.start.last)
   plugins.restore(engine.start.last?.upgrade)
-  await Promise.all([fix.refreshLast(), plugins.refreshLast()])
+  await history.refresh()
+})
+
+/**
+ * What a fix or an undo did is said on the Overview. Fixed from another page (one project, from
+ * its panel), a toast says it there, with the undo within reach.
+ */
+const elsewhere = () => route.path !== '/'
+watch(
+  () => fix.review,
+  (review, before) => {
+    const fixed = fix.fixed
+    // Closed to undo it at once (the result's own button): that is said when it is undone.
+    if (review || !before || !fixed || fix.undoing || !elsewhere()) return
+    toast.add({
+      title: `Fixed: ${plural(fixed.sets, 'set')} rewritten, ${plural(fixed.files, 'file')} copied${fixed.bytes ? ` (${bytes(fixed.bytes)})` : ''}`,
+      icon: 'i-lucide-circle-check',
+      // Long enough to reach for the undo.
+      duration: 12_000,
+      actions: [
+        ...(fixed.run && engine.capabilities.undo
+          ? [
+              {
+                label: 'Undo',
+                icon: 'i-lucide-undo-2',
+                color: 'neutral' as const,
+                variant: 'outline' as const,
+                onClick: () => void fix.undo(fixed.run),
+              },
+            ]
+          : []),
+        {
+          label: 'History',
+          color: 'neutral' as const,
+          variant: 'ghost' as const,
+          onClick: () => void router.push('/history'),
+        },
+      ],
+    })
+  },
+)
+watch(
+  () => fix.undone,
+  (undone) => {
+    if (!undone || !elsewhere()) return
+    toast.add({
+      title: `Undone: ${plural(undone.restored, 'set')} restored, ${plural(undone.trashed, 'file')} moved to the Trash`,
+      icon: 'i-lucide-undo-2',
+      ...(undone.changedSince.length + undone.problems.length
+        ? { description: 'Not everything could be taken back: the Overview says what was left.' }
+        : {}),
+    })
+  },
+)
+watch(
+  () => fix.failure,
+  (failure) => {
+    // A fix that failed says so in its review; this is for an undo started from a toast.
+    if (!failure || fix.review || !elsewhere()) return
+    toast.add({ title: 'It did not work', description: failure.message, color: 'error' })
+  },
+)
+
+// Something nobody expected is said, not swallowed: the app goes on, and the user knows.
+onErrorCaptured((error) => {
+  console.error(error)
+  toast.add({
+    title: 'Something went wrong',
+    description: (error as Error).message || String(error),
+    color: 'error',
+  })
+  return false
 })
 
 // A folder dropped beside the lists must not make the browser leave the page for it.
@@ -91,6 +169,14 @@ const actions = computed<CommandPaletteItem[]>(() => [
         },
       ]
     : []),
+  {
+    label: 'Keyboard shortcuts',
+    icon: 'i-lucide-keyboard',
+    kbds: ['?'],
+    onSelect: () => {
+      shortcutsOpen.value = true
+    },
+  },
 ])
 
 const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
@@ -108,14 +194,17 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
   },
 ])
 
-defineShortcuts(
-  Object.fromEntries(
+defineShortcuts({
+  ...Object.fromEntries(
     [...PLACES, SETTINGS].map((place) => [
       place.keys.join('-').toLowerCase(),
       () => router.push(place.to),
     ]),
   ),
-)
+  '?': () => {
+    shortcutsOpen.value = true
+  },
+})
 </script>
 
 <template>
@@ -166,7 +255,18 @@ defineShortcuts(
               <span class="truncate">{{ where.label }}</span>
             </span>
           </UTooltip>
-          <UColorModeButton />
+          <div class="flex shrink-0 items-center">
+            <UTooltip text="Keyboard shortcuts" :kbds="['?']">
+              <UButton
+                icon="i-lucide-keyboard"
+                color="neutral"
+                variant="ghost"
+                aria-label="Keyboard shortcuts"
+                @click="shortcutsOpen = true"
+              />
+            </UTooltip>
+            <UColorModeButton />
+          </div>
         </footer>
       </template>
     </UDashboardSidebar>
@@ -176,5 +276,6 @@ defineShortcuts(
     <RouterView />
     <ReviewSheet />
     <UpgradeSheet />
+    <ShortcutsHelp />
   </UDashboardGroup>
 </template>

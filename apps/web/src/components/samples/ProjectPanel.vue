@@ -19,6 +19,7 @@ import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
 import { useScanStore } from '../../stores/scan'
 import PathText from '../common/PathText.vue'
+import RevealLink from '../common/RevealLink.vue'
 import ScrollRegion from '../common/ScrollRegion.vue'
 import StatusPill from '../common/StatusPill.vue'
 
@@ -27,7 +28,6 @@ const emit = defineEmits<{ close: []; changes: [search: string] }>()
 const engines = useEngineStore()
 const fix = useFixStore()
 const scans = useScanStore()
-const toast = useToast()
 
 /** Changes and missing samples listed here; the tabs list them all. */
 const LISTED = 30
@@ -59,14 +59,6 @@ const file = computed(() => {
   return d.set ? `${d.project.root}/${d.set.path.slice(d.project.path.length + 1)}` : d.project.root
 })
 
-async function reveal(): Promise<void> {
-  try {
-    await engines.engine().reveal(file.value)
-  } catch (error) {
-    toast.add({ title: 'Could not show it', description: (error as Error).message, color: 'error' })
-  }
-}
-
 function fixIt(): void {
   if (!detail.value) return
   emit('close')
@@ -86,15 +78,7 @@ function fixIt(): void {
         <div class="flex flex-wrap items-center gap-3">
           <StatusPill :health="health" class="font-medium" />
           <div class="ms-auto flex gap-2">
-            <UButton
-              v-if="engines.capabilities.reveal"
-              size="sm"
-              color="neutral"
-              variant="subtle"
-              icon="i-lucide-folder-search"
-              label="Show in Finder"
-              @click="reveal"
-            />
+            <RevealLink button :path="file" />
             <UButton
               v-if="engines.capabilities.fix && detail.project.changingSets > 0"
               size="sm"

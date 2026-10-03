@@ -5,6 +5,7 @@ import FixCard from '../components/overview/FixCard.vue'
 import HealthHeadline from '../components/overview/HealthHeadline.vue'
 import MissingCard from '../components/overview/MissingCard.vue'
 import PluginsCard from '../components/overview/PluginsCard.vue'
+import RecentRuns from '../components/overview/RecentRuns.vue'
 import ReferencesCard from '../components/overview/ReferencesCard.vue'
 import ReportsMenu from '../components/overview/ReportsMenu.vue'
 import ScanFacts from '../components/overview/ScanFacts.vue'
@@ -33,25 +34,6 @@ const fix = useFixStore()
     </template>
 
     <div class="mx-auto w-full max-w-5xl space-y-6">
-      <UAlert
-        v-if="engines.problem"
-        color="error"
-        variant="subtle"
-        icon="i-lucide-unplug"
-        title="livesaver on this computer does not answer"
-        :description="`${engines.problem} Start it again with “livesaver web” and reload this page.`"
-        role="alert"
-      />
-      <UAlert
-        v-if="scans.problem"
-        color="error"
-        variant="subtle"
-        icon="i-lucide-circle-x"
-        title="The scan did not work"
-        :description="scans.problem"
-        role="alert"
-        data-testid="scan-problem"
-      />
       <ScanProgress
         v-if="scans.running && !fix.review"
         :progress="scans.progress"
@@ -70,6 +52,7 @@ const fix = useFixStore()
           <ReferencesCard :scan="scans.scan" />
           <SourcesCard :rows="scans.scan.samples.foundSources" />
         </div>
+        <RecentRuns />
         <ScanFacts :scan="scans.scan" />
       </template>
 
@@ -104,6 +87,7 @@ const fix = useFixStore()
             <p v-else class="text-sm text-muted">A scan changes nothing.</p>
           </div>
         </UCard>
+        <RecentRuns />
       </template>
     </div>
   </PagePanel>

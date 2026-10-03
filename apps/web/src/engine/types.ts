@@ -24,6 +24,8 @@ export interface Capabilities {
   readonly liveStatus: boolean
   /** The last scan survives a reload of the page. */
   readonly keepsScan: boolean
+  /** It has settings of its own, which the folders and options can be reset to. */
+  readonly ownSettings: boolean
 }
 
 export interface ScanOptions {
@@ -192,6 +194,20 @@ export interface KnownFolder extends LibraryFolder {
   readonly files?: number
 }
 
+/** Where things are on this computer, as livesaver found them. */
+export interface Found {
+  /** The settings file livesaver reads ('' = there is none). */
+  readonly config: string
+  /** Where livesaver keeps its runs: their reports, and the original of every set it rewrote. */
+  readonly state: string
+  /** Ableton's folders ('' = not there). */
+  readonly userLibrary: string
+  readonly factoryPacks: string
+  readonly coreLibrary: string
+  /** The folders and options are those of the last scan, not those of the settings. */
+  readonly remembered: boolean
+}
+
 /** What the app starts with. */
 export interface Start {
   readonly version: string
@@ -208,6 +224,7 @@ export interface Start {
   readonly home: string
   /** The plug-ins an upgrade can convert, by name. */
   readonly upgradable: readonly string[]
+  readonly found?: Found
   /** The scan the engine still has, with what was scanned and the upgrade plan if there is one. */
   readonly last?: {
     readonly scan: Scan
@@ -235,10 +252,20 @@ export class RunFailed extends Error {
   }
 }
 
+/** The engine is not there to be asked: nothing works until the page is loaded again. */
+export class Unreachable extends RunFailed {
+  constructor(message: string) {
+    super(message)
+    this.name = 'Unreachable'
+  }
+}
+
 export interface Engine {
   readonly kind: EngineKind
   readonly capabilities: Capabilities
   start(): Promise<Start>
+  /** Forgets the folders and options of the last scan, and starts with its own settings again. */
+  reset(): Promise<Start>
   /** The samples and the plug-ins of every set. Rejects with `RunFailed`. */
   scan(request: ScanRequest, onProgress?: OnProgress): Promise<Scan>
   /** What an upgrade of VST2 plug-ins to VST3 would do. */

@@ -40,6 +40,11 @@ export const useScanStore = defineStore('scan', () => {
     return current
   }
 
+  /** Resolves once no scan runs: nothing may be written in the middle of one. */
+  async function idle(): Promise<void> {
+    while (current !== undefined) await current.catch(() => false)
+  }
+
   async function once(): Promise<boolean> {
     const request = library.request
     running.value = true
@@ -67,5 +72,5 @@ export const useScanStore = defineStore('scan', () => {
     () => scanned.value !== undefined && requestKey(scanned.value) !== requestKey(library.request),
   )
 
-  return { running, progress, scan, scanned, problem, restore, run, stale }
+  return { running, progress, scan, scanned, problem, restore, run, idle, stale }
 })

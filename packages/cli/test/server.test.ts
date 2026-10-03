@@ -194,8 +194,10 @@ test('the page gets what it starts with, folders to choose from, and a check lin
   const info = JSON.parse((await ask('/api/info', { headers: own() })).text) as WebInfo
   expect(info.search.map((folder) => folder.path)).toEqual([samples])
   const listing = await ask(`/api/folders?path=${encodeURIComponent(tmp.path)}`, { headers: own() })
+  // `home` is livesaver's own folder: the server makes it when it starts.
   expect(JSON.parse(listing.text).folders.map((f: { name: string }) => f.name)).toEqual([
     'assets',
+    'home',
     'projects',
     'samples',
   ])
@@ -278,4 +280,38 @@ test('a scan is kept until something is written, and the history tells what was'
   expect(revealed).toEqual([set])
   expect((await post('/api/reveal', { path: join(tmp.path, 'gone') })).status).toBe(400)
   expect((await get<WebInfo>('/api/info')).reveal).toBe(true)
+})
+
+test('a reset forgets the folders of the last scan, but not while something runs', async () => {
+  const get = async <T>(path: string) => JSON.parse((await ask(path, { headers: own() })).text) as T
+  const post = (path: string, body: unknown) => ask(path, { method: 'POST', headers: own(), body })
+  const request = {
+    projects: [projects],
+    search: [],
+    options: { packLimitMB: 7, matchLibraryPath: true },
+  }
+  // A scan is started and, while it runs, a reset is refused.
+  const scan = post('/api/scan', request)
+  let refused = 0
+  for (let tries = 0; tries < 200 && refused === 0; tries++) {
+    const { busy } = await get<WebStatus>('/api/status')
+    if (busy === 'scan') refused = (await post('/api/reset', {})).status
+    else await new Promise((wait) => setTimeout(wait, 5))
+  }
+  expect(refused).toBe(409)
+  await scan
+  const kept = await get<WebInfo>('/api/info')
+  expect([kept.projects, kept.search, kept.options.packLimitMB]).toEqual([[projects], [], 7])
+  expect(kept.found.remembered).toBe(true)
+
+  expect((await post('/api/reset', {})).status).toBe(200)
+  const reset = await get<WebInfo>('/api/info')
+  expect([reset.projects, reset.options]).toEqual([
+    [],
+    { packLimitMB: 50, matchLibraryPath: false },
+  ])
+  expect(reset.search.map((folder) => folder.path)).toEqual([samples])
+  expect(reset.found.remembered).toBe(false)
+  // The scan itself is kept: it is still what was found in the folders it names.
+  expect((await get<WebLastScan>('/api/scan')).request).toEqual(request)
 })

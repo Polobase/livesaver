@@ -38,6 +38,51 @@
   --status-unknown: var(--ui-color-neutral-400);
 }
 
+/*
+ * Motion says where something comes from, briefly, and never moves the layout: a page fades in,
+ * a bar fills from its start. Who asked their system for less motion gets none.
+ */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes fill-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+.page-in {
+  animation: page-in 180ms ease-out;
+}
+
+.fill-in {
+  animation: fill-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    /*
+     * Not none: what waits for an animation to end (a dialog that closes) still gets its end.
+     * And important, because it has to win over every class of the component library.
+     */
+    /* biome-ignore-start lint/complexity/noImportantStyles: must override the library's classes */
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+    /* biome-ignore-end lint/complexity/noImportantStyles: must override the library's classes */
+  }
+}
+
 /* Numbers that are compared line up; Inter's tabular figures do that without a mono font. */
 .tabular {
   font-variant-numeric: tabular-nums;

@@ -25,7 +25,7 @@ could neither keep a journal for an undo nor see that Live is running.
 | Place | What it shows | What can be done |
 |---|---|---|
 | **Overview**, before a scan | what livesaver does in three steps, the project folders and sample folders, the options | add folders, scan |
-| **Overview**, after a scan | how many sets are complete, can be fixed, or have samples that stay missing (one bar); what a fix would do; what is missing, by source, with what to do about the largest; every reference by state; where found samples lie | review and fix, download the reports, undo the last fix |
+| **Overview**, after a scan | how many sets are complete, can be fixed, or have samples that stay missing (one bar); what a fix would do; what is missing, by source, with what to do about the largest; every reference by state; where found samples lie; the last changes | review and fix, download the reports, undo the last fix |
 | **Samples › Projects** | every project: state, sets, what a fix changes, what stays missing, what is copied | fix one, a selection, or all; a project opens from the side with its sets, its changes (old place → new place) and its gaps; show it in Finder |
 | **Samples › Missing** | missing samples grouped by where they came from, each group with advice | add the folder that has them, copy the list, open a sample |
 | **Samples › Changes** | every planned change: how the file was found, and whether the fingerprint confirms it | search, filter (uncertain only), open a change |
@@ -33,7 +33,8 @@ could neither keep a journal for an undo nor see that Live is running.
 | **Plug-ins › In your sets** | every plug-in the sets use: format, state (not installed, Rosetta only, installed), how often and where | search, filter; a plug-in opens from the side with what to do, the sets that use it, where it is installed, and the same plug-in in other formats |
 | **Plug-ins › Installed** | what is installed: format, native or Rosetta only, version, known to Live, used by how many sets | filter (Rosetta only, used by no set, not scanned by Live); what breaks if a plug-in is uninstalled |
 | **Plug-ins › Upgrade to VST3** | per plug-in what converts and what stands in the way (in a rack, automation, an old file format, no VST3 installed); every plug-in in every set | upgrade all or the ticked plug-ins after a review; undo |
-| **Settings** | the folders and options of a scan, the appearance, what was detected | change them; the app says when a scan is older than they are |
+| **History** | every run that changed something, by day: what it did, where, and what became of it; on request also the runs that only planned or reported | a run opens from the side with what it was asked, its numbers, its report files and every step; undo a run, after a question that says what the undo does |
+| **Settings** | the folders and options of a scan, the appearance, the keyboard shortcuts, what livesaver found on this computer (Live, its libraries, the settings file, where runs and originals are kept) | change them; reset them to the command line's settings; show a folder in Finder; the app says when a scan is older than they are |
 
 - **Nothing is written without a review.** A fix goes through three steps: what will happen
   (sets, references, copies, per project; with a switch that leaves the uncertain matches out),
@@ -41,6 +42,18 @@ could neither keep a journal for an undo nor see that Live is running.
   fix and what it did, with its undo.
 - **A fix does what was scanned.** If folders or options were changed after the scan, the app
   says so, and a fix still uses those of the scan.
+- **An undo is always within reach.** In the result of a fix, in the notice of the last fix on
+  the Overview (also after a reload), in a toast when a fix was made from another page, and for
+  every run in the History. The fix just made is undone with one click; a run from the History
+  may be weeks old, so that undo says first what it will do.
+- **Everything works with the keyboard.** `?` lists the keys: `G` then a letter goes to a place,
+  `⌘K` opens the palette, `/` searches the table, the arrow keys walk its rows, Enter opens one.
+- **What fails is said where one is.** A scan that failed and a livesaver that no longer answers
+  are said on every page, with what to do; an error nobody expected is shown, not swallowed.
+  Every page is part of the first load, so the app goes on working, and saying so, when what
+  served it is gone.
+- **Motion is short and optional.** A page fades in, a bar fills from its start; with the
+  system's setting for reduced motion there is none.
 - **The tables hold a library.** Only the rows in view are in the page: 9,305 planned changes of
   a real library scroll without a slow frame, and a search over them takes 27 ms.
 - **States are never told by colour alone.** Fine, can be fixed, missing: each has an icon of its
@@ -52,7 +65,8 @@ could neither keep a journal for an undo nor see that Live is running.
 
 | Request | What it does |
 |---|---|
-| `GET /api/info` | what the page starts with: the folders of the last check, else the settings of the command line (search folders, the projects folder of `status`), and the last fix that can still be undone |
+| `GET /api/info` | what the page starts with: the folders of the last scan, else the settings of the command line (search folders, the projects folder of `status`); and what was found on this computer (Live's folders, the settings file, livesaver's own folder) |
+| `POST /api/reset` | forgets the folders and options of the last scan: the page starts with the command line's settings again (refused while something runs) |
 | `GET /api/folders?path=` | the folders in a folder: the page shows them to choose one, since a browser's own folder dialog never tells a path |
 | `POST /api/check` | `doctor` over the given folders; answers line by line (progress, then the result) |
 | `POST /api/scan` | the samples and the plug-ins of every set (see [A scan](#a-scan)); line by line |
@@ -105,8 +119,9 @@ plug-ins of every set (as `plugins audit` reports them).
   report files equal those of `doctor --full`.
 
 ## One contract, two engines
-The app talks to an `Engine` (`apps/web/src/engine/types.ts`): start, scan, plan an upgrade,
-fix, upgrade, undo, the history, status, reveal, list folders. Two engines implement it:
+The app talks to an `Engine` (`apps/web/src/engine/types.ts`): start, reset, scan, plan an
+upgrade, fix, upgrade, undo, the history, status, reveal, list folders. Two engines implement
+it:
 
 | | `ComputerEngine` | `BrowserEngine` |
 |---|---|---|
@@ -116,14 +131,18 @@ fix, upgrade, undo, the history, status, reveal, list folders. Two engines imple
 | plug-ins | with what is installed | which are used, and where; installed or not is `unknown` |
 
 What an engine cannot do is in its `capabilities`, and asking for it fails as `Unsupported`, so
-a screen shows and explains it instead of hiding it. One suite of tests
+a screen shows and explains it instead of hiding it. An engine that is gone (livesaver was
+stopped, or started again, which gives its page a new token) fails as `Unreachable`; the app
+notices that in one place, whichever screen asked. One suite of tests
 (`apps/web/test/engine.conformance.test.ts`) runs the same scenarios against both, and demands
 that both show the same for the same library.
 
 ## How it is built
-- **The page** (Vue, Pinia, Nuxt UI in Vue mode, Tailwind) holds the state in three stores
-  (library, scan, fix) that talk to the engine; the stores and everything they compute are plain
-  TypeScript, tested without a browser.
+- **The page** (Vue, Pinia, Nuxt UI in Vue mode, Tailwind) holds the state in stores (engine,
+  library, scan, fix, plug-ins, history) that talk to the engine; the stores and everything they
+  compute are plain TypeScript, tested without a browser. The history store has the one list of
+  runs: the last fix and the last upgrade that can be undone are read from it, and every undo
+  goes through it, one at a time.
 - **An engine worker** runs the scan (`scanFolders` in `@livesaver/web`), so the page stays
   responsive. The files of the folders stay with the page; the worker asks for each one it reads.
 - **Parse workers** (started by the engine worker) gunzip the sets and find their references
@@ -132,7 +151,11 @@ that both show the same for the same library.
   fails on any request that leaves the page's own address: the app promises that nothing leaves
   the computer.
 - **For everyone.** Every scrolling area can take the keyboard's focus, the whole flow from scan
-  to undo works without a mouse, and axe finds no barrier on any screen, in light and dark.
+  to undo works without a mouse, and axe finds no barrier on any screen, in light and dark. A
+  message of failure is red in its icon and frame, and in the colour of text in its words:
+  red words on a red ground cannot be read.
+- **Two files of script**: what comes from libraries (which a new version of the app rarely
+  changes), and the app. Together about 320 kB compressed.
 - `bun run web` is Vite's development server with livesaver's API behind it. `bun run build`
   builds the app and copies it (without source maps) into the command line's package, which is
   what `livesaver web` serves.
@@ -234,9 +257,9 @@ there.
   matches, an upgrade of plug-ins, undo, the history and its reports, and that the server
   answers only its own page.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
-  review, fix, undo, a page that is opened again) against both engines; the app's own sums and
-  words (states, plans, advice).
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 128 tests.
+  review, fix, undo, the history, a page that is opened again) against both engines; the app's
+  own sums and words (states, plans, advice, what a run was and what its undo does).
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 195 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
@@ -246,8 +269,17 @@ there.
   - Plug-ins: the set Live saved with VST2 and VST3 devices is upgraded after a review and
     undone, byte for byte; what the sets use against a made-up set of installed plug-ins, and
     what breaks if one is uninstalled; on its own, the app says what it cannot know there.
-  - The whole flow from scan to undo with the keyboard alone; no barrier that axe can find on
-    any screen, in light and dark; no error in the page; no request to another address.
+  - The history: runs from before (a plan of the command line, a run of an older version), a
+    fix made on another page with the undo in its toast, every run with its details, a report
+    downloaded, a step shown in Finder, an undo that asks first and is then seen everywhere.
+  - The settings: what livesaver found, a folder shown in Finder, the reset to the command
+    line's settings; what every page says when livesaver is gone, or was started again.
+  - A library of real size (299 projects, 876 sets, 9,305 planned changes, 2,243 missing
+    samples, 199 plug-ins; made up from a small real scan): a table builds fewer than 80 rows,
+    scrolls to its end without a frame of half a second, and is sorted and searched at once.
+  - The whole flow from scan to undo with the keyboard alone, the keys of the tables, and an
+    undo from the history; no barrier that axe can find on any screen, in light and dark; no
+    error in the page; no request to another address; no motion for who asked for less.
   - The tests load the production build: a test runner's `NODE_ENV` would otherwise make Vite
     build Vue's development version.
 - `bun run test:node`: the built `livesaver web` under Node.js serves the app it ships with.

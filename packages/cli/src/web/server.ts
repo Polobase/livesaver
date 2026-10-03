@@ -4,13 +4,22 @@
  * carry the token of the page it served: no other page in the browser can ask it for anything.
  */
 import { randomBytes } from 'node:crypto'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { liveIsRunning } from '@livesaver/node'
-import { type WebSettings, webCheck, webFix, webFolders, webInfo, webUndo } from './local.js'
+import { stateDir } from '../state.js'
+import {
+  type WebSettings,
+  webCheck,
+  webFix,
+  webFolders,
+  webInfo,
+  webReset,
+  webUndo,
+} from './local.js'
 import { canReveal, freeBytesAt, webReport, webReveal, webRun, webRuns } from './local-runs.js'
 import { type ScanNotes, webScan, webUpgrade, webUpgradePlan } from './local-scan.js'
 import {
@@ -89,6 +98,8 @@ async function body(req: IncomingMessage): Promise<unknown> {
 
 export async function startWeb(options: WebServerOptions = {}): Promise<WebServer> {
   const assets = options.assets === false ? '' : (options.assets ?? findAssets())
+  // The page says where livesaver keeps its runs, and shows the folder: it is there from now on.
+  mkdirSync(stateDir(), { recursive: true })
   const token = randomBytes(24).toString('hex')
   let port = options.port ?? 0
   /** One run at a time: a check reads what a fix writes. What runs, and how far it is. */
@@ -169,6 +180,12 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
       } catch (error) {
         return json(res, 200, { problem: (error as Error).message })
       }
+    }
+    if (route === 'POST /api/reset') {
+      // A scan that runs notes its folders when it ends: they would be back at once.
+      if (busy) return json(res, 409, { message: BUSY })
+      webReset()
+      return json(res, 200, {})
     }
     if (route === 'GET /api/status')
       return json(res, 200, await status(url.searchParams.get('path') ?? ''))

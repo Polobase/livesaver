@@ -37,6 +37,9 @@ export async function watch(
   const context = await browser.newContext({
     colorScheme: scheme,
     viewport: { width: 1280, height: 800 },
+    // The browser and livesaver are on one computer, so in one time zone: the one of this
+    // process (a test runner may set its own, whatever the system's is).
+    timezoneId: Intl.DateTimeFormat().resolvedOptions().timeZone,
   })
   const page = await context.newPage()
   // Something that never appears fails with what was waited for, not with a test's time limit.
@@ -57,6 +60,12 @@ export async function watch(
 
 /** Findings of axe that keep someone from using the page (serious and critical). */
 export async function barriers(page: Page): Promise<string[]> {
+  // What fades in is judged when it is there: half-way, its text has no contrast yet.
+  await page.evaluate(() =>
+    Promise.all(
+      document.getAnimations().map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  )
   const { violations } = await new AxeBuilder({ page }).analyze()
   return violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')

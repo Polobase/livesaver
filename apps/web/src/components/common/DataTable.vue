@@ -5,7 +5,7 @@
  * does not fit in a line is shown when the row is opened.
  */
 import type { TableColumn, TableRow } from '@nuxt/ui'
-import { computed } from 'vue'
+import { computed, useTemplateRef, watch } from 'vue'
 
 /** The columns the rows are sorted by, the first one first. */
 export type Sorting = { id: string; desc: boolean }[]
@@ -44,6 +44,10 @@ const selected = defineModel<Record<string, boolean>>('selected', { default: () 
 
 const ROW_HEIGHT = 41
 
+// A list in a new order is read from its top, not from where the old one was scrolled to.
+const table = useTemplateRef<{ $el?: HTMLElement }>('table')
+watch(sorting, () => table.value?.$el?.scrollTo({ top: 0 }))
+
 const defs = computed<TableColumn<T>[]>(() => [
   ...(props.selectable
     ? [
@@ -77,6 +81,18 @@ const SORT_ICON = {
   none: 'i-lucide-chevrons-up-down',
 } as const
 
+/** The arrow keys move between the rows, as in a list. */
+function move(event: KeyboardEvent): void {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+  const row = event.target as HTMLElement
+  if (row.tagName !== 'TR' || !row.closest('tbody')) return
+  const next = event.key === 'ArrowDown' ? row.nextElementSibling : row.previousElementSibling
+  // Not every row can take the focus: rows that only hold the place of rows out of view cannot.
+  if (!(next instanceof HTMLElement) || next.tabIndex < 0) return
+  event.preventDefault()
+  next.focus()
+}
+
 function open(event: Event, row: TableRow<T>): void {
   // A tick, a button or a link in the row is its own action.
   if ((event.target as HTMLElement).closest('button, a, [role=checkbox], input')) return
@@ -86,6 +102,7 @@ function open(event: Event, row: TableRow<T>): void {
 
 <template>
   <UTable
+    ref="table"
     v-model:sorting="sorting"
     v-model:row-selection="selected"
     :data="rows as T[]"
@@ -105,11 +122,13 @@ function open(event: Event, row: TableRow<T>): void {
       thead: 'bg-default backdrop-blur-none',
       th: 'px-4 py-2.5 whitespace-nowrap',
       td: 'px-4 py-0 h-[41px] max-w-0 text-default',
+      // A row that takes the focus scrolls into view below the header that stays, not under it.
       tbody: openable
-        ? '[&>tr]:cursor-pointer [&>tr]:hover:bg-elevated/50 [&>tr]:focus-visible:outline-3 [&>tr]:outline-primary/25 [&>tr]:-outline-offset-3 divide-y divide-default'
+        ? '[&>tr]:cursor-pointer [&>tr]:hover:bg-elevated/50 [&>tr]:focus-visible:outline-3 [&>tr]:outline-primary/25 [&>tr]:-outline-offset-3 [&>tr]:scroll-mt-11 divide-y divide-default'
         : 'divide-y divide-default',
     }"
     v-bind="openable ? { onSelect: open } : {}"
+    @keydown="move"
   >
     <template v-if="selectable" #select-header="{ table }">
       <UCheckbox

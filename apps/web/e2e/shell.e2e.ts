@@ -90,6 +90,24 @@ for (const [name, type] of ENGINES) {
       await served.page.context().close()
     }, 60_000)
 
+    test('a page comes in with a short motion, and with none for who asked for less', async () => {
+      const duration = async (reducedMotion: 'reduce' | 'no-preference') => {
+        const context = await browser.newContext({ reducedMotion })
+        const page = await context.newPage()
+        await page.goto(server.url)
+        await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
+        const seconds = await page.evaluate(() => {
+          const content = document.querySelector('.page-in')
+          return content ? Number.parseFloat(getComputedStyle(content).animationDuration) : -1
+        })
+        await context.close()
+        return seconds
+      }
+      expect(await duration('no-preference')).toBeCloseTo(0.18)
+      expect(await duration('reduce')).toBeLessThan(0.001)
+      expect(await duration('reduce')).toBeGreaterThan(0)
+    }, 60_000)
+
     for (const scheme of ['light', 'dark'] as const) {
       test(`has no barrier in ${scheme}`, async () => {
         const { page } = await watch(browser, server.url, scheme)

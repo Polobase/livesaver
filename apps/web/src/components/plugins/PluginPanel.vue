@@ -8,6 +8,7 @@ import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
 import { count, plural } from '../../lib/format'
 import { canUpgrade, pluginAdvice } from '../../lib/plugins'
+import RevealLink from '../common/RevealLink.vue'
 import ScrollRegion from '../common/ScrollRegion.vue'
 import PluginPill from './PluginPill.vue'
 
@@ -74,7 +75,9 @@ const uninstall = computed(() =>
         <section v-if="use.installedAt.length" aria-labelledby="plugin-at">
           <h3 id="plugin-at" class="font-semibold text-highlighted">Installed at</h3>
           <ul class="mt-2 space-y-1 text-muted">
-            <li v-for="path in use.installedAt" :key="path" class="break-all">{{ path }}</li>
+            <li v-for="path in use.installedAt" :key="path" class="break-all">
+              {{ path }} <RevealLink :path="path" />
+            </li>
           </ul>
         </section>
 
@@ -122,7 +125,9 @@ const uninstall = computed(() =>
         <section aria-labelledby="plugin-paths">
           <h3 id="plugin-paths" class="font-semibold text-highlighted">Where it lies</h3>
           <ul class="mt-2 space-y-1 text-muted">
-            <li v-for="path in installed.paths" :key="path" class="break-all">{{ path }}</li>
+            <li v-for="path in installed.paths" :key="path" class="break-all">
+              {{ path }} <RevealLink :path="path" />
+            </li>
             <li v-if="installed.paths.length === 0">Registered with the system, no file known.</li>
           </ul>
         </section>

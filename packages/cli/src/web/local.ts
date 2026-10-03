@@ -3,24 +3,22 @@
  * check is `livesaver doctor`, a fix is `livesaver collect --apply`: the same pipeline, settings,
  * backups, journal and undo as on the command line.
  */
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { posix } from '@livesaver/core'
 import { createNodeHost, liveIsRunning } from '@livesaver/node'
-import { checkView, type DoctorEvent, isInside, readJournal, undoRun } from '@livesaver/ops'
+import { checkView, type DoctorEvent, isInside, undoRun } from '@livesaver/ops'
 import { type CollectRun, collectRun, type DoctorFlags } from '../commands/doctor.js'
 import { type PluginSources, upgradablePlugins } from '../commands/plugins.js'
-import { absolute, type ResolvedConfig, resolveConfig, resolveStatusConfig } from '../config.js'
 import {
-  acquireLock,
-  cachePath,
-  listRuns,
-  readText,
-  runsDir,
-  stateDir,
-  writeStateFile,
-} from '../state.js'
+  absolute,
+  CONFIG_PATH,
+  type ResolvedConfig,
+  resolveConfig,
+  resolveStatusConfig,
+} from '../config.js'
+import { acquireLock, cachePath, readText, runsDir, stateDir, writeStateFile } from '../state.js'
 import type {
   WebEvent,
   WebFixRequest,
@@ -28,7 +26,6 @@ import type {
   WebFolderInfo,
   WebFolders,
   WebInfo,
-  WebLastFix,
   WebPlace,
   WebRequest,
   WebResult,
@@ -62,6 +59,14 @@ export function remember(request: WebRequest): Promise<void> {
     options: request.options,
   }
   return writeStateFile(rememberedPath(), JSON.stringify(kept))
+}
+
+/**
+ * Forgets the folders and options of the last scan: the page starts with the settings again
+ * (the settings file, and what was found on this computer), as the command line does.
+ */
+export function webReset(): void {
+  rmSync(rememberedPath(), { force: true })
 }
 
 function remembered(): Remembered | undefined {
@@ -120,22 +125,6 @@ function places(): WebPlace[] {
   return [...fixed, ...volumes].filter((place) => isFolder(place.path))
 }
 
-/** The newest applied collect run that changed something and was not undone. */
-async function lastFix(): Promise<WebLastFix | undefined> {
-  const host = createNodeHost()
-  for (const run of listRuns().reverse()) {
-    const stamp = /^(\d{4}-\d\d-\d\d)_(\d\d)(\d\d)\d\d_collect_apply/.exec(run)
-    if (!stamp) continue
-    const entries = await readJournal(host, { id: run, dir: join(runsDir(), run) })
-    const done = (op: string) => entries.filter((e) => e.t === 'end' && e.op === op).length
-    const sets = done('write-set')
-    const files = done('copy')
-    if (entries.some((e) => e.t === 'undo') || sets + files === 0) continue
-    return { run, when: `${stamp[1]} ${stamp[2]}:${stamp[3]}`, sets, files }
-  }
-  return undefined
-}
-
 export async function webInfo(settings: WebSettings = {}): Promise<WebInfo> {
   const config = await resolveConfig(settings.config ? { config: settings.config } : {})
   const last = remembered()
@@ -148,10 +137,19 @@ export async function webInfo(settings: WebSettings = {}): Promise<WebInfo> {
       path,
       vendor: config.env.vendorLibraries.some((library) => isInside(path, library)),
     }))
-  const fix = await lastFix()
+  const file = settings.config ? absolute(settings.config) : CONFIG_PATH
+  const there = (path: string) => (path && isFolder(path) ? path : '')
+  const { userLibrary, factoryPacks, appResources } = config.env
   return {
-    ...(fix ? { lastFix: fix } : {}),
     version: settings.version ?? '',
+    found: {
+      config: existsSync(file) ? file : '',
+      state: stateDir(),
+      userLibrary: there(userLibrary),
+      factoryPacks: there(factoryPacks),
+      coreLibrary: there(appResources ? join(appResources, 'Core Library') : ''),
+      remembered: last !== undefined,
+    },
     home: homedir(),
     places: places(),
     live: config.install ? basename(config.install.app, '.app') : '',

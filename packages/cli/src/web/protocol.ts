@@ -29,13 +29,18 @@ export interface WebPlace {
   readonly path: string
 }
 
-/** The newest fix that was not undone: the page offers to undo it, also after a reload. */
-export interface WebLastFix {
-  readonly run: string
-  /** When it ran, as its run folder is named: `2026-10-03 14:30`. */
-  readonly when: string
-  readonly sets: number
-  readonly files: number
+/** What livesaver found on this computer, for the page to show where things are. */
+export interface WebFound {
+  /** The settings file livesaver reads ('' = there is none: everything is as it was found). */
+  readonly config: string
+  /** Where livesaver keeps its runs: their reports, and the original of every set it rewrote. */
+  readonly state: string
+  /** Ableton's folders ('' = not there). */
+  readonly userLibrary: string
+  readonly factoryPacks: string
+  readonly coreLibrary: string
+  /** The folders and options are those of the last scan, not those of the settings. */
+  readonly remembered: boolean
 }
 
 /** What the page starts with: the last check's folders, else livesaver's settings. */
@@ -51,7 +56,7 @@ export interface WebInfo {
   readonly suggested: readonly string[]
   readonly search: readonly WebFolderInfo[]
   readonly options: WebOptions
-  readonly lastFix?: WebLastFix
+  readonly found: WebFound
   /** `darwin`, `linux`, `win32`: what this computer can do depends on it (Finder, Live). */
   readonly platform: string
   /** The plug-ins an upgrade from VST2 to VST3 can convert, by name. */

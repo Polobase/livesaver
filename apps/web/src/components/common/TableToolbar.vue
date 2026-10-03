@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /** Above a table: search it, narrow it, and see how many rows are left. */
+import { useTemplateRef } from 'vue'
 import { count } from '../../lib/format'
 
 defineProps<{
@@ -11,11 +12,15 @@ defineProps<{
 }>()
 const query = defineModel<string>('query', { required: true })
 const filter = defineModel<string>('filter', { required: true })
+
+const search = useTemplateRef<{ inputRef?: HTMLInputElement | null }>('search')
+defineShortcuts({ '/': () => search.value?.inputRef?.focus() })
 </script>
 
 <template>
   <div class="flex flex-wrap items-center gap-2 border-b border-default px-4 py-2.5 sm:px-6">
     <UInput
+      ref="search"
       v-model="query"
       type="search"
       icon="i-lucide-search"

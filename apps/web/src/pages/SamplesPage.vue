@@ -99,6 +99,7 @@ function showChanges(search: string): void {
       <RowPanel
         :change="change"
         :missing="missing"
+        :base="scans.scan.samples.base"
         @close="
           () => {
             change = undefined

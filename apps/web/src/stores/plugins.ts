@@ -6,14 +6,16 @@
 import type { UpgradeView } from '@livesaver/ops'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, watch } from 'vue'
-import { type Run, RunFailed, type Status, type Undone, type Upgraded } from '../engine/types.js'
+import { RunFailed, type Status, type Undone, type Upgraded } from '../engine/types.js'
 import { advance, type RunProgress, starting } from '../lib/progress.js'
 import { useEngineStore } from './engine.js'
+import { useHistoryStore } from './history.js'
 import { useScanStore } from './scan.js'
 
 export const usePluginsStore = defineStore('plugins', () => {
   const engines = useEngineStore()
   const scans = useScanStore()
+  const history = useHistoryStore()
   /** What an upgrade would do, for the scan that is shown. */
   const plan = shallowRef<UpgradeView>()
   const planning = ref(false)
@@ -25,10 +27,20 @@ export const usePluginsStore = defineStore('plugins', () => {
   const running = ref(false)
   const upgraded = shallowRef<Upgraded>()
   const failure = ref<{ message: string; run: string }>()
-  const undoing = ref(false)
+  const undoing = computed(() => history.undoing !== '')
   const undone = shallowRef<Undone>()
   /** The newest upgrade that still stands: it can be undone, also after a reload. */
-  const last = shallowRef<Run>()
+  const last = computed(() =>
+    history.runs.find((run) => run.command === 'vst3' && run.state === 'applied' && run.sets > 0),
+  )
+  // An upgrade that was taken back elsewhere (in the history) is no longer a result to show.
+  watch(
+    () => history.runs,
+    (runs) => {
+      const run = runs.find((candidate) => candidate.id === upgraded.value?.run)
+      if (run?.state === 'undone' || run?.state === 'partly-undone') upgraded.value = undefined
+    },
+  )
   const status = shallowRef<Status>()
 
   // A plan is of one scan: once the sets were scanned again, it has to be made again.
@@ -98,18 +110,6 @@ export const usePluginsStore = defineStore('plugins', () => {
     if (!running.value) review.value = undefined
   }
 
-  async function refreshLast(): Promise<void> {
-    if (!engines.capabilities.history) return
-    try {
-      const runs = await engines.engine().runs()
-      last.value = runs.find(
-        (run) => run.command === 'vst3' && run.state === 'applied' && run.sets > 0,
-      )
-    } catch {
-      last.value = undefined
-    }
-  }
-
   async function apply(): Promise<boolean> {
     const asked = review.value
     if (!asked || running.value || folders.value.length === 0) return false
@@ -130,7 +130,7 @@ export const usePluginsStore = defineStore('plugins', () => {
     } finally {
       running.value = false
     }
-    await refreshLast()
+    await history.refresh()
     if (upgraded.value || failure.value?.run) {
       await scans.run()
       await loadPlan()
@@ -140,17 +140,13 @@ export const usePluginsStore = defineStore('plugins', () => {
 
   async function undo(run: string): Promise<boolean> {
     if (undoing.value || running.value) return false
-    undoing.value = true
     failure.value = undefined
     try {
-      undone.value = await engines.engine().undo(run)
+      undone.value = await history.undo(run)
       upgraded.value = undefined
     } catch (error) {
       failure.value = { message: `The undo failed: ${(error as Error).message}`, run: '' }
-    } finally {
-      undoing.value = false
     }
-    await refreshLast()
     await scans.run()
     await loadPlan()
     return undone.value !== undefined
@@ -184,7 +180,6 @@ export const usePluginsStore = defineStore('plugins', () => {
     apply,
     undo,
     dismiss,
-    refreshLast,
     refreshStatus,
   }
 })

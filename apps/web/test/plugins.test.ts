@@ -20,6 +20,7 @@ import { BrowserEngine, ComputerEngine } from '../src/engine/index.js'
 import { canUpgrade, pluginAdvice } from '../src/lib/plugins.js'
 import { blockerLines, upgradeSum } from '../src/lib/upgrade.js'
 import { useEngineStore } from '../src/stores/engine.js'
+import { useHistoryStore } from '../src/stores/history.js'
 import { useLibraryStore } from '../src/stores/library.js'
 import { usePluginsStore } from '../src/stores/plugins.js'
 import { useScanStore } from '../src/stores/scan.js'
@@ -103,7 +104,7 @@ async function onComputer() {
     scans.restore(engines.start.last)
     plugins.restore(engines.start.last?.upgrade)
   }
-  await plugins.refreshLast()
+  await useHistoryStore().refresh()
   return { engines, library, scans, plugins }
 }
 

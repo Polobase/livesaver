@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { copyFixtures, readSet, tempDir, writeFile } from '@livesaver/test-kit'
-import { webCheck, webFix, webFolders, webInfo, webUndo } from '../src/web/local.js'
+import { webCheck, webFix, webFolders, webInfo, webReset, webUndo } from '../src/web/local.js'
 import type { WebEvent, WebFixed, WebRequest, WebResult } from '../src/web/protocol.js'
 
 let tmp: { path: string; cleanup: () => void }
@@ -77,6 +77,16 @@ describe('what the page starts with', () => {
     expect(first.projects).toEqual([])
     expect(first.search).toEqual([{ path: samples, vendor: false, holds: [], exists: true }])
     expect(first.options).toEqual({ packLimitMB: 50, matchLibraryPath: false })
+    // Where things are on this computer: the settings file, livesaver's own folder, and of
+    // Ableton's folders those that are there.
+    expect(first.found).toEqual({
+      config: settings.config,
+      state: join(tmp.path, 'home'),
+      userLibrary: '',
+      factoryPacks: '',
+      coreLibrary: '',
+      remembered: false,
+    })
 
     const extra = join(tmp.path, 'Ableton')
     writeFile(join(extra, 'User Library', 'Samples', 'u.wav'), 'RIFF')
@@ -98,6 +108,27 @@ describe('what the page starts with', () => {
       { path: join(tmp.path, 'gone'), vendor: false, holds: [], exists: false },
     ])
     expect(next.options).toEqual({ packLimitMB: 20, matchLibraryPath: true })
+    expect(next.found).toMatchObject({
+      userLibrary: join(extra, 'User Library'),
+      factoryPacks: '',
+      remembered: true,
+    })
+
+    // A reset forgets the last check's folders: the settings count again, as on the command line.
+    webReset()
+    const reset = await webInfo(settings)
+    expect([reset.projects, reset.search, reset.options]).toEqual([
+      first.projects,
+      first.search,
+      first.options,
+    ])
+    expect(reset.found.remembered).toBe(false)
+    webReset() // with nothing to forget, it does nothing
+  })
+
+  test('without a settings file, everything is as it was found', async () => {
+    const info = await webInfo({ config: join(tmp.path, 'none.json') })
+    expect(info.found.config).toBe('')
   })
 
   test('the first time, the projects folder of the settings is offered as the one to check', async () => {
@@ -186,14 +217,11 @@ describe('a fix on this computer', () => {
     expect(readdirSync(join(broken(), 'Backup'))).toHaveLength(1)
     expect((await check()).result.changingSets).toBe(0)
 
-    // The page offers to undo the newest fix, also after a reload.
-    expect((await webInfo(settings)).lastFix).toMatchObject({ run: fixed.run, sets: 1, files: 1 })
     const undone = await webUndo(fixed.run, settings)
     expect(undone).toEqual({ restored: 1, trashed: 2, kept: 0, changedSince: [], problems: [] })
     expect(readFileSync(setOf(broken())).equals(original)).toBe(true)
     expect(existsSync(join(broken(), 'Samples', 'Imported', '1.wav'))).toBe(false)
     expect((await check()).result.changingSets).toBe(1)
-    expect((await webInfo(settings)).lastFix).toBeUndefined()
   })
 
   test('of one project leaves the others as they are, and still finds samples in them', async () => {

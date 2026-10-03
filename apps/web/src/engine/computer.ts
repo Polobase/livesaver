@@ -30,6 +30,7 @@ import {
   type Start,
   type Status,
   type Undone,
+  Unreachable,
   type Upgraded,
   type UpgradeRequest,
 } from './types.js'
@@ -91,6 +92,7 @@ export class ComputerEngine implements Engine {
     installedPlugins: true,
     liveStatus: true,
     keepsScan: true,
+    ownSettings: true,
   }
   private readonly base: string
   private readonly headers: Record<string, string>
@@ -110,9 +112,12 @@ export class ComputerEngine implements Engine {
         ...(body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) }),
       })
     } catch {
-      throw new RunFailed('livesaver on this computer does not answer. Start it again.')
+      throw new Unreachable('livesaver on this computer does not answer.')
     }
     if (response.ok) return response
+    // The token is of the livesaver that served the page: one started later does not know it.
+    if (response.status === 403)
+      throw new Unreachable('This page is from an earlier start of livesaver.')
     let message = `livesaver answered ${response.status}`
     try {
       message = ((await response.json()) as { message?: string }).message || message
@@ -176,6 +181,7 @@ export class ComputerEngine implements Engine {
       places: info.places,
       home: info.home,
       upgradable: info.upgradable,
+      found: info.found,
       ...(last.scan && last.request && last.at
         ? {
             last: {
@@ -186,6 +192,11 @@ export class ComputerEngine implements Engine {
           }
         : {}),
     }
+  }
+
+  async reset(): Promise<Start> {
+    await this.json('/api/reset', {})
+    return this.start()
   }
 
   async scan(request: ScanRequest, onProgress?: OnProgress): Promise<Scan> {

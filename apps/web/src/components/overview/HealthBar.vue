@@ -30,7 +30,7 @@ const summary = computed(() =>
 
 <template>
   <div>
-    <div class="flex h-3 gap-0.5" role="img" :aria-label="summary">
+    <div class="fill-in flex h-3 gap-0.5" role="img" :aria-label="summary">
       <UTooltip
         v-for="part in parts"
         :key="part.health"

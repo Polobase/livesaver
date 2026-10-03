@@ -4,9 +4,15 @@ import type { ChangeRow, MissingRow } from '@livesaver/ops'
 import { computed } from 'vue'
 import { bytes, count } from '../../lib/format'
 import { ACTION_LABEL, ACTION_WHY, STATUS_LABEL, STATUS_WHY } from '../../lib/health'
+import RevealLink from '../common/RevealLink.vue'
 import ScrollRegion from '../common/ScrollRegion.vue'
 
-const props = defineProps<{ change?: ChangeRow; missing?: MissingRow }>()
+const props = defineProps<{
+  change?: ChangeRow
+  missing?: MissingRow
+  /** The folder the sets' paths are relative to. */
+  base: string
+}>()
 const emit = defineEmits<{ close: [] }>()
 const open = computed({
   get: () => props.change !== undefined || props.missing !== undefined,
@@ -38,6 +44,7 @@ const subtitle = computed(() =>
           <div>
             <dt class="text-muted">Set</dt>
             <dd class="break-all text-highlighted">{{ change.setPath }}</dd>
+            <dd><RevealLink :path="`${base}/${change.setPath}`" /></dd>
           </div>
           <div>
             <dt class="text-muted">The set points at</dt>
@@ -50,6 +57,7 @@ const subtitle = computed(() =>
           <div v-if="change.source">
             <dt class="text-muted">Copied from</dt>
             <dd class="break-all">{{ change.source }}</dd>
+            <dd><RevealLink :path="change.source" /></dd>
           </div>
           <div v-if="change.method">
             <dt class="text-muted">How it was found</dt>
@@ -100,7 +108,9 @@ const subtitle = computed(() =>
             <dt class="text-muted">Files of this name that were found, and are not it</dt>
             <dd>
               <ul>
-                <li v-for="file in missing.candidates" :key="file" class="break-all">{{ file }}</li>
+                <li v-for="file in missing.candidates" :key="file" class="break-all">
+                  {{ file }} <RevealLink :path="file" />
+                </li>
               </ul>
             </dd>
           </div>

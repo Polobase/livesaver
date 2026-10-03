@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** A page of the app: its title bar with the sidebar switch, and its content. */
 import ScrollRegion from '../components/common/ScrollRegion.vue'
+import PageNotices from './PageNotices.vue'
 
 defineProps<{
   id: string
@@ -24,11 +25,12 @@ defineProps<{
           <slot name="actions" />
         </template>
       </UDashboardNavbar>
+      <PageNotices />
       <slot name="toolbar" />
-      <div v-if="flush" class="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div v-if="flush" class="page-in flex min-h-0 flex-1 flex-col overflow-hidden">
         <slot />
       </div>
-      <ScrollRegion v-else :label="title" class="flex flex-col gap-4 p-4 sm:gap-6 sm:p-6">
+      <ScrollRegion v-else :label="title" class="page-in flex flex-col gap-4 p-4 sm:gap-6 sm:p-6">
         <slot />
       </ScrollRegion>
     </main>

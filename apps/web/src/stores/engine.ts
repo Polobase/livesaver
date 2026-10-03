@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import { createEngine } from '../engine/create.js'
-import type { Capabilities, Engine, Start } from '../engine/types.js'
+import { type Capabilities, type Engine, type Start, Unreachable } from '../engine/types.js'
 
 const NOTHING: Capabilities = {
   paths: false,
@@ -14,18 +14,42 @@ const NOTHING: Capabilities = {
   installedPlugins: false,
   liveStatus: false,
   keepsScan: false,
+  ownSettings: false,
+}
+
+/**
+ * The engine with every answer watched: whichever screen asks, an engine that is gone is noticed
+ * in one place, and said on every page.
+ */
+function watched(engine: Engine, lost: (message: string) => void): Engine {
+  return new Proxy(engine, {
+    get(target, key) {
+      const value = Reflect.get(target, key, target) as unknown
+      if (typeof value !== 'function') return value
+      return (...args: unknown[]) => {
+        const answer = value.apply(target, args) as unknown
+        if (answer instanceof Promise)
+          answer.catch((error: unknown) => {
+            if (error instanceof Unreachable) lost(error.message)
+          })
+        return answer
+      }
+    },
+  })
 }
 
 export const useEngineStore = defineStore('engine', () => {
   const current = shallowRef<Engine>()
   const start = shallowRef<Start>()
   const capabilities = shallowRef<Capabilities>(NOTHING)
-  /** Why the engine could not be reached ('' = it could, or was not asked yet). */
+  /** Why the engine cannot be reached ('' = it can, or was not asked yet). */
   const problem = ref('')
 
   /** Puts an engine in place of the page's own (tests bring theirs). */
   function use(engine: Engine): void {
-    current.value = engine
+    current.value = watched(engine, (message) => {
+      problem.value = message
+    })
     capabilities.value = engine.capabilities
   }
 
@@ -43,11 +67,18 @@ export const useEngineStore = defineStore('engine', () => {
       // livesaver has said by now what its system can do.
       capabilities.value = own.capabilities
     } catch (error) {
-      problem.value = (error as Error).message
+      // Said in the engine's own words if it is gone; else it answered, and something is wrong.
+      if (!problem.value) problem.value = (error as Error).message
     }
+  }
+
+  /** Back to the engine's own settings: what it starts with then. Rejects if it cannot. */
+  async function reset(): Promise<Start> {
+    start.value = await engine().reset()
+    return start.value
   }
 
   const kind = computed(() => current.value?.kind ?? 'browser')
 
-  return { engine, start, problem, load, use, kind, capabilities }
+  return { engine, start, problem, load, reset, use, kind, capabilities }
 })

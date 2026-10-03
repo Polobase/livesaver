@@ -112,7 +112,8 @@ lets you leave uncertain matches out, checks that Live is closed and that there 
 fix can be undone there, like `livesaver undo`. The plug-in screens show what your sets use
 against what is installed (not installed, Rosetta only, unused, what breaks if you uninstall
 one), and upgrade VST2 plug-ins to VST3 like `plugins upgrade --apply`, with the same review
-and undo.
+and undo. The **History** lists every run that changed something (those of the command line
+too), with its reports and every step, and undoes a run like `livesaver undo`.
 
 The app talks to livesaver on your computer, which reads and writes the files with your
 settings: nothing leaves the computer, and only the page that livesaver served can ask it for
@@ -168,7 +169,7 @@ what the command line reports.
 | ✅ M5 | plug-in inventory and audit (`plugins list`, `plugins audit`) |
 | ✅ M6 | catalog and search (`index`, `find`, `sql`) |
 | ✅ M7 | codemods (`livesaver run`) |
-| 🚧 M8 | web app (samples and plug-ins: scan, review, fix, upgrade, undo: done; history and a site: next), Finder Quick Actions |
+| 🚧 M8 | web app (samples and plug-ins: scan, review, fix, upgrade, undo, history: done; a site: next), Finder Quick Actions |
 
 ## Development
 ```sh

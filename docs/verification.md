@@ -22,8 +22,9 @@ writes runs on temporary copies.
   `process.stdout` had been looked at; the command line writes through the stream instead.)
 - `bun run test:web` runs the built web app in a headless browser: on its own (read-only), and
   with livesaver behind it, where it fixes one project, undoes, and fixes all on temporary
-  copies. On a real library its report files are byte-identical to the command line's (see
-  [web.md](web.md)).
+  copies, upgrades plug-ins, and undoes runs from the history. A scan of the size of a real
+  library (9,305 planned changes) must stay quick in its tables. On a real library its report
+  files are byte-identical to the command line's (see [web.md](web.md)).
 
 ## Corpus round trip
 `LIVESAVER_CORPUS=<folder> bun test corpus` (read-only): every Live document below the folder,

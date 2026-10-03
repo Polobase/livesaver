@@ -16,6 +16,14 @@ Rosetta only, the same plug-in in another format), what is installed and what br
 uninstalled, and what an upgrade of VST2 plug-ins to VST3 converts and what blocks the rest; an
 upgrade is reviewed first and can be undone.
 
+The History lists every run that changed something, by day, with what it was asked, its
+numbers, its report files and every step; a run is undone from there after a question that says
+what the undo does, and a fix made on another page offers its undo in a toast. The Settings say
+what livesaver found on this computer, show a folder in Finder, and reset the folders and
+options to those of the command line (`POST /api/reset`). `?` lists the keyboard shortcuts; `/`
+searches a table and the arrow keys walk its rows. When livesaver no longer answers, every page
+says so and what to do.
+
 The default port of `livesaver web` is now 5483. A fix can take several projects (`only` of
 `/api/fix`). `checkView` names for every missing sample the sets that use it and the source it
 is counted under, and for every planned change its set's path.

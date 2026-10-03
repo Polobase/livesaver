@@ -13,6 +13,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { BrowserEngine, ComputerEngine } from '../src/engine/index.js'
 import { useEngineStore } from '../src/stores/engine.js'
 import { useFixStore } from '../src/stores/fix.js'
+import { useHistoryStore } from '../src/stores/history.js'
 import { useLibraryStore } from '../src/stores/library.js'
 import { useScanStore } from '../src/stores/scan.js'
 
@@ -62,12 +63,13 @@ async function onComputer() {
   const library = useLibraryStore()
   const scans = useScanStore()
   const fix = useFixStore()
+  const history = useHistoryStore()
   if (engines.start) {
     library.init(engines.start)
     scans.restore(engines.start.last)
   }
-  await fix.refreshLast()
-  return { engines, library, scans, fix }
+  await history.refresh()
+  return { engines, library, scans, fix, history }
 }
 
 const setOf = (project: string) => join(projects, project, 'Brokenpath.als')
@@ -188,6 +190,66 @@ describe('with livesaver on this computer', () => {
     expect(again.fix.last?.record?.options).toMatchObject({ certainOnly: true })
   })
 
+  test('the history lists every run; one taken back there is no longer a fix to undo', async () => {
+    const { engines, library, scans, fix, history } = await onComputer()
+    expect([history.loaded, history.runs]).toEqual([true, []])
+    library.addPath('projects', await engines.engine().folders(projects))
+    await scans.run()
+    // A scan plans and writes nothing: it is no run.
+    await history.refresh()
+    expect(history.runs).toEqual([])
+
+    const other = scans.scan?.samples.projectRows.find((row) => row.path === 'Other Project')
+    fix.open([other?.root as string])
+    await fix.apply()
+    fix.close()
+    fix.open()
+    await fix.apply()
+    fix.close()
+    expect(history.runs.map((run) => [run.command, run.state, run.sets, run.canUndo])).toEqual([
+      ['collect', 'applied', 1, true],
+      ['collect', 'applied', 1, true],
+    ])
+    const [newest, first] = history.runs.map((run) => run.id) as [string, string]
+    expect([fix.last?.id, fix.fixed?.run]).toEqual([newest, newest])
+    expect(history.runs[1]?.record?.targets).toEqual([join(projects, 'Other Project')])
+
+    const detail = await history.detail(newest)
+    expect(detail.steps.map((step) => [step.op, step.finished, step.undone])).toEqual([
+      ['copy', true, ''],
+      ['write-set', true, ''],
+    ])
+    expect(detail.steps[1]?.backup).toContain('Brokenpath Project/Backup/Brokenpath [')
+    expect(await history.report(newest, 'changes.csv')).toContain('Brokenpath.als')
+
+    // Taken back in the history: the overview no longer offers to undo it, the scan is renewed.
+    expect(await history.takeBack(newest)).toBe(true)
+    expect(history.undone).toMatchObject({ run: newest, result: { restored: 1, problems: [] } })
+    expect([history.undoing, history.busy, history.problem]).toEqual(['', false, ''])
+    expect(history.runs.map((run) => [run.state, run.canUndo])).toEqual([
+      ['undone', false],
+      ['applied', true],
+    ])
+    expect([fix.fixed, fix.last?.id]).toEqual([undefined, first])
+    expect([fixedOnDisk('Brokenpath Project'), fixedOnDisk('Other Project')]).toEqual([false, true])
+    expect(scans.scan?.samples.changingSets).toBe(1)
+    expect((await history.detail(newest)).steps.map((step) => step.undone)).toEqual([
+      'trashed',
+      'restored',
+    ])
+
+    // Nothing is left of it to take back: a second undo does nothing, and a run that is not
+    // there says so.
+    expect(await history.takeBack(newest)).toBe(true)
+    expect(history.undone?.result).toMatchObject({ restored: 0, trashed: 0, problems: [] })
+    expect(await history.takeBack('nothing')).toBe(false)
+    expect([history.undone, history.problem]).toEqual([
+      undefined,
+      'The undo failed: This is not a run that changed anything: nothing',
+    ])
+    expect(fixedOnDisk('Other Project')).toBe(true)
+  })
+
   test('a fix that cannot run says why and changes nothing', async () => {
     const { engines, library, scans, fix } = await onComputer()
     library.addPath('projects', await engines.engine().folders(projects))
@@ -233,8 +295,12 @@ describe('in the browser', () => {
     library.update(search?.id as string, { path: '/Volumes/Samples' })
     expect(scans.stale).toBe(true)
 
-    await fix.refreshLast()
-    expect(fix.last).toBeUndefined()
+    // A page on its own keeps no runs: there is nothing to list, and nothing to take back.
+    const history = useHistoryStore()
+    await history.refresh()
+    expect([history.loaded, history.runs, fix.last]).toEqual([false, [], undefined])
+    expect(await history.takeBack('2026-10-03_120000_collect_apply')).toBe(false)
+    expect(history.problem).toBe('The undo failed: Undo is not possible here.')
     fix.open()
     expect(await fix.apply()).toBe(false)
     expect(fix.failure?.message).toBe('Fixing is not possible here.')

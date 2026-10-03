@@ -90,7 +90,7 @@ for (const [name, type] of ENGINES) {
     test('it starts with the sample folders of this computer, and wants a project folder', async () => {
       await page.getByTestId('folder-row').first().waitFor()
       expect(await page.getByTestId('folder-name').allInnerTexts()).toEqual(['samples'])
-      expect(await textOf(page.getByTestId('folder-place'))).toBe(samples)
+      expect(await textOf(page.getByTestId('folder-path'))).toBe(samples)
       expect(await page.getByTestId('scan-library').isDisabled()).toBe(true)
       expect(await page.getByTestId('where').innerText()).toBe('On this computer')
     }, 30_000)

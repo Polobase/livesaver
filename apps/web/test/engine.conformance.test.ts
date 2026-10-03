@@ -21,6 +21,7 @@ import {
   RunFailed,
   type Scan,
   type ScanRequest,
+  Unreachable,
   Unsupported,
 } from '../src/engine/index.js'
 
@@ -198,6 +199,7 @@ for (const [where, setup] of ENGINES) {
         installedPlugins: [],
         liveStatus: [],
         keepsScan: [],
+        ownSettings: [() => engine.reset()],
       }
       for (const [capability, calls] of Object.entries(asked)) {
         for (const call of calls) {
@@ -238,6 +240,17 @@ describe('only livesaver on this computer', () => {
     expect(start.projects).toEqual(request.projects)
     expect(start.search.map((folder) => [folder.path, folder.exists])).toEqual([[samples, true]])
     expect(again.capabilities.reveal).toBe(true)
+    // Where things are on this computer; and the folders are those of the scan until a reset.
+    expect(start.found).toMatchObject({
+      config: join(tmp.path, 'config.json'),
+      state: join(tmp.path, 'home'),
+      remembered: true,
+    })
+    const reset = await again.reset()
+    expect([reset.projects, reset.found?.remembered]).toEqual([[], false])
+    expect(reset.search.map((folder) => folder.path)).toEqual([samples])
+    // The scan is of the folders it names, whatever the app starts with: it is kept.
+    expect(reset.last?.request).toEqual(request)
   })
 
   test('plans an upgrade, and remembers the plan with the scan', async () => {
@@ -317,12 +330,19 @@ describe('only livesaver on this computer', () => {
   test('lists the folders of a folder, and says so when livesaver is gone', async () => {
     const { engine } = computer()
     const listing = await engine.folders(tmp.path)
-    expect(listing.folders.map((folder) => folder.name)).toEqual(['projects', 'samples'])
+    // `home` is livesaver's own folder, which is there once it runs.
+    expect(listing.folders.map((folder) => folder.name)).toEqual(['home', 'projects', 'samples'])
     expect(engine.folders(join(tmp.path, 'gone'))).rejects.toBeInstanceOf(RunFailed)
+    // A page of an earlier start has a token this livesaver does not know; one whose livesaver
+    // was stopped gets no answer. Both are the engine being gone, not a run that failed.
     const lost = new ComputerEngine({ token: 'wrong', base: server.url })
-    expect(lost.start()).rejects.toThrow('not allowed')
+    const stale = await lost.start().catch((error: unknown) => error)
+    expect(stale).toBeInstanceOf(Unreachable)
+    expect((stale as Error).message).toBe('This page is from an earlier start of livesaver.')
     await server.close()
-    expect(engine.status()).rejects.toThrow('does not answer')
+    const gone = await engine.status().catch((error: unknown) => error)
+    expect(gone).toBeInstanceOf(Unreachable)
+    expect((gone as Error).message).toBe('livesaver on this computer does not answer.')
   })
 })
 

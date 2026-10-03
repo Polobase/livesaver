@@ -318,7 +318,7 @@ for (const [name, type] of ENGINES) {
     for (const scheme of ['light', 'dark'] as const) {
       test(`the screens have no barrier in ${scheme}`, async () => {
         await page.emulateMedia({ colorScheme: scheme })
-        for (const place of ['Overview', 'Samples', 'Settings']) {
+        for (const place of ['Overview', 'Samples', 'History', 'Settings']) {
           await goTo(place)
           expect([place, await barriers(page)]).toEqual([place, []])
         }
@@ -329,6 +329,22 @@ for (const [name, type] of ENGINES) {
         }
       }, 60_000)
     }
+
+    test('what only livesaver can do is explained, or not offered', async () => {
+      await goTo('History')
+      expect(await textOf(page.getByTestId('no-history'))).toContain('There is no history here')
+      expect(await page.getByTestId('all-runs').count()).toBe(0)
+      await goTo('Settings')
+      // No settings of its own to go back to, and nothing of this computer it could have found.
+      expect(await page.getByTestId('reset-settings').count()).toBe(0)
+      expect(await page.getByTestId('found').count()).toBe(0)
+      expect(await page.getByRole('button', { name: /^Show in Finder/ }).count()).toBe(0)
+      expect(await textOf(page.locator('#about-title + dl'))).toContain(
+        'in this browser, on its own',
+      )
+      await goTo('Overview')
+      expect(await page.getByTestId('recent-runs').count()).toBe(0)
+    }, 30_000)
 
     test('coming back to the page shows its own state, not what the browser remembered', async () => {
       // A browser restores form controls by their order: an option could get the tick of a

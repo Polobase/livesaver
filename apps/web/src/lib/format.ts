@@ -33,6 +33,35 @@ export function when(iso: string, now = new Date()): string {
   return sameDay ? time.format(date) : `${day.format(date)}, ${time.format(date)}`
 }
 
+const full = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+/** The parts of a date by name: how they are joined differs between browsers, so the app joins them. */
+function partsOf(at: Date): Record<string, string> {
+  return Object.fromEntries(full.formatToParts(at).map((part) => [part.type, part.value]))
+}
+
+/** A moment in full, for where the year matters: `3 October 2026, 14:30`. */
+export function moment(at: Date): string {
+  if (Number.isNaN(at.getTime())) return ''
+  const p = partsOf(at)
+  return `${p.day} ${p.month} ${p.year}, ${p.hour}:${p.minute}`
+}
+
+/** A day in full: `Saturday, 3 October 2026`. */
+export function dayName(at: Date): string {
+  if (Number.isNaN(at.getTime())) return ''
+  const p = partsOf(at)
+  return `${p.weekday}, ${p.day} ${p.month} ${p.year}`
+}
+
 export function seconds(s: number): string {
   return s < 10 ? `${s.toFixed(1)} s` : s < 90 ? `${Math.round(s)} s` : `${Math.round(s / 60)} min`
 }

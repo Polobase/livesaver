@@ -44,6 +44,7 @@ export class BrowserEngine implements Engine {
     installedPlugins: false,
     liveStatus: false,
     keepsScan: false,
+    ownSettings: false,
   }
   private readonly options: BrowserOptions
   /** The files of the folders stay with the page; a folder is known to the app by its id. */
@@ -146,6 +147,10 @@ export class BrowserEngine implements Engine {
 
   async runs(): Promise<readonly never[]> {
     return []
+  }
+
+  reset(): Promise<never> {
+    return Promise.reject(new Unsupported('Resetting to settings of its own'))
   }
 
   planUpgrade(): Promise<never> {

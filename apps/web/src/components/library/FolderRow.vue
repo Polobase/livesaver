@@ -6,6 +6,7 @@ import { count } from '../../lib/format'
 import { LIVE_CONTENT } from '../../lib/library'
 import { useEngineStore } from '../../stores/engine'
 import { type FolderKind, useLibraryStore } from '../../stores/library'
+import RevealLink from '../common/RevealLink.vue'
 
 const props = defineProps<{ folder: KnownFolder; kind: FolderKind; disabled?: boolean }>()
 const engines = useEngineStore()
@@ -60,9 +61,10 @@ const canMark = computed(
         class="flex flex-wrap items-center gap-x-2 text-xs text-muted"
         data-testid="folder-place"
       >
-        <span v-if="place" class="break-all">{{ place }}</span>
+        <span v-if="place" class="break-all" data-testid="folder-path">{{ place }}</span>
         <span v-if="how">({{ how }})</span>
         <span v-if="!folder.exists" class="text-default">This folder does not exist.</span>
+        <RevealLink v-else-if="engines.capabilities.paths" :path="folder.path" />
         <UButton
           v-if="!engines.capabilities.paths"
           variant="link"
