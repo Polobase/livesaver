@@ -10,7 +10,9 @@ library, all without Live running. Fast, byte-exact, and safe by default.
 > Tested against sets saved by Live itself and on a real 842-set library (read-only round trips
 > of 13,000 Live documents). See [docs/verification.md](docs/verification.md).
 
-New here? Start with the [guide](docs/guide/getting-started.md): from the first scan to an undo.
+**[polobase.github.io/livesaver](https://polobase.github.io/livesaver/)**: what it does, the
+guide, and the app to try in your browser. New here? Start with the
+[guide](docs/guide/getting-started.md): from the first scan to an undo.
 
 ## Quick start
 ```sh

@@ -11,7 +11,7 @@
     "url": "git+https://github.com/Polobase/livesaver.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/Polobase/livesaver/tree/main/packages/cli#readme",
+  "homepage": "https://polobase.github.io/livesaver/",
   "bugs": {
     "url": "https://github.com/Polobase/livesaver/issues"
   },

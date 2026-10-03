@@ -1,0 +1,51 @@
+name: Pages
+
+# The site (landing page and docs) at /livesaver/, with the web app beside it at /livesaver/app/.
+# The app is the one the command line ships: built once, without source maps.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A deployment that runs is finished; of those that wait, only the newest is made.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
+      - name: Build the packages and the web app
+        run: bun run build
+      - name: Build the site
+        run: bun run site:build
+      - name: Put the web app beside the site
+        run: cp -R packages/cli/dist/web-app apps/site/.output/public/app
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/site/.output/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

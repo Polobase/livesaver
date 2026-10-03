@@ -3,6 +3,9 @@
  * Every page and every link is checked once without a browser; then the landing page, the docs,
  * the search and the way into the app in the three browser engines, with no barrier that axe
  * can find and no request to another address.
+ *
+ * `LIVESAVER_SITE_URL=https://polobase.github.io/livesaver/ bun run test:site` tests the site
+ * that is deployed instead of building one.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Browser, Page } from 'playwright'
@@ -13,10 +16,14 @@ import { serve } from '../serve.js'
 
 let site: { url: string; stop: () => void }
 let origin: string
+const deployed = process.env.LIVESAVER_SITE_URL
 
 beforeAll(async () => {
-  await Promise.all([build(), buildApp()])
-  site = serve()
+  if (deployed) site = { url: deployed.replace(/\/?$/, '/'), stop: () => {} }
+  else {
+    await Promise.all([build(), buildApp()])
+    site = serve()
+  }
   origin = new URL(site.url).origin
 }, 300_000)
 afterAll(() => site?.stop())

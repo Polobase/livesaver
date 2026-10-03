@@ -18,9 +18,13 @@ Content). Not published to npm.
 - **The web app is not part of the site.** It is built on its own (`apps/web`) and put beside
   the site at `app/` when both are deployed; `serve.ts` does the same for the tests.
 
+It is deployed by `.github/workflows/pages.yml` on every push to `main`:
+`https://polobase.github.io/livesaver/`, with the app at `app/`.
+
 ```sh
 bun run site          # work on it: http://localhost:3000/
 bun run site:build    # the static files, for /livesaver/ (apps/site/.output/public)
 bun run test:site     # the built site as GitHub Pages serves it, in three browsers
 bun test apps/site    # the docs: every one has its place, every link and picture leads somewhere
+LIVESAVER_SITE_URL=https://polobase.github.io/livesaver/ bun run test:site   # the deployed site
 ```
