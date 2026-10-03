@@ -63,10 +63,31 @@ With a stand-in path, a file that a set references by an absolute path into that
 the same repair, counted in another row.
 
 ## Ableton's own folders
-Recognised by name among the given folders: `User Library`, `Factory Packs`, `Core Library`. If
-the whole `App-Resources` folder of the Live app is given, the page also reads Live's table of
-content it moved between versions (`Database/filerefmap.db`, a SQLite file read by
-`readSqliteTable` in `@livesaver/core`), and only the Core Library inside it is searched.
+Recognised by name among the given folders (`apps/web/src/ableton.ts`), and named on their rows
+as soon as a folder is added; what is still missing is listed under the sample folders.
+
+- **User Library** and **Factory Packs**: a folder of that name, or the folder that holds it
+  (`Music/Ableton` in the home folder).
+- **Live's own content** lies inside the Live app, in `Contents/App-Resources`: the Core Library,
+  and Live's table of content it moved between versions (`Database/filerefmap.db`, a SQLite file
+  read by `readSqliteTable` in `@livesaver/core`). The Live app itself can be dropped on the
+  page: to a drop an app is a folder, while a folder dialog does not open one (there the path of
+  `App-Resources` has to be pasted). `App-Resources`, the app's `Contents` folder or the Core
+  Library alone are recognised too. Of the app only the Core Library is searched.
+
+Without Live's own content, samples of the Core Library cannot be found and moved content is not
+recognised; the result says so. On a real library that made 55 of 460 complete sets look
+incomplete.
+
+## Installed libraries
+Two rules only apply to files of installed libraries: a file that its vendor re-saved slightly
+larger is accepted when the audio is the same, and the opt-in rule that accepts a library file
+by its name and place in the library. The command line knows `/Users/Shared` (Native
+Instruments) as such a place. The page cannot see that path, so each sample folder has a box,
+"Contains installed libraries", ticked when the folder is called like one (`Shared`,
+`Native Instruments`, `… Library`). Ableton's packs and the Core Library always count. If the
+opt-in rule is switched on while no folder is marked, the page says that it will find nothing
+there.
 
 ## What differs from the command line
 - Read-only: nothing is collected or rewritten, and patched sets are only counted, not scanned
@@ -78,12 +99,14 @@ content it moved between versions (`Database/filerefmap.db`, a SQLite file read 
 ## How it is tested
 - `packages/web/test`: `WebFs` over fake handles, uploads and listings; a `doctor` run over the
   browser host equals a run over the Node host on the fixtures.
-- `apps/web/test`: the engine (locating, Ableton's folders, the remap table, the shaped result).
+- `apps/web/test`: the engine (locating, Ableton's folders, the Live app given as a folder, the
+  remap table, the shaped result).
 - `bun run test:web`: the built page in a real headless browser. Folders are given through the
-  folder upload and by drops (with names a handle would hide); the results, the tables and a
-  downloaded report are read from the page.
+  folder upload and by drops (with names a handle would hide, and an app as a folder); the
+  hints, the results, the tables and a downloaded report are read from the page.
 - On a real library (876 sets, 138,662 indexed files), given the project folder and the four
   folders the command line searches, with their paths typed, the five report files of the page
   are byte-identical to those of `livesaver doctor`, apart from the time stamp. That holds for
-  uploaded and for dropped folders. The check takes about 15 s in the browser (12 s on the
-  command line).
+  uploaded and for dropped folders. With the Live app dropped and no path typed, the numbers of
+  the result equal the command line's, with and without `--match-library-path`. The check takes
+  about 15 s in the browser (12 s on the command line).

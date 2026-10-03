@@ -4,7 +4,8 @@
  */
 import { type FolderSource, foldersFromDrop, foldersFromFiles } from '@livesaver/web'
 import { useRef, useState } from 'preact/hooks'
-import { count } from './format.js'
+import { holdsNames, holdsOf } from './ableton.js'
+import { plural } from './format.js'
 import { CloseIcon, FolderIcon, PlusIcon } from './icons.js'
 import type { FolderInput, LocatedFolder } from './protocol.js'
 
@@ -23,10 +24,15 @@ const HOW: Record<LocatedFolder['how'], string> = {
   unknown: 'location unknown',
 }
 
-function files(source: FolderSource): string {
+/** How much a folder holds, and which of Ableton's own folders are in it. */
+function contents(source: FolderSource): string {
   if (source.kind === 'handle') return 'read on demand'
-  return `${count(source.kind === 'files' ? source.files.length : source.paths.length)} files`
+  const files = source.kind === 'files' ? source.files.length : source.paths.length
+  return [plural(files, 'file'), ...holdsNames(holdsOf(source))].join(' · ')
 }
+
+/** The vendor's rules only apply where the user says installed libraries are. */
+export const INSTALLED = 'Contains installed libraries'
 
 interface RowProps {
   readonly folder: FolderInput
@@ -47,7 +53,7 @@ function FolderRow({ folder, kind, at, disabled, onChange, onRemove }: RowProps)
       <div class="folder-main">
         <div>
           <span class="folder-name">{name}</span>{' '}
-          <span class="folder-meta">{files(folder.source)}</span>
+          <span class="folder-meta">{contents(folder.source)}</span>
         </div>
         <div class="folder-meta folder-place">
           {place && `${place} `}
@@ -69,22 +75,25 @@ function FolderRow({ folder, kind, at, disabled, onChange, onRemove }: RowProps)
             placeholder="Where the folder lies on disk, e.g. /Users/you/Music"
             aria-label={`Path of ${name} on disk`}
             spellcheck={false}
+            autocomplete="off"
             disabled={disabled}
             onInput={(event) => onChange({ path: event.currentTarget.value })}
           />
         )}
-        {kind === 'search' && (
+        {/* Live's own content always counts as installed; there is nothing to say about it. */}
+        {kind === 'search' && !holdsOf(folder.source)?.live && (
           <label
             class="check"
-            title="Content installed by a vendor, such as Native Instruments libraries. Vendors re-saved some files slightly larger; in such a folder livesaver accepts those when the audio is the same."
+            title="Libraries installed by a vendor, such as Native Instruments. Vendors re-saved some of their files slightly larger; in such a folder livesaver accepts those when the audio is the same."
           >
             <input
               type="checkbox"
               checked={folder.vendor}
               disabled={disabled}
+              autocomplete="off"
               onChange={(event) => onChange({ vendor: event.currentTarget.checked })}
             />
-            Installed library
+            {INSTALLED}
           </label>
         )}
       </div>
@@ -98,6 +107,33 @@ function FolderRow({ folder, kind, at, disabled, onChange, onRemove }: RowProps)
         <CloseIcon />
       </button>
     </li>
+  )
+}
+
+/** What a complete check needs and is not among the sample folders yet. */
+function Wanted({ folders }: { folders: readonly FolderInput[] }) {
+  const holds = folders.map((folder) => holdsOf(folder.source))
+  const libraries = holds.some((h) => h?.userLibrary || h?.factoryPacks)
+  const live = holds.some((h) => h?.live)
+  if (libraries && live) return null
+  return (
+    <div class="wanted">
+      <p>Not added yet:</p>
+      <ul>
+        {!libraries && (
+          <li>
+            your User Library and Factory Packs: the folder <code>Music/Ableton</code> in your home
+            folder;
+          </li>
+        )}
+        {!live && (
+          <li>
+            Live's own content: drag the Ableton Live app here from your Applications folder (the
+            folder dialog cannot open an app).
+          </li>
+        )}
+      </ul>
+    </div>
   )
 }
 
@@ -190,7 +226,7 @@ export function FolderList(props: FolderListProps) {
         </button>
         <span class="hint">
           {reading !== undefined
-            ? `listing… ${count(reading)} files`
+            ? `listing… ${plural(reading, 'file')}`
             : listing
               ? 'a large folder takes a few seconds to appear…'
               : 'or drop a folder here'}
@@ -215,6 +251,7 @@ export function FolderList(props: FolderListProps) {
           {problem}
         </p>
       )}
+      {kind === 'search' && <Wanted folders={folders} />}
     </section>
   )
 }

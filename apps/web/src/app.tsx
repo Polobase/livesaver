@@ -1,6 +1,6 @@
 /** The page: give folders, run the check in a worker, read the result. */
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { FolderList } from './folders.js'
+import { FolderList, INSTALLED } from './folders.js'
 import { count } from './format.js'
 import { HealthIcon } from './icons.js'
 import type {
@@ -75,6 +75,16 @@ function Results({ result }: { result: RunResult }) {
     )
   return (
     <>
+      {!result.ableton.coreLibrary && (
+        <p class="callout" role="note">
+          <HealthIcon health="missing" />
+          <span>
+            Live's own content was not among the folders: samples of Live's Core Library cannot be
+            found, and content that Live moved between versions is not recognised. Drag the Ableton
+            Live app from your Applications folder onto Sample folders, and check again.
+          </span>
+        </p>
+      )}
       <Tiles result={result} />
       <References counts={result.counts} />
       <div class="columns">
@@ -217,15 +227,16 @@ export function App() {
               <code>Music/Ableton</code> in your home folder (User Library and Factory Packs);
             </li>
             <li>
-              Live's own content:{' '}
-              <code>/Applications/Ableton Live 12 Suite.app/Contents/App-Resources</code> (the Core
-              Library, and Live's list of content it moved between versions). An app cannot be
-              opened in the folder dialog: press ⌘⇧G there and paste the path;
+              Live's own content (the Core Library, and Live's list of content it moved between
+              versions): drag the Ableton Live app from your Applications folder onto Sample
+              folders. The folder dialog cannot open an app, but{' '}
+              <code>/Applications/Ableton Live 12 Suite.app/Contents/App-Resources</code> can be
+              pasted there after pressing ⌘⇧G;
             </li>
             <li>
-              <code>/Users/Shared</code>, where Native Instruments installs its libraries. Tick
-              "Installed library" for such folders: vendors re-saved some files slightly larger, and
-              livesaver then accepts those when the audio is the same.
+              <code>/Users/Shared</code>, where Native Instruments installs its libraries. Leave "
+              {INSTALLED}" ticked for such a folder: vendors re-saved some files slightly larger,
+              and livesaver then accepts those when the audio is the same.
             </li>
           </ul>
         </details>
@@ -245,6 +256,7 @@ export function App() {
               type="checkbox"
               checked={options.matchLibraryPath}
               disabled={running}
+              autocomplete="off"
               onChange={(event) =>
                 setOptions({ ...options, matchLibraryPath: event.currentTarget.checked })
               }
@@ -252,6 +264,13 @@ export function App() {
             Also accept a library file with another fingerprint when its name and place in the
             library match (marked uncertain)
           </label>
+          {options.matchLibraryPath && !search.some((folder) => folder.vendor) && (
+            <p class="hint option-note" role="note">
+              None of your sample folders is marked "{INSTALLED}", so this only applies to Ableton's
+              packs. Tick it on the folder that holds your libraries (Native Instruments installs
+              them in <code>/Users/Shared</code>).
+            </p>
+          )}
           <label class="field">
             Keep pack files larger than
             <input
@@ -260,6 +279,7 @@ export function App() {
               step="1"
               value={options.packLimitMB}
               disabled={running}
+              autocomplete="off"
               onInput={(event) =>
                 setOptions({
                   ...options,

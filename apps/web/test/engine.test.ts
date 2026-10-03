@@ -211,6 +211,40 @@ describe('a run in the page', () => {
     expect(withApp.result.counts).toMatchObject({ 'not-found': 0, external: 1 })
   })
 
+  test('the Live app itself can be given: only its Core Library is searched', async () => {
+    // An app is a folder to a drop: App-Resources lies in its Contents folder.
+    const app = join(tmp.path, 'Ableton Live 12 Suite.app')
+    const resources = join(app, 'Contents', 'App-Resources')
+    cpSync(join(samples, 'Lib1'), join(resources, 'Core Library', 'Samples'), { recursive: true })
+    // The same sample elsewhere in the app (a lesson, a Max package) is none to relink to.
+    cpSync(join(samples, 'Lib1'), join(resources, 'Max', 'Samples'), { recursive: true })
+    const broken = join(projects, 'Brokenpath Project')
+    const { result } = await check(
+      [folder('p', uploadedFolder(broken))],
+      [folder('live', uploadedFolder(app))],
+    )
+    expect(result.ableton.coreLibrary).toBe(
+      '/Ableton Live 12 Suite.app/Contents/App-Resources/Core Library',
+    )
+    expect(result.indexedFiles).toBe(1)
+    expect(result.changes.map((c) => c.source)).toEqual([
+      '/Ableton Live 12 Suite.app/Contents/App-Resources/Core Library/Samples/Kick/1.wav',
+    ])
+  })
+
+  test('a folder of the user\'s with a "Core Library" in it is still searched as a whole', async () => {
+    const mine = join(tmp.path, 'Mine')
+    cpSync(join(samples, 'Lib1'), join(mine, 'Loops'), { recursive: true })
+    writeFile(join(mine, 'Core Library', 'Samples', 'c.wav'), 'RIFF')
+    const broken = join(projects, 'Brokenpath Project')
+    const { result } = await check(
+      [folder('p', uploadedFolder(broken))],
+      [folder('m', uploadedFolder(mine))],
+    )
+    expect(result.ableton.coreLibrary).toBe('/Mine/Core Library')
+    expect(result.changes.map((c) => c.source)).toEqual(['/Mine/Loops/Kick/1.wav'])
+  })
+
   test('a failure is reported, not thrown', async () => {
     const broken = { kind: 'files', name: 'x', files: null } as unknown as FolderInput['source']
     const events: EngineEvent[] = []

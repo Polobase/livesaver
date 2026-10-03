@@ -109,9 +109,9 @@ collected or repaired, what is missing and where it came from, with the same rep
 download. It never writes.
 
 A browser does not tell a page where a folder lies on disk. livesaver works that out for project
-folders from the sets themselves; a path can also be typed. Given Live's `App-Resources` folder,
-the page reads Live's own list of content it moved between versions, and then reports exactly
-what the command line reports.
+folders from the sets themselves; a path can also be typed. Drop the Ableton Live app on the page
+as well: it holds the Core Library and Live's own list of content it moved between versions, and
+with it the page reports exactly what the command line reports.
 
 ## Why livesaver
 - **Byte-exact edits.** Only the bytes that must change do change; everything else in a Live Set

@@ -311,6 +311,22 @@ input[type="number"] {
   color: var(--ink);
 }
 
+.wanted {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.wanted ul {
+  margin: 2px 0 0;
+  padding-left: 20px;
+}
+
+.option-note {
+  margin: -2px 0 2px 21px;
+  color: var(--ink);
+}
+
 .about {
   margin-top: 16px;
   font-size: 13px;

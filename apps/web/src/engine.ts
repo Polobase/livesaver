@@ -41,6 +41,7 @@ import {
   type ProjectAnchor,
   WebFs,
 } from '@livesaver/web'
+import { APP_RESOURCES_IN } from './ableton.js'
 import type {
   EngineEvent,
   FolderInput,
@@ -155,28 +156,50 @@ async function locate(request: RunRequest): Promise<LocatedFolder[]> {
   return located
 }
 
-/** Ableton's own folders, recognised by name: a given folder itself, or a folder directly in it. */
+interface Ableton {
+  readonly config: EnvConfig
+  /** The given folder that is, or holds, Live's App-Resources folder ('' = none does). */
+  readonly liveFolder: string
+}
+
+/** Ableton's own folders, recognised by name: a given folder itself, or a folder in it. */
 async function ableton(
   fs: WebFs,
   mounts: readonly Mount[],
   vendor: readonly string[],
-): Promise<EnvConfig> {
+): Promise<Ableton> {
+  const is = (path: string, name: string) => posix.basename(path).toLowerCase() === name
+  const isDir = async (path: string) => (await fs.kind(path)) === 'directory'
   const named = async (mount: string, name: string) => {
-    if (posix.basename(mount).toLowerCase() === name.toLowerCase()) return mount
+    if (is(mount, name.toLowerCase())) return mount
     const child = posix.join(mount, name)
-    return (await fs.stat(child))?.isDirectory ? child : ''
+    return (await isDir(child)) ? child : ''
   }
   let userLibrary = ''
   let factoryPacks = ''
-  let coreLibrary = ''
+  let appResources = ''
+  let liveFolder = ''
   for (const { path } of mounts) {
     userLibrary ||= await named(path, 'User Library')
     factoryPacks ||= await named(path, 'Factory Packs')
-    coreLibrary ||= await named(path, 'Core Library')
+    if (appResources) continue
+    // The Core Library lies in the Live app's App-Resources folder.
+    if (is(path, 'core library')) {
+      appResources = posix.dirname(path)
+      continue
+    }
+    for (const inside of APP_RESOURCES_IN) {
+      const dir = inside ? posix.join(path, inside) : path
+      if (!(await isDir(posix.join(dir, 'Core Library')))) continue
+      appResources = dir
+      // Only a folder of the Live app is narrowed to its Core Library when searching, not a
+      // folder of the user's that happens to have a "Core Library" in it.
+      if (inside || is(path, 'app-resources')) liveFolder = path
+      break
+    }
   }
-  // The Core Library lies in the Live app's App-Resources folder. If that whole folder was
-  // given, Live's table of content it moved between versions is there too.
-  const appResources = coreLibrary ? posix.dirname(coreLibrary) : ''
+  // If the whole App-Resources folder was given, Live's table of content it moved between
+  // versions is there too.
   let remap: RemapTable = EMPTY_REMAP
   const table = posix.join(appResources, 'Database', 'filerefmap.db')
   if (appResources && (await fs.kind(table)) === 'file') {
@@ -185,12 +208,15 @@ async function ableton(
     } catch {} // an unreadable table only means fewer references are resolved
   }
   return {
-    userLibrary,
-    factoryPacks,
-    appResources,
-    preferredRoots: [],
-    vendorLibraries: vendor,
-    remap,
+    config: {
+      userLibrary,
+      factoryPacks,
+      appResources,
+      preferredRoots: [],
+      vendorLibraries: vendor,
+      remap,
+    },
+    liveFolder,
   }
 }
 
@@ -312,7 +338,7 @@ export async function run(
     const probe = new Probe(host.fs, host.hash)
     const targets = mounts.slice(0, request.projects.length).map((m) => m.path)
     const vendor = mounts.filter((_, i) => (inputs[i] as FolderInput).vendor).map((m) => m.path)
-    const config = await ableton(host.fs, mounts, vendor)
+    const { config, liveFolder } = await ableton(host.fs, mounts, vendor)
     const parser = options.spawn
       ? createWorkerParser({
           host,
@@ -327,9 +353,7 @@ export async function run(
       // Of the Live app's own folder only the Core Library holds samples to relink to; the rest
       // (built-in devices, lessons, Max) is Live's business.
       searchRoots: mounts.map((m) =>
-        config.appResources && m.path === config.appResources
-          ? posix.join(m.path, 'Core Library')
-          : m.path,
+        m.path === liveFolder ? posix.join(config.appResources, 'Core Library') : m.path,
       ),
       env: config,
       packCopyLimit: Math.trunc(request.options.packLimitMB * 1_000_000),

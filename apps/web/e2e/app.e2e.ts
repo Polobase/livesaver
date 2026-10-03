@@ -77,8 +77,13 @@ if (!executable && process.env.CI)
     await session.detach()
   }
 
+  /** What the page still wants among the sample folders (the start of each hint). */
+  const wanted = async () =>
+    (await page.locator('.wanted li').allInnerTexts()).map((text) => text.split(':')[0])
+
   test('nothing to check without a project folder', async () => {
     expect(await page.getByRole('button', { name: 'Check sets' }).isDisabled()).toBe(true)
+    expect(await wanted()).toEqual(['your User Library and Factory Packs', "Live's own content"])
   })
 
   test('uploaded folders are checked and the result is shown', async () => {
@@ -101,6 +106,9 @@ if (!executable && process.env.CI)
       'samples/Lib1',
     ])
     expect(await page.locator('table.data tbody tr').count()).toBe(3)
+    expect(await page.locator('.callout').innerText()).toContain(
+      "Live's own content was not among the folders",
+    )
   }, 60_000)
 
   test('the tabs list the planned change, and filters narrow the rows', async () => {
@@ -195,6 +203,62 @@ if (!executable && process.env.CI)
     expect(await tile('Files to copy')).toBe('1')
     expect(await page.locator('.facts').innerText()).toContain('against 4 audio files')
   }, 60_000)
+
+  test('the library option says when no folder is marked as holding installed libraries', async () => {
+    const option = page.getByLabel(/Also accept a library file/)
+    const note = page.locator('.option-note')
+    expect(await note.count()).toBe(0)
+    await option.check()
+    expect(await note.innerText()).toContain('None of your sample folders is marked')
+    // A folder called like the place of Native Instruments' libraries is marked when it is added.
+    writeFile(join(tmp.path, 'Shared', 'Some Library', 'Samples', 'x.wav'), 'RIFF')
+    await page.getByTestId('search-input').setInputFiles(join(tmp.path, 'Shared'))
+    const marked = page
+      .locator('.folder-row', { hasText: 'Shared' })
+      .getByLabel('Contains installed libraries')
+    expect(await marked.isChecked()).toBe(true)
+    expect(await note.count()).toBe(0)
+    await marked.uncheck()
+    expect(await note.count()).toBe(1)
+    await marked.check()
+    await option.uncheck()
+  })
+
+  test('the Live app can be dropped as a folder, and the page says what it still wants', async () => {
+    const app = join(tmp.path, 'Ableton Live 12 Suite.app')
+    writeFile(join(app, 'Contents', 'App-Resources', 'Core Library', 'Samples', 'x.wav'), 'RIFF')
+    writeFile(join(app, 'Contents', 'Info.plist'), '<plist/>')
+    await drop(page.locator('.folders').last(), app)
+    await page.locator('.folder-name', { hasText: 'Ableton Live 12 Suite.app' }).waitFor()
+    expect(await page.locator('.folder-main > div:first-child').last().innerText()).toBe(
+      "Ableton Live 12 Suite.app 2 files · Live's own content",
+    )
+    expect(await wanted()).toEqual(['your User Library and Factory Packs'])
+    // Live's own content always counts as installed: no box to tick on its row.
+    expect(await page.getByLabel('Contains installed libraries').count()).toBe(2)
+    writeFile(join(tmp.path, 'Ableton', 'User Library', 'Samples', 'u.wav'), 'RIFF')
+    await page.getByTestId('search-input').setInputFiles(join(tmp.path, 'Ableton'))
+    await page.locator('.folder-name', { hasText: /^Ableton$/ }).waitFor()
+    expect(await page.locator('.wanted').count()).toBe(0)
+
+    await page.getByRole('button', { name: 'Check sets' }).click()
+    await page.locator('.tiles').waitFor({ timeout: 30_000 })
+    expect(await page.locator('.callout').count()).toBe(0)
+    expect(await page.locator('.facts').innerText()).toContain(
+      'Recognised: User Library, Core Library.',
+    )
+  }, 60_000)
+
+  test('coming back to the page shows its own state, not boxes the browser remembered', async () => {
+    // A browser restores form controls by their order: the option would get the tick of the
+    // first folder's box, while the page itself starts with the option off.
+    await page.getByLabel('Contains installed libraries').first().check()
+    await page.goto('about:blank')
+    await page.goBack()
+    await page.getByRole('button', { name: 'Check sets' }).waitFor()
+    expect(await page.locator('.folder-row').count()).toBe(0)
+    expect(await page.getByLabel(/Also accept a library file/).isChecked()).toBe(false)
+  })
 
   test('the page reported no errors', () => {
     expect(problems).toEqual([])

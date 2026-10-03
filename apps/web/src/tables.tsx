@@ -58,6 +58,7 @@ function Table<T>(props: TableProps<T>) {
           value={query}
           placeholder={`Search ${props.name}`}
           aria-label={`Search ${props.name}`}
+          autocomplete="off"
           onInput={(event) => {
             setQuery(event.currentTarget.value)
             setShown(PAGE)
@@ -66,6 +67,7 @@ function Table<T>(props: TableProps<T>) {
         <select
           aria-label={`Filter ${props.name}`}
           value={filter}
+          autocomplete="off"
           onChange={(event) => {
             setFilter(Number(event.currentTarget.value))
             setShown(PAGE)
