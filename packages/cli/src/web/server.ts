@@ -9,13 +9,19 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { liveIsRunning } from '@livesaver/node'
 import { type WebSettings, webCheck, webFix, webFolders, webInfo, webUndo } from './local.js'
+import { canReveal, freeBytesAt, webReport, webReveal, webRun, webRuns } from './local-runs.js'
+import { type ScanNotes, webScan, webUpgrade, webUpgradePlan } from './local-scan.js'
 import {
   TOKEN_HEADER,
   TOKEN_META,
   type WebEvent,
   type WebFixRequest,
+  type WebLastScan,
   type WebRequest,
+  type WebStatus,
+  type WebUpgradeRequest,
 } from './protocol.js'
 
 export interface WebServerOptions extends WebSettings {
@@ -83,8 +89,16 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
   const assets = options.assets === false ? '' : (options.assets ?? findAssets())
   const token = randomBytes(24).toString('hex')
   let port = options.port ?? 0
-  /** One run at a time: a check reads what a fix writes. */
-  let busy = false
+  /** One run at a time: a check reads what a fix writes. What runs, and how far it is. */
+  let busy: WebStatus['busy'] = ''
+  let progress: Pick<WebStatus, 'phase' | 'done' | 'total'> = {}
+  /** The last scan is kept: a page that is reloaded, or opened again, shows it without scanning. */
+  let lastScan: WebLastScan | undefined
+  let notes: ScanNotes | undefined
+  const forget = () => {
+    lastScan = undefined
+    notes = undefined
+  }
 
   /** Only the page this server served may ask: it has the token, and it came from this address. */
   const allowed = (req: IncomingMessage) => {
@@ -99,31 +113,53 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
     )
   }
 
+  const BUSY = 'Another scan or fix is still running.'
+
   /** A run answers line by line, so the page can show how far it is. */
   const stream = async (
     res: ServerResponse,
+    kind: Exclude<WebStatus['busy'], ''>,
     run: (emit: (event: WebEvent) => void) => Promise<void>,
   ) => {
-    if (busy) return json(res, 409, { message: 'Another check or fix is still running.' })
-    busy = true
+    if (busy) return json(res, 409, { message: BUSY })
+    busy = kind
+    progress = {}
+    // What a scan found is no longer true once something is written.
+    if (kind === 'fix' || kind === 'upgrade') forget()
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' })
     // The page may be gone before the run ends (closed, reloaded): the run finishes all the
     // same, since a fix must not stop half-way, and its lines go nowhere.
     res.on('error', () => {})
     try {
       await run((event) => {
+        if (event.type === 'phase') progress = { phase: event.phase }
+        else if (event.type === 'progress')
+          progress = { ...progress, done: event.done, total: event.total }
         if (!res.destroyed) res.write(`${JSON.stringify(event)}\n`)
       })
     } finally {
-      busy = false
+      busy = ''
+      progress = {}
       if (!res.destroyed) res.end()
+    }
+  }
+
+  const status = async (path: string): Promise<WebStatus> => {
+    const freeBytes = await freeBytesAt(path)
+    return {
+      liveRunning: liveIsRunning(),
+      busy,
+      ...progress,
+      lastScan: lastScan?.at ?? '',
+      ...(freeBytes === undefined ? {} : { freeBytes }),
     }
   }
 
   const api = async (req: IncomingMessage, res: ServerResponse, url: URL) => {
     if (!allowed(req)) return json(res, 403, { message: 'not allowed' })
     const route = `${req.method} ${url.pathname}`
-    if (route === 'GET /api/info') return json(res, 200, await webInfo(options))
+    if (route === 'GET /api/info')
+      return json(res, 200, { ...(await webInfo(options)), reveal: canReveal(options) })
     if (route === 'GET /api/folders') {
       // A path that cannot be opened is an answer, not a failure: paths are typed by hand.
       try {
@@ -132,23 +168,78 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
         return json(res, 200, { problem: (error as Error).message })
       }
     }
+    if (route === 'GET /api/status')
+      return json(res, 200, await status(url.searchParams.get('path') ?? ''))
     if (route === 'POST /api/check') {
       const request = (await body(req)) as WebRequest
-      return stream(res, (emit) => webCheck(request, emit, options))
+      return stream(res, 'check', (emit) => webCheck(request, emit, options))
+    }
+    if (route === 'GET /api/scan') return json(res, 200, lastScan ?? {})
+    if (route === 'POST /api/scan') {
+      const request = (await body(req)) as WebRequest
+      return stream(res, 'scan', async (emit) => {
+        notes = await webScan(
+          request,
+          (event) => {
+            if (event.type === 'scanned') lastScan = { scan: event.scan, request, at: event.at }
+            emit(event)
+          },
+          options,
+        )
+      })
+    }
+    if (route === 'POST /api/upgrade/plan') {
+      const request = (await body(req)) as WebUpgradeRequest
+      // What the scan learned holds for a plan of the folders it scanned, or of one of them.
+      const scanned = lastScan
+      const known =
+        scanned !== undefined &&
+        JSON.stringify(request.projects) === JSON.stringify(scanned.request.projects)
+      const whole = known && !request.only && !request.plugins?.length
+      return stream(res, 'plan', (emit) =>
+        webUpgradePlan(
+          request,
+          (event) => {
+            if (event.type === 'planned' && whole && lastScan === scanned)
+              lastScan = { ...scanned, upgrade: event.upgrade }
+            emit(event)
+          },
+          options,
+          known ? notes : undefined,
+        ),
+      )
     }
     if (route === 'POST /api/fix') {
       const request = (await body(req)) as WebFixRequest
-      return stream(res, (emit) => webFix(request, emit, options))
+      return stream(res, 'fix', (emit) => webFix(request, emit, options))
+    }
+    if (route === 'POST /api/upgrade') {
+      const request = (await body(req)) as WebUpgradeRequest
+      return stream(res, 'upgrade', (emit) => webUpgrade(request, emit, options))
     }
     if (route === 'POST /api/undo') {
-      if (busy) return json(res, 409, { message: 'Another check or fix is still running.' })
-      busy = true
+      if (busy) return json(res, 409, { message: BUSY })
+      busy = 'undo'
+      forget()
       try {
         const { run } = (await body(req)) as { run?: string }
         return json(res, 200, await webUndo(String(run ?? ''), options))
       } finally {
-        busy = false
+        busy = ''
       }
+    }
+    if (route === 'GET /api/runs') return json(res, 200, await webRuns())
+    const run = /^GET \/api\/runs\/([^/]+)(?:\/reports\/([^/]+))?$/.exec(route)
+    if (run) {
+      const id = decodeURIComponent(run[1] as string)
+      if (run[2] === undefined) return json(res, 200, await webRun(id))
+      const text = webReport(id, decodeURIComponent(run[2]))
+      return send(res, 200, text, 'text/plain; charset=utf-8')
+    }
+    if (route === 'POST /api/reveal') {
+      const { path } = (await body(req)) as { path?: string }
+      await webReveal(String(path ?? ''), options)
+      return json(res, 200, {})
     }
     return json(res, 404, { message: 'not found' })
   }

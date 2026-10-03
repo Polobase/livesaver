@@ -3,7 +3,7 @@
  * itself in a browser, but only this computer's livesaver can fix what it finds: it reads and
  * writes like the command line does, with the same settings, backups, journal and undo.
  */
-import type { CheckView } from '@livesaver/ops'
+import type { CheckView, PluginsView, RunStep, RunSummary, UpgradeView } from '@livesaver/ops'
 
 export interface WebOptions {
   /** Pack files larger than this stay in the pack (megabytes; 0 = never copy). */
@@ -52,6 +52,12 @@ export interface WebInfo {
   readonly search: readonly WebFolderInfo[]
   readonly options: WebOptions
   readonly lastFix?: WebLastFix
+  /** `darwin`, `linux`, `win32`: what this computer can do depends on it (Finder, Live). */
+  readonly platform: string
+  /** The plug-ins an upgrade from VST2 to VST3 can convert, by name. */
+  readonly upgradable: readonly string[]
+  /** This computer can show a file in its file manager. */
+  readonly reveal?: boolean
 }
 
 /** The folders in a folder, for choosing one in the page (a page cannot ask the system for it). */
@@ -73,6 +79,69 @@ export interface WebRequest {
 export interface WebFixRequest extends WebRequest {
   /** The one project folder to fix; without it, every project is fixed. */
   readonly only?: string
+  /** Leave uncertain matches out: their samples stay missing. */
+  readonly certainOnly?: boolean
+}
+
+/** A scan: the samples, and the plug-ins the sets use. */
+export interface WebScan {
+  readonly samples: WebResult
+  readonly plugins: PluginsView
+  /** Seconds spent in each phase. */
+  readonly seconds: Readonly<Partial<Record<WebPhase, number>>>
+}
+
+/** The scan livesaver still has: a page that was reloaded shows it without scanning again. */
+export interface WebLastScan {
+  readonly scan: WebScan
+  /** What was scanned. */
+  readonly request: WebRequest
+  /** When it ended (ISO 8601). */
+  readonly at: string
+  /** What an upgrade to VST3 would do, once it was planned for these folders. */
+  readonly upgrade?: UpgradeView
+}
+
+export interface WebUpgradeRequest {
+  readonly projects: readonly string[]
+  /** Only these plug-ins, by name; without it, every plug-in that can be converted. */
+  readonly plugins?: readonly string[]
+  /** The one project folder to upgrade; without it, every project. */
+  readonly only?: string
+}
+
+export interface WebUpgraded {
+  /** The run, to undo it. */
+  readonly run: string
+  /** Sets that were rewritten. */
+  readonly sets: number
+  /** Every plug-in in every set: converted or not, and why. */
+  readonly upgrade: UpgradeView
+  readonly errors: readonly { readonly set: string; readonly error: string }[]
+}
+
+/** A run of the history: what it did, and the report files in its folder. */
+export interface WebRun extends RunSummary {
+  readonly reports: readonly string[]
+}
+
+export interface WebRunDetail {
+  readonly run: WebRun
+  readonly steps: readonly RunStep[]
+}
+
+export interface WebStatus {
+  /** Live must be closed before anything is written. */
+  readonly liveRunning: boolean
+  /** What runs right now ('' = nothing), and how far it is. */
+  readonly busy: '' | 'check' | 'scan' | 'plan' | 'fix' | 'upgrade' | 'undo'
+  readonly phase?: WebPhase
+  readonly done?: number
+  readonly total?: number
+  /** When the scan livesaver still has ended ('' = it has none). */
+  readonly lastScan: string
+  /** Free space on the volume of the folder that was asked about (`?path=`), where it is known. */
+  readonly freeBytes?: number
 }
 
 export interface WebResult extends CheckView {
@@ -109,7 +178,7 @@ export interface WebUndone {
   readonly problems: readonly string[]
 }
 
-export type WebPhase = 'indexing' | 'checking' | 'fixing' | 'reporting'
+export type WebPhase = 'indexing' | 'checking' | 'plugins' | 'fixing' | 'upgrading' | 'reporting'
 
 /** A run answers with one event per line. */
 export type WebEvent =
@@ -122,7 +191,11 @@ export type WebEvent =
       readonly name: string
     }
   | { readonly type: 'done'; readonly result: WebResult }
+  | { readonly type: 'scanned'; readonly scan: WebScan; readonly at: string }
+  /** What an upgrade of VST2 plug-ins to VST3 would do. */
+  | { readonly type: 'planned'; readonly upgrade: UpgradeView }
   | { readonly type: 'fixed'; readonly fixed: WebFixed }
+  | { readonly type: 'upgraded'; readonly upgraded: WebUpgraded }
   /** `run`: a fix failed on its way, and what it had done until then can be undone. */
   | { readonly type: 'failed'; readonly message: string; readonly run?: string }
 

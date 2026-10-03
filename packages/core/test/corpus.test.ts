@@ -6,7 +6,8 @@
  *
  * Every Live document below the folder (Backup folders included) must decode, scan, and round-trip
  * byte-identically through an empty patch. On every 7th file, the byte-search reference finder is
- * cross-checked against an independent regular expression for the same references.
+ * cross-checked against an independent regular expression for the same references, and the
+ * plug-ins read from the plug-in devices alone against those of the full analysis.
  */
 import { expect, test } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -14,7 +15,14 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { nodeCodec, nodeSearch } from '@livesaver/node'
 import { patch, scan } from '@livesaver/xml'
-import { fileRefs, LiveFormatError, openDocument } from '../src/index.js'
+import {
+  analyzeSet,
+  documentFromXml,
+  fileRefs,
+  LiveFormatError,
+  openDocument,
+  pluginUses,
+} from '../src/index.js'
 
 const root = process.env.LIVESAVER_CORPUS?.replace(/^~(?=$|\/)/, homedir())
 const extensions = (process.env.LIVESAVER_CORPUS_EXT ?? '.als')
@@ -44,7 +52,15 @@ function files(dir: string, out: string[] = []): string[] {
   'every Live document decodes, scans and round-trips byte-identically',
   async () => {
     const all = files(root as string)
-    const stats = { files: all.length, xml: 0, bytes: 0, refs: 0, unsupported: 0, crossChecked: 0 }
+    const stats = {
+      files: all.length,
+      xml: 0,
+      bytes: 0,
+      refs: 0,
+      plugins: 0,
+      unsupported: 0,
+      crossChecked: 0,
+    }
     const failures: string[] = []
     for (const [i, path] of all.entries()) {
       let doc: Awaited<ReturnType<typeof openDocument>>
@@ -78,11 +94,23 @@ function files(dir: string, out: string[] = []): string[] {
         const expected = [...text.matchAll(SAMPLE_REF_RE)].length
         if (expected !== refs.length)
           failures.push(`${path}: ${refs.length} refs, the regular expression finds ${expected}`)
+        if (path.toLowerCase().endsWith('.als')) {
+          try {
+            const full = analyzeSet(documentFromXml(doc.xml, doc.gzipped, true, nodeSearch))
+            const fast = pluginUses(doc)
+            stats.plugins += fast.length
+            if (JSON.stringify(fast) !== JSON.stringify(full.plugins))
+              failures.push(`${path}: the plug-ins differ from those of the full analysis`)
+          } catch (error) {
+            failures.push(`${path}: plug-ins: ${(error as Error).message}`)
+          }
+        }
       }
     }
     console.log(
       `corpus ${root}: ${stats.files} files, ${stats.xml} XML (${(stats.bytes / 1e9).toFixed(2)} GB), ` +
-        `${stats.unsupported} binary/legacy, ${stats.refs} references, ${stats.crossChecked} cross-checked`,
+        `${stats.unsupported} binary/legacy, ${stats.refs} references, ${stats.crossChecked} cross-checked ` +
+        `(${stats.plugins} plug-ins in them)`,
     )
     for (const f of failures.slice(0, 20)) console.log(`  FAIL ${f}`)
     expect(failures).toEqual([])

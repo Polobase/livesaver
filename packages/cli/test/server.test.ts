@@ -3,14 +3,24 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { writeFileSync } from 'node:fs'
 import { request as httpRequest } from 'node:http'
 import { join } from 'node:path'
+import { Inventory } from '@livesaver/plugins'
 import { copyFixtures, tempDir, writeFile } from '@livesaver/test-kit'
-import { TOKEN_HEADER, type WebEvent, type WebInfo } from '../src/web/protocol.js'
+import {
+  TOKEN_HEADER,
+  type WebEvent,
+  type WebInfo,
+  type WebLastScan,
+  type WebRun,
+  type WebRunDetail,
+  type WebStatus,
+} from '../src/web/protocol.js'
 import { startWeb, type WebServer } from '../src/web/server.js'
 
 let tmp: { path: string; cleanup: () => void }
 let projects: string
 let samples: string
 let server: WebServer
+let revealed: string[]
 const saved = { home: process.env.LIVESAVER_HOME, trash: process.env.LIVESAVER_TRASH_DIR }
 
 beforeEach(async () => {
@@ -29,7 +39,17 @@ beforeEach(async () => {
     '<!doctype html><meta name="livesaver-local" content="" /><script src="./main.js"></script>',
   )
   writeFile(join(assets, 'main.js'), 'console.log(1)')
-  server = await startWeb({ assets, config, force: true })
+  revealed = []
+  server = await startWeb({
+    assets,
+    config,
+    force: true,
+    // Nothing of this computer: no plug-in is installed, and no window is opened.
+    plugins: async () => ({ inventory: new Inventory([]), catalog: new Map() }),
+    reveal: async (path) => {
+      revealed.push(path)
+    },
+  })
 })
 afterEach(async () => {
   await server.close()
@@ -201,4 +221,61 @@ test('the page gets what it starts with, folders to choose from, and a check lin
   expect(last?.type).toBe('done')
   expect(last?.type === 'done' && [last.result.sets, last.result.changingSets]).toEqual([3, 1])
   expect((await ask('/api/unknown', { headers: own() })).status).toBe(404)
+})
+
+test('a scan is kept until something is written, and the history tells what was', async () => {
+  const get = async <T>(path: string) => JSON.parse((await ask(path, { headers: own() })).text) as T
+  const post = (path: string, body: unknown) => ask(path, { method: 'POST', headers: own(), body })
+  const request = {
+    projects: [projects],
+    search: [{ path: samples, vendor: false }],
+    options: { packLimitMB: 50, matchLibraryPath: false },
+  }
+  expect(await get<WebStatus>('/api/status')).toMatchObject({ busy: '', lastScan: '' })
+  expect(await get<object>('/api/scan')).toEqual({})
+
+  const scanned = await post('/api/scan', request)
+  const last = JSON.parse(scanned.text.trim().split('\n').at(-1) as string) as WebEvent
+  expect(last.type).toBe('scanned')
+  // A page that is opened again gets the same scan without scanning.
+  const kept = await get<WebLastScan>('/api/scan')
+  expect(kept.request).toEqual(request)
+  expect(last.type === 'scanned' && kept.scan).toEqual(last.type === 'scanned' && last.scan)
+  expect((await get<WebStatus>('/api/status')).lastScan).toBe(kept.at)
+  expect([kept.scan.samples.changingSets, kept.scan.plugins.inventory]).toEqual([1, true])
+  // Nothing of Live is known here, so an upgrade cannot be planned; the answer says why.
+  const planned = await post('/api/upgrade/plan', { projects: [projects] })
+  expect(JSON.parse(planned.text.trim().split('\n').at(-1) as string)).toEqual({
+    type: 'failed',
+    message: "No VST3 plug-ins in Live's plug-in database.",
+  })
+
+  const fixed = await post('/api/fix', request)
+  const fix = JSON.parse(fixed.text.trim().split('\n').at(-1) as string) as WebEvent
+  expect(fix.type === 'fixed' && [fix.fixed.sets, fix.fixed.files]).toEqual([1, 1])
+  expect(await get<object>('/api/scan')).toEqual({})
+
+  const runs = await get<WebRun[]>('/api/runs')
+  expect(runs.map((run) => [run.command, run.state, run.sets, run.files])).toEqual([
+    ['collect', 'applied', 1, 1],
+  ])
+  const id = runs[0]?.id as string
+  const detail = await get<WebRunDetail>(`/api/runs/${id}`)
+  expect(detail.steps.map((step) => step.op)).toEqual(['copy', 'write-set'])
+  expect(detail.run.reports).toContain('changes.csv')
+  const report = await ask(`/api/runs/${id}/reports/changes.csv`, { headers: own() })
+  expect([report.status, report.type]).toEqual([200, 'text/plain; charset=utf-8'])
+  expect(report.text).toContain('1.wav')
+  const none = await ask(`/api/runs/${id}/reports/journal.jsonl`, { headers: own() })
+  expect([none.status, JSON.parse(none.text).message]).toEqual([
+    400,
+    'The run has no such report: journal.jsonl',
+  ])
+  expect((await ask('/api/runs/nothing', { headers: own() })).status).toBe(400)
+
+  const set = detail.steps[1]?.path as string
+  expect((await post('/api/reveal', { path: set })).status).toBe(200)
+  expect(revealed).toEqual([set])
+  expect((await post('/api/reveal', { path: join(tmp.path, 'gone') })).status).toBe(400)
+  expect((await get<WebInfo>('/api/info')).reveal).toBe(true)
 })

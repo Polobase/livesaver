@@ -39,6 +39,7 @@ const TAG_RE = /<(\/?)([A-Za-z_][\w.]*)[^>]*?(\/?)>/g
 const RACK_TAG_RE =
   /<(\/?)(InstrumentGroupDevice|AudioEffectGroupDevice|DrumGroupDevice|MidiEffectGroupDevice)\b[^>]*?(\/?)>/g
 const DEVICE_RE = /<PluginDevice Id="\d+">/g
+const POINTEE_RE = /<PointeeId Value="(\d+)"/g
 const PARAM_RE = /<(Plugin\w*Parameter) Id="\d+">[\s\S]*?<\/\1>/g
 const TARGET_RE = /<(?:AutomationTarget|ModulationTarget) Id="(\d+)"/g
 const BRANCH_RE = /<BranchDeviceId Value="([^"]*)" \/>/
@@ -120,10 +121,37 @@ function fromHex(text: string): Uint8Array {
   return out
 }
 
+/**
+ * The matches of an expression that all begin where `opening` precedes `needle`, as `matchAll`
+ * finds them, but found by string search: a Set is tens of megabytes of text in which these
+ * places are rare, and walking an expression over all of it is most of a plan's time.
+ */
+function* matchesAt(
+  text: string,
+  expression: RegExp,
+  needle: string,
+  opening = '',
+): Generator<RegExpExecArray> {
+  const sticky = new RegExp(expression.source, 'y')
+  let from = 0
+  for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + needle.length)) {
+    const start = opening ? text.lastIndexOf(opening, at) : at
+    // Inside the match before it: a global search would not find it either.
+    if (start < from) continue
+    sticky.lastIndex = start
+    const m = sticky.exec(text)
+    if (!m) continue
+    from = start + m[0].length
+    yield m
+  }
+}
+
+const devices = (text: string) => matchesAt(text, DEVICE_RE, '<PluginDevice Id="')
+
 function rackSpans(text: string): Span[] {
   const spans: Span[] = []
   const stack: number[] = []
-  for (const m of text.matchAll(RACK_TAG_RE)) {
+  for (const m of matchesAt(text, RACK_TAG_RE, 'GroupDevice', '<')) {
     const [, closing, , selfClosing] = m
     if (closing) {
       const start = stack.pop()
@@ -133,6 +161,13 @@ function rackSpans(text: string): Span[] {
     }
   }
   return spans
+}
+
+/** The ids automation and mappings point at. */
+function pointeeIds(text: string): Set<string> {
+  const ids = new Set<string>()
+  for (const m of matchesAt(text, POINTEE_RE, '<PointeeId Value="')) ids.add(m[1] as string)
+  return ids
 }
 
 /** Whether the Set's file format knows VST3 devices: MinorVersion 10.0_377 (Live 10.1) or newer. */
@@ -357,13 +392,12 @@ export function convertText(
 ): ConvertResult {
   const known = options.known ?? KNOWN
   const vst3Format = supportsVst3(text)
-  const pointees = new Set(
-    [...text.matchAll(/<PointeeId Value="(\d+)"/g)].map((m) => m[1] as string),
-  )
-  const racks = rackSpans(text)
+  // Read from the whole text only when a device needs them: most Sets have no device to convert.
+  let pointees: Set<string> | undefined
+  let racks: Span[] | undefined
   const instances = new Map<string, Instance[]>()
   const unchecked = new Map<string, number>()
-  for (const m of text.matchAll(DEVICE_RE)) {
+  for (const m of devices(text)) {
     const end = text.indexOf('</PluginDevice>', m.index)
     if (end < 0) continue
     const span: Span = [m.index, end + '</PluginDevice>'.length]
@@ -386,10 +420,16 @@ export function convertText(
     const target = targetFor(vst2Id, entry, catalog)
     let inst: Instance
     if (!vst3Format) inst = { span, blocker: 'old_format', patches: [], selectionReset: false }
-    else if (racks.some(([a, b]) => a < span[0] && span[0] < b))
-      inst = { span, blocker: 'rack', patches: [], selectionReset: false }
-    else if (!target) inst = { span, blocker: 'no_vst3', patches: [], selectionReset: false }
-    else inst = convertDevice(text, span, entry, target, pointees)
+    else {
+      racks ??= rackSpans(text)
+      if (racks.some(([from, to]) => from < span[0] && span[0] < to))
+        inst = { span, blocker: 'rack', patches: [], selectionReset: false }
+      else if (!target) inst = { span, blocker: 'no_vst3', patches: [], selectionReset: false }
+      else {
+        pointees ??= pointeeIds(text)
+        inst = convertDevice(text, span, entry, target, pointees)
+      }
+    }
     const list = instances.get(entry.name) ?? []
     list.push(inst)
     instances.set(entry.name, list)
@@ -419,7 +459,7 @@ export function convertText(
   const refsBefore = fileRefs(documentFromXml(encodeUtf8(text), false, false)).length
   const refsAfter = fileRefs(documentFromXml(newBytes, false, false)).length
   if (
-    (newText.match(DEVICE_RE)?.length ?? 0) !== (text.match(DEVICE_RE)?.length ?? 0) ||
+    [...devices(newText)].length !== [...devices(text)].length ||
     countOf(newText, '<Vst3PluginInfo') !== countOf(text, '<Vst3PluginInfo') + converted ||
     refsAfter !== refsBefore
   ) {

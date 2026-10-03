@@ -23,12 +23,19 @@ export type {
   WebFolders,
   WebInfo,
   WebLastFix,
+  WebLastScan,
   WebOptions,
   WebPhase,
   WebPlace,
   WebRequest,
   WebResult,
+  WebRun,
+  WebRunDetail,
+  WebScan,
+  WebStatus,
   WebUndone,
+  WebUpgraded,
+  WebUpgradeRequest,
 } from './web/protocol.js'
 export { TOKEN_HEADER, TOKEN_META } from './web/protocol.js'
 export { startWeb, type WebServer, type WebServerOptions } from './web/server.js'

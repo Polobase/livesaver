@@ -12,9 +12,17 @@
  * - automation: Live 10+ `<Track>/AutomationEnvelopes/Envelopes`, Live 9 an `ArrangerAutomation` per
  *   parameter; an event at the default time -63072000 holds the value, only later events automate
  */
-import { decodeEntities, decodeUtf8, type El, type XmlIndex } from '@livesaver/xml'
+import type { El } from '@livesaver/xml'
 import { compareCodePoints, pyFixed, pyFloat, pyFloorDiv, pyMod, pyStrip } from './compat.js'
 import type { LiveDoc } from './document.js'
+import {
+  auRefOf,
+  countPlugins,
+  etAttr,
+  type PluginRef,
+  type PluginUseCount,
+  vstRefOf,
+} from './plugin-uses.js'
 import { Sha1 } from './sha1.js'
 
 export const DEFAULT_TIME = -63072000.0
@@ -29,16 +37,6 @@ export const MASTERING_DEVICES: ReadonlySet<string> = new Set([
   'MultibandDynamics',
 ])
 const NOT_PARAMETERS = new Set(['MainSequencer', 'FreezeSequencer', 'ClipSlotList', 'TakeLanes'])
-
-export type PluginFormat = 'VST2' | 'VST3' | 'AU'
-
-/** A plug-in as the Set refers to it; Live finds it by format and id, never by name. */
-export interface PluginRef {
-  readonly format: PluginFormat
-  /** VST2: unique id (decimal), VST3: class id (32 hex digits), AU: "type:subtype:manufacturer". */
-  readonly ident: string
-  readonly name: string
-}
 
 export interface SetInfo {
   readonly creator: string
@@ -71,7 +69,7 @@ export interface SetInfo {
   /** Mastering devices on the master, racks included. */
   readonly masterDevices: readonly string[]
   /** Plug-ins with their instance counts, in order of appearance. */
-  readonly plugins: readonly { readonly ref: PluginRef; readonly instances: number }[]
+  readonly plugins: readonly PluginUseCount[]
   /** Tempo, clips and notes; equal for copies of the same music. */
   readonly contentHash: string
   readonly beatsPerBar: number
@@ -82,38 +80,6 @@ export interface SetInfo {
   readonly seconds: number
   readonly startBar: number
   readonly contentTracks: number
-}
-
-/** Four-character code of a 32-bit id ('' if not printable). */
-export function fourcc(value: number): string {
-  const n = value >>> 0
-  const bytes = [n >>> 24, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff]
-  return bytes.every((b) => b >= 32 && b < 127) ? String.fromCharCode(...bytes) : ''
-}
-
-/** Four-character code of a plug-in id, or 8 hex digits if it is not printable. */
-export function idCode(value: number): string {
-  return fourcc(value) || (value >>> 0).toString(16).padStart(8, '0')
-}
-
-/** Readable id: the four characters of a VST2 id, the AU codes or the VST3 class id. */
-export function pluginCode(ref: PluginRef): string {
-  return ref.format === 'VST2' ? idCode(Number(ref.ident)) : ref.ident
-}
-
-function strictInt(text: string): number | undefined {
-  const t = pyStrip(text)
-  return /^[+-]?\d+(?:_\d+)*$/.test(t) ? Number(t.replaceAll('_', '')) : undefined
-}
-
-/** Attribute value as ElementTree reports it (XML attribute-value normalization, then entities). */
-function etAttr(ix: XmlIndex, el: El, name: string): string | undefined {
-  const span = ix.attrSpan(el, name)
-  if (!span) return undefined
-  const raw = decodeUtf8(ix.bytes, span.start, span.end)
-    .replaceAll('\r\n', '\n')
-    .replace(/[\t\n\r]/g, ' ')
-  return raw.includes('&') ? decodeEntities(raw) : raw
 }
 
 export function analyzeSet(doc: LiveDoc): SetInfo {
@@ -321,49 +287,15 @@ export function analyzeSet(doc: LiveDoc): SetInfo {
     .sort((a, b) => a.time - b.time || a.i - b.i)
     .map(({ loc }) => value(find(loc, 'Name')))
 
-  const plugins = new Map<string, { ref: PluginRef; instances: number }>()
-  const addPlugin = (ref: PluginRef) => {
-    const key = `${ref.format}\u0000${ref.ident}\u0000${ref.name}`
-    const hit = plugins.get(key)
-    if (hit) hit.instances++
-    else plugins.set(key, { ref, instances: 1 })
-  }
   // All PluginDevices first, then all AuPluginDevices (a stable order for reports).
+  const pluginRefs: PluginRef[] = []
   for (const device of ix.descendants(liveSet, 'PluginDevice')) {
-    const vst = find(device, 'PluginDesc/VstPluginInfo')
-    const vst3 = find(device, 'PluginDesc/Vst3PluginInfo')
-    if (vst !== undefined) {
-      const id = strictInt(value(find(vst, 'UniqueId'), '0'))
-      if (id === undefined) continue
-      addPlugin({ format: 'VST2', ident: String(id >>> 0), name: value(find(vst, 'PlugName')) })
-    } else if (vst3 !== undefined) {
-      const uid = find(vst3, 'Uid')
-      const fields = new Map<string, string>()
-      for (const c of uid === undefined ? [] : ix.children(uid))
-        fields.set(ix.name(c), etAttr(ix, c, 'Value') ?? '0')
-      const parts: string[] = []
-      for (let i = 0; i < 4; i++) {
-        const v = fields.get(`Fields.${i}`)
-        const n = v === undefined ? undefined : strictInt(v)
-        if (n === undefined) break
-        parts.push((n >>> 0).toString(16).padStart(8, '0'))
-      }
-      if (parts.length < 4) continue
-      addPlugin({ format: 'VST3', ident: parts.join(''), name: value(find(vst3, 'Name')) })
-    }
+    const ref = vstRefOf(ix, device)
+    if (ref) pluginRefs.push(ref)
   }
   for (const device of ix.descendants(liveSet, 'AuPluginDevice')) {
-    const au = find(device, 'PluginDesc/AuPluginInfo')
-    if (au === undefined) continue
-    const codes = ['ComponentType', 'ComponentSubType', 'ComponentManufacturer'].map((t) =>
-      strictInt(value(find(au, t), '0')),
-    )
-    if (codes.some((c) => c === undefined)) continue
-    addPlugin({
-      format: 'AU',
-      ident: codes.map((c) => idCode(c as number)).join(':'),
-      name: value(find(au, 'Name')),
-    })
+    const ref = auRefOf(ix, device)
+    if (ref) pluginRefs.push(ref)
   }
 
   return makeSetInfo({
@@ -385,7 +317,7 @@ export function analyzeSet(doc: LiveDoc): SetInfo {
     locators,
     automated,
     masterDevices,
-    plugins: [...plugins.values()],
+    plugins: countPlugins(pluginRefs),
     contentHash,
   })
 }

@@ -12,7 +12,7 @@ import {
 import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { RunContext } from '@livesaver/ops'
+import type { RunContext, RunRecord } from '@livesaver/ops'
 
 export function stateDir(): string {
   if (process.env.LIVESAVER_HOME) return process.env.LIVESAVER_HOME
@@ -29,10 +29,23 @@ function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-/** A new run folder, e.g. runs/2026-09-30_214501_collect_apply. */
+/** What a run is asked to do: the journal says what changed, but not what for. */
+export interface RunAsked {
+  readonly targets: readonly string[]
+  /** The options that shape the run, named as on the command line. */
+  readonly options?: Readonly<Record<string, unknown>>
+}
+
+const RECORD = 'run.json'
+
+/**
+ * A new run folder, e.g. runs/2026-09-30_214501_collect_apply, with a note of what was asked
+ * (`run.json`), which `endRun` completes.
+ */
 export async function newRun(
   command: string,
   apply: boolean,
+  asked: RunAsked,
   now = new Date(),
 ): Promise<RunContext> {
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
@@ -41,12 +54,53 @@ export async function newRun(
   for (let n = 2; existsSync(join(runsDir(), id)); n++) id = `${base}-${n}`
   const dir = join(runsDir(), id)
   await mkdir(dir, { recursive: true })
+  const record: RunRecord = {
+    version: 1,
+    command,
+    apply,
+    targets: asked.targets,
+    options: asked.options ?? {},
+    started: now.toISOString(),
+  }
+  await writeStateFile(join(dir, RECORD), JSON.stringify(record, null, 2))
   return { id, dir }
+}
+
+/** Note how a run ended: the numbers worth showing later, or why it failed. */
+export async function endRun(
+  run: RunContext,
+  outcome: Readonly<Record<string, number>> = {},
+  error = '',
+): Promise<void> {
+  const record = readRun(run.id)
+  if (!record) return
+  const ended: RunRecord = {
+    ...record,
+    ended: new Date().toISOString(),
+    outcome,
+    ...(error ? { error } : {}),
+  }
+  await writeStateFile(join(run.dir, RECORD), JSON.stringify(ended, null, 2))
+}
+
+/** A run's note of what it was asked; runs of older versions have none. */
+export function readRun(id: string): RunRecord | undefined {
+  try {
+    const record = JSON.parse(readText(join(runsDir(), id, RECORD)) ?? '') as Partial<RunRecord>
+    return record.version === 1 && typeof record.command === 'string'
+      ? (record as RunRecord)
+      : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export function listRuns(): string[] {
   try {
-    return readdirSync(runsDir()).sort()
+    return readdirSync(runsDir(), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
   } catch {
     return []
   }

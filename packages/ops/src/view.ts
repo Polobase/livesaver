@@ -27,6 +27,14 @@ export interface SourceRow {
   readonly hint: string
 }
 
+/** What a fix does when uncertain matches are left out (`certainOnly`). */
+export interface CertainPlan {
+  readonly changingSets: number
+  readonly changes: number
+  readonly copyFiles: number
+  readonly copyBytes: number
+}
+
 export interface ProjectRow {
   /** The project folder (absolute), which is what a fix of one project is given. */
   readonly root: string
@@ -43,6 +51,7 @@ export interface ProjectRow {
   readonly missing: number
   readonly copyFiles: number
   readonly copyBytes: number
+  readonly certain: CertainPlan
   /** Sets that could not be read. */
   readonly errors: number
 }
@@ -96,6 +105,7 @@ export interface CheckView {
   readonly copyFiles: number
   readonly copyBytes: number
   readonly changingSets: number
+  readonly certain: CertainPlan
   readonly missingSources: readonly SourceRow[]
   readonly foundSources: readonly SourceRow[]
   readonly projectRows: readonly ProjectRow[]
@@ -105,6 +115,16 @@ export interface CheckView {
 }
 
 const changes = (set: SetResult) => (set.error ? 0 : set.changes.length)
+
+/**
+ * The changes of a set that remain without uncertain matches. Paths are only brought up to date
+ * in a set that is rewritten anyway, so a set whose every repair is uncertain is left as it is.
+ */
+function certainChanges(set: SetResult): number {
+  if (set.error) return 0
+  const rewritten = set.changes.some((c) => c.certain && c.action !== 'path-updated')
+  return rewritten ? set.changes.filter((c) => c.certain).length : 0
+}
 
 export function checkView(r: DoctorResult, env: Environment): CheckView {
   const rel = (path: string) => {
@@ -132,9 +152,17 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
       missing: sum((set) => MISSING_STATES.reduce((n, status) => n + set.counts[status], 0)),
       copyFiles: copies.get(root)?.copiedFiles ?? 0,
       copyBytes: copies.get(root)?.copiedBytes ?? 0,
+      certain: {
+        changingSets: sets.filter((set) => certainChanges(set) > 0).length,
+        changes: sum(certainChanges),
+        copyFiles: copies.get(root)?.certainCopies.files ?? 0,
+        copyBytes: copies.get(root)?.certainCopies.bytes ?? 0,
+      },
       errors: sets.filter((set) => set.error).length,
     }
   })
+  const total = (count: (plan: CertainPlan) => number) =>
+    projectRows.reduce((n, project) => n + count(project.certain), 0)
   return {
     base: r.base,
     seconds: r.ms / 1000,
@@ -149,6 +177,12 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
     copyFiles: r.projects.reduce((n, p) => n + p.copiedFiles, 0),
     copyBytes: r.projects.reduce((n, p) => n + p.copiedBytes, 0),
     changingSets: projectRows.reduce((n, p) => n + p.changingSets, 0),
+    certain: {
+      changingSets: total((plan) => plan.changingSets),
+      changes: total((plan) => plan.changes),
+      copyFiles: total((plan) => plan.copyFiles),
+      copyBytes: total((plan) => plan.copyBytes),
+    },
     missingSources: libraryGroups(groups).map((lib) => ({
       kind: KIND_NAMES[lib.kind],
       name: lib.name,

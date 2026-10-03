@@ -12,6 +12,9 @@
   - `Vst3Preset` holds `ProcessorState` (hex) and `ControllerState` (hex, often empty)
   - no path
 - **AU:** `AuPluginDevice/PluginDesc/AuPluginInfo` with `ComponentType/SubType/Manufacturer` (4CCs as ints), `Name`, `Manufacturer`.
+- **Reading them fast:** both device elements end in `PluginDevice`, never nest, and hold the
+  plug-in's state as text. One byte search for that name finds them all, and only their own
+  elements need scanning (`pluginUses`): a Set is mostly clips and automation.
 - Live 12.4.5 and earlier never replace one format with another. A VST2 device shows as missing even when its VST3 version is installed.
 
 ## VST3 class id from a VST2 id

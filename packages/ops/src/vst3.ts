@@ -2,7 +2,15 @@
  * VST2 → VST3 over folders of sets. Writing goes through the same writer as collect: backup,
  * journal, atomic replace, so `livesaver undo` reverses it too.
  */
-import { encodeDocument, type FileStat, type Host, inProcessParser, posix } from '@livesaver/core'
+import {
+  encodeDocument,
+  type FileStat,
+  type Host,
+  inProcessParser,
+  type ParsedSet,
+  posix,
+  type SetParser,
+} from '@livesaver/core'
 import {
   type Catalog,
   convertText,
@@ -36,8 +44,19 @@ export interface UpgradeOptions {
   readonly only?: readonly string[]
   readonly writer?: Writer
   readonly probe?: Probe
+  /** Reads sets ahead of the conversion (worker threads); defaults to parsing in-process. */
+  readonly parser?: SetParser
+  /**
+   * Sets that need not be read: they are known to hold no VST2 plug-in the conversion says
+   * anything about (a scan has read the plug-ins of every set already). Such a set converts
+   * nothing and reports nothing, read or not.
+   */
+  readonly skip?: (setPath: string) => boolean
   readonly onSet?: (result: SetUpgrade, index: number, total: number) => void
 }
+
+/** Sets that are being read while earlier ones are converted. */
+const LOOKAHEAD = 8
 
 function sameFile(a: FileStat, b: FileStat): boolean {
   return a.size === b.size && a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs && a.ino === b.ino
@@ -50,14 +69,21 @@ export async function upgradePlugins(
   const started = performance.now()
   const probe = options.probe ?? new Probe(host.fs, host.hash)
   const writer = options.writer ?? DRY_RUN
-  const parser = inProcessParser(host)
+  const parser = options.parser ?? inProcessParser(host)
   const only = options.only?.length ? new Set(options.only.map((p) => p.toLowerCase())) : undefined
   let base = posix.commonpath(options.targets)
   if (await probe.isFile(base)) base = posix.dirname(base)
   const sets = await findSets(options.targets, options.excludes ?? [], probe)
   const decoder = new TextDecoder('utf-8', { fatal: true })
   const results: SetUpgrade[] = []
+  const pending = new Map<number, Promise<ParsedSet>>()
+  const request = (i: number) => {
+    const path = sets[i]
+    if (path !== undefined && !pending.has(i) && !options.skip?.(path))
+      pending.set(i, parser.parse(path))
+  }
   for (const [i, setPath] of sets.entries()) {
+    for (let k = i; k < i + LOOKAHEAD; k++) request(k)
     const root = await projectRootOf(setPath, probe)
     const result: SetUpgrade = {
       setPath,
@@ -71,7 +97,13 @@ export async function upgradePlugins(
       error: '',
     }
     results.push(result)
-    const parsed = await parser.parse(setPath)
+    const reading = pending.get(i)
+    if (!reading) {
+      options.onSet?.(result, i + 1, sets.length)
+      continue
+    }
+    const parsed = await reading
+    pending.delete(i)
     if (!parsed.ok) {
       result.error = parsed.error
       options.onSet?.(result, i + 1, sets.length)
@@ -104,6 +136,7 @@ export async function upgradePlugins(
     }
     options.onSet?.(result, i + 1, sets.length)
   }
+  if (!options.parser) await parser.close()
   return { results, base, ms: performance.now() - started }
 }
 

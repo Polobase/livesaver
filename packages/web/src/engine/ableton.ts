@@ -4,7 +4,7 @@
  * Live app: `Contents/App-Resources` holds the Core Library and the table of content Live moved
  * between versions.
  */
-import type { FolderSource } from '@livesaver/web'
+import type { FolderSource } from '../source.js'
 
 /**
  * Where `App-Resources` may lie in a given folder: the folder is it, or is the `Contents` folder

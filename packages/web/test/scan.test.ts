@@ -1,10 +1,11 @@
-/** The engine behind the page: locating folders, checking sets, shaping the result. */
+/** A scan in a page: locating folders, checking sets, the plug-ins, shaping the result. */
 
 import { Database } from 'bun:sqlite'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { cpSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { CORE_LIBRARY_PACK_ID, REL_PACK } from '@livesaver/core'
+import type { CheckView } from '@livesaver/ops'
 import {
   copyFixtures,
   deviceSet,
@@ -15,8 +16,7 @@ import {
   writeFile,
   writeSet,
 } from '@livesaver/test-kit'
-import { run } from '../src/engine.js'
-import type { EngineEvent, FolderInput, RunResult } from '../src/protocol.js'
+import { type BrowserScan, type FolderInput, type ScanEvent, scanFolders } from '../src/index.js'
 
 let tmp: { path: string; cleanup: () => void }
 let projects: string
@@ -35,23 +35,36 @@ const folder = (id: string, source: FolderInput['source'], extra: Partial<Folder
   ...extra,
 })
 
+/** The samples of a scan with what the page is told beside them, as one result. */
+type Result = CheckView & Pick<BrowserScan, 'folders' | 'reports' | 'ableton'>
+
 async function check(
   projectFolders: FolderInput[],
   search: FolderInput[],
   matchLibraryPath = false,
-): Promise<{ events: EngineEvent[]; result: RunResult }> {
-  const events: EngineEvent[] = []
-  await run(
+): Promise<{ events: ScanEvent[]; result: Result; scan: BrowserScan }> {
+  const events: ScanEvent[] = []
+  await scanFolders(
     { projects: projectFolders, search, options: { packLimitMB: 50, matchLibraryPath } },
     (event) => events.push(event),
     { cores: 4 },
   )
   const last = events.at(-1)
-  if (last?.type !== 'done') throw new Error(JSON.stringify(last))
-  return { events, result: last.result }
+  if (last?.type !== 'scanned') throw new Error(JSON.stringify(last))
+  const { scan } = last
+  return {
+    events,
+    scan,
+    result: {
+      ...scan.samples,
+      folders: scan.folders,
+      reports: scan.reports,
+      ableton: scan.ableton,
+    },
+  }
 }
 
-describe('a run in the page', () => {
+describe('a scan in the page', () => {
   test('locates the project folder from the sets, checks them, and reports', async () => {
     const { events, result } = await check(
       [folder('p', pickedFolder(projects))],
@@ -64,7 +77,7 @@ describe('a run in the page', () => {
       'indexed',
       'phase',
       'phase',
-      'done',
+      'scanned',
     ])
     // The fixture sets say where their project was saved; the sample folder has no such witness.
     expect(result.folders).toEqual([
@@ -116,9 +129,7 @@ describe('a run in the page', () => {
       ['not-found', '1.wav', 1, 1],
     ])
     expect(result.missingSources).toHaveLength(1)
-    expect(result.missingSources[0]?.hint).toBe(
-      'Find the folder or drive and add it as a sample folder',
-    )
+    expect(result.missingSources[0]?.hint).toContain('Find the folder or drive')
     expect([result.sets, result.completeSets, result.completeProjects]).toEqual([1, 0, 0])
   })
 
@@ -247,8 +258,8 @@ describe('a run in the page', () => {
 
   test('a failure is reported, not thrown', async () => {
     const broken = { kind: 'files', name: 'x', files: null } as unknown as FolderInput['source']
-    const events: EngineEvent[] = []
-    await run(
+    const events: ScanEvent[] = []
+    await scanFolders(
       {
         projects: [folder('p', broken)],
         search: [],
@@ -258,5 +269,30 @@ describe('a run in the page', () => {
       { cores: 4 },
     )
     expect(events.at(-1)?.type).toBe('failed')
+  })
+
+  test('the plug-ins the sets use are read along; whether they are installed is not known', async () => {
+    const { scan } = await check([folder('p', pickedFolder(projects))], [])
+    expect([scan.plugins.sets, scan.plugins.projects, scan.plugins.inventory]).toEqual([
+      3,
+      3,
+      false,
+    ])
+    expect(scan.plugins.uses.map((u) => [u.name, u.format, u.state, u.instances, u.sets])).toEqual([
+      ['Massive', 'VST2', 'unknown', 1, ['VST2toVST3 Project/VST2toVST3.als']],
+      ['Massive', 'VST3', 'unknown', 1, ['VST2toVST3 Project/VST2toVST3.als']],
+      ['Omnisphere', 'VST2', 'unknown', 1, ['VST2toVST3 Project/VST2toVST3.als']],
+      ['Omnisphere', 'VST3', 'unknown', 1, ['VST2toVST3 Project/VST2toVST3.als']],
+      ['Serum', 'VST2', 'unknown', 1, ['VST2toVST3 Project/VST2toVST3.als']],
+      ['Serum', 'VST3', 'unknown', 1, ['VST2toVST3 Project/VST2toVST3.als']],
+    ])
+    expect(scan.plugins.installed).toEqual([])
+    expect(scan.plugins.counts).toMatchObject({ used: 6, missing: 0, rosetta: 0 })
+    expect(Object.keys(scan.seconds).sort()).toEqual([
+      'checking',
+      'indexing',
+      'locating',
+      'reporting',
+    ])
   })
 })

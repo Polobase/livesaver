@@ -23,7 +23,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 | `@livesaver/ops` | resolve/match, doctor, collect, status, reorg, move, audit, codemods, journal/undo, reports | anywhere |
 | `@livesaver/catalog` | SQLite catalog of sets, incremental index, the `find` language | anywhere |
 | `@livesaver/node` | Node/Bun host: fs, gzip, workers, xattr, Finder comments, SQLite, Live setup and plug-in database | Node/Bun |
-| `@livesaver/web` | browser host: uploaded/dropped/picked folders as a read-only file system, gzip, hash, worker-based parsing | browser |
+| `@livesaver/web` | browser host: uploaded/dropped/picked folders as a read-only file system, gzip, hash, worker-based parsing, and the scan (samples and plug-ins) that runs in a page | browser |
 | `livesaver` (packages/cli) | the CLI; `livesaver web` serves the web app and checks, fixes and undoes for it (`src/web/`) | Node/Bun |
 | `livesaver-web` (apps/web) | the web app: Preact page; with livesaver behind it it can fix, on its own it checks in workers, read-only (private) | browser |
 | `livesaver-web-next` (apps/web-next) | the rewrite of the web app, which replaces `apps/web` when it can do the same: Vite, Vue, Nuxt UI (private). `.vue` files are type-checked by `vue-tsc` under Node.js (TypeScript 6 in this workspace) | browser |
@@ -32,7 +32,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 ## Hard rules
 1. **Ableton Extensions are out of scope.** Never look at `../cloned-extensions`, `../my-extensions` or `../ignore`.
 2. **Never write to the real library from tests.** Tests work in temp dirs only. Corpus tests are read-only.
-3. **Never run `--apply` against a real library** (the user's projects, see `CLAUDE.local.md`, or `~/Music/Ableton`) **without the user's explicit OK** in the current conversation. This includes `status --apply` (Finder tags, comments, the rating sheet), `reorg run --apply`, `move run/sets --apply`, `run <codemod> --apply`, and Fix or Undo in the web app (its `/api/fix` and `/api/undo`): try those on temporary copies only.
+3. **Never run `--apply` against a real library** (the user's projects, see `CLAUDE.local.md`, or `~/Music/Ableton`) **without the user's explicit OK** in the current conversation. This includes `status --apply` (Finder tags, comments, the rating sheet), `reorg run --apply`, `move run/sets --apply`, `run <codemod> --apply`, and Fix, Upgrade or Undo in the web app (its `/api/fix`, `/api/upgrade` and `/api/undo`): try those on temporary copies only.
 4. **The repo is self-contained and public.** No references to private tools, scripts or folders outside the repo, and no personal data: no user names, home folders, or project and song names from a real library in code, tests, docs or fixtures. Tests use `fixtures/` (sets saved by Live, anonymized with `scripts/anonymize-fixture.ts`) and the builders in `@livesaver/test-kit`. When a case needs a set only Live can produce, ask the user to save one and add it to `fixtures/` (see the wanted list in `fixtures/README.md`).
 5. **Runtime-agnostic packages** (xml, core, plugins, ops, catalog; also `@livesaver/web` and the web apps' `src`, which may use browser APIs):
    - no `node:*`/`bun` imports and no `Buffer`/`process`/`Bun` (Biome enforces this)

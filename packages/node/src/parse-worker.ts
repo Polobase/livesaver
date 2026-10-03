@@ -1,10 +1,10 @@
 /**
- * Worker thread: read → gunzip → find references for one set per message. The decompressed XML goes
- * back as a transferred ArrayBuffer (zero-copy); references are plain data.
+ * Worker thread: read → gunzip → find references and plug-ins for one set per message. The
+ * decompressed XML goes back as a transferred ArrayBuffer (zero-copy); the rest is plain data.
  */
 import { readFile } from 'node:fs/promises'
 import { parentPort } from 'node:worker_threads'
-import { fileRefs, inspectFile, openDocument } from '@livesaver/core'
+import { fileRefs, inspectFile, openDocument, pluginUsesOf } from '@livesaver/core'
 import { NodeFs, nodeCodec, nodeSearch } from './host.js'
 
 export interface ParseRequest {
@@ -45,10 +45,13 @@ if (port) {
         },
       )
       const refs = fileRefs(doc)
+      const { plugins } = pluginUsesOf(doc)
       const xml = doc.xml
       const own = xml.byteOffset === 0 && xml.byteLength === xml.buffer.byteLength
       const buffer = (own ? xml.buffer : xml.slice().buffer) as ArrayBuffer
-      port.postMessage({ id, ok: true, xml: buffer, gzipped: doc.gzipped, refs, stat }, [buffer])
+      port.postMessage({ id, ok: true, xml: buffer, gzipped: doc.gzipped, refs, plugins, stat }, [
+        buffer,
+      ])
     } catch (error) {
       port.postMessage({ id, ok: false, error: `unreadable: ${(error as Error).message}` })
     }

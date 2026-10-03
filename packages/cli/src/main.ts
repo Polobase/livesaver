@@ -34,6 +34,10 @@ export function program(): Command {
         '--match-library-path',
         'also accept a library file with another fingerprint when its name and place in the library match and its size differs by at most 16 bytes (marked uncertain)',
       )
+      .option(
+        '--certain-only',
+        'leave uncertain matches out: only a file whose fingerprint (size and CRC) confirms it is taken, the rest stays missing',
+      )
       .option('--config <file>', 'config file (default ~/.config/livesaver/config.json)')
       .option('--report-dir <dir>', 'write the report files (CSV, Markdown) to this folder')
       .option('--json', 'print the full result as JSON')
@@ -110,6 +114,7 @@ export function program(): Command {
     .option('--plugin <name>', 'only this plug-in (repeatable)', collect)
     .option('--exclude <dir>', 'folder whose sets are not processed (repeatable)', collect)
     .option('--report-dir <dir>', 'write the report to this folder')
+    .option('--workers <n>', 'parser threads (0 = none)')
     .option('--json', 'print the result as JSON')
     .action(async (targets: string[], flags) => {
       process.exitCode = await runUpgrade(targets, flags)

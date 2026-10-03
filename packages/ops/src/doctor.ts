@@ -30,6 +30,8 @@ export interface DoctorOptions {
   readonly packCopyLimit?: number
   /** Accept vendor library files by name and place in the library (see `ChooseOptions`). */
   readonly matchLibraryPath?: boolean
+  /** Leave uncertain matches out: their references stay missing (see `ChooseOptions`). */
+  readonly certainOnly?: boolean
   readonly writer?: Writer
   readonly keepXml?: boolean
   /** Dry runs skip the strict scan of patched sets (see `ProcessOptions`). */
@@ -71,6 +73,7 @@ export async function doctor(host: Host, options: DoctorOptions): Promise<Doctor
   const collect: CollectOptions = {
     packCopyLimit: options.packCopyLimit ?? DEFAULT_PACK_LIMIT,
     matchLibraryPath: options.matchLibraryPath ?? false,
+    certainOnly: options.certainOnly ?? false,
   }
   const writer = options.writer ?? DRY_RUN
 

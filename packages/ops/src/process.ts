@@ -74,6 +74,7 @@ export async function processSet(
     return result
   }
   const { doc, refs } = parsed
+  if (parsed.plugins) result.plugins = parsed.plugins
   result.creator = doc.creator
   result.minorVersion = doc.minorVersion
   const groups = new Map<string, FileRef[]>()
@@ -178,7 +179,8 @@ export async function processSet(
           source = ''
         } else {
           const wanted = wantedLocation(ref, root)
-          dst = await project.place(choice.path, wanted, await importDir(ref, choice.path, probe))
+          const folder = await importDir(ref, choice.path, probe)
+          dst = await project.place(choice.path, wanted, folder, choice.verified)
           source = choice.path
         }
         status = 'found'

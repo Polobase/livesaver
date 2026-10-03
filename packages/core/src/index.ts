@@ -2,13 +2,8 @@ export {
   analyzeSet,
   BLOCK_BARS,
   DEFAULT_TIME,
-  fourcc,
-  idCode,
   MASTERING_DEVICES,
   makeSetInfo,
-  type PluginFormat,
-  type PluginRef,
-  pluginCode,
   type SetInfo,
   type SetMeasures,
 } from './analyze.js'
@@ -92,6 +87,7 @@ export {
   inProcessParser,
   inspectFile,
   type ParsedSet,
+  pluginUsesOf,
   type SetParser,
 } from './parse.js'
 export * as posix from './path.js'
@@ -103,6 +99,15 @@ export {
   type PlistValue,
   parsePlist,
 } from './plist.js'
+export {
+  fourcc,
+  idCode,
+  type PluginFormat,
+  type PluginRef,
+  type PluginUseCount,
+  pluginCode,
+  pluginUses,
+} from './plugin-uses.js'
 export {
   EMPTY_REMAP,
   MAX_REMAP_STEPS,

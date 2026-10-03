@@ -10,6 +10,7 @@ import {
   inProcessParser,
   type PluginFormat,
   type PluginRef,
+  type PluginUseCount,
   posix,
   type SetParser,
 } from '@livesaver/core'
@@ -65,14 +66,26 @@ export interface AuditResult {
   readonly base: string
 }
 
-export interface AuditOptions {
-  readonly targets: readonly string[]
-  readonly excludes?: readonly string[]
+/** What the sets are compared with. */
+export interface AuditSources {
   readonly inventory: Inventory
   /** Live's VST3 catalog (class id → entry), for upgrade candidates. */
   readonly catalog?: Catalog
+}
+
+export interface AuditOptions extends AuditSources {
+  readonly targets: readonly string[]
+  readonly excludes?: readonly string[]
   readonly parser?: SetParser
   readonly onProgress?: (done: number, total: number) => void
+}
+
+/** The plug-ins of one set, as read from it. */
+export interface SetPlugins {
+  readonly setPath: string
+  readonly projectRoot: string
+  /** Left out: the set, or a plug-in device in it, could not be read. */
+  readonly plugins?: readonly PluginUseCount[]
 }
 
 const useKey = (r: PluginRef) => `${r.format}\u0000${r.ident}\u0000${r.name}`
@@ -121,36 +134,50 @@ export async function auditPlugins(host: Host, options: AuditOptions): Promise<A
   const probe = new Probe(host.fs, host.hash)
   let base = posix.commonpath(options.targets)
   if (await probe.isFile(base)) base = posix.dirname(base)
-  const sets = await findSets(options.targets, options.excludes ?? [], probe)
+  const paths = await findSets(options.targets, options.excludes ?? [], probe)
   const parser = options.parser ?? inProcessParser(host)
-  const inspect = parser.inspect?.bind(parser) ?? inProcessParser(host).inspect
   let done = 0
-  const inspected = await mapLimited(sets, 16, async (path) => {
-    const r = await (inspect as NonNullable<SetParser['inspect']>)(path)
-    options.onProgress?.(++done, sets.length)
-    return r
+  // Only the plug-ins are kept of each set: its XML is tens of megabytes.
+  const read = await mapLimited(paths, 16, async (path) => {
+    const parsed = await parser.parse(path)
+    options.onProgress?.(++done, paths.length)
+    return parsed.ok ? parsed.plugins : undefined
   })
+  if (!options.parser) await parser.close()
+  const sets: SetPlugins[] = []
+  for (const [i, setPath] of paths.entries()) {
+    const plugins = read[i]
+    const projectRoot = await projectRootOf(setPath, probe)
+    sets.push({ setPath, projectRoot, ...(plugins ? { plugins } : {}) })
+  }
+  return auditSets(sets, base, options)
+}
+
+/** The audit of sets whose plug-ins were read already (a scan reads them with the samples). */
+export function auditSets(
+  sets: readonly SetPlugins[],
+  base: string,
+  sources: AuditSources,
+): AuditResult {
   const uses = new Map<string, PluginUse>()
   const projects = new Set<string>()
   const unreadable: string[] = []
-  for (const [i, path] of sets.entries()) {
-    const r = inspected[i]
-    if (!r?.ok) {
-      unreadable.push(path)
+  for (const { setPath, projectRoot, plugins } of sets) {
+    if (!plugins) {
+      unreadable.push(setPath)
       continue
     }
-    const root = await projectRootOf(path, probe)
-    projects.add(root)
-    for (const { ref, instances } of r.info.plugins) {
+    projects.add(projectRoot)
+    for (const { ref, instances } of plugins) {
       let use = uses.get(useKey(ref))
       if (!use) {
-        const { state, found } = options.inventory.status(ref)
+        const { state, found } = sources.inventory.status(ref)
         const target =
-          ref.format === 'VST2' && options.catalog
-            ? derivedTarget(Number(ref.ident), options.catalog, ref.name)
+          ref.format === 'VST2' && sources.catalog
+            ? derivedTarget(Number(ref.ident), sources.catalog, ref.name)
             : undefined
         const known = ref.format === 'VST2' ? KNOWN.get(Number(ref.ident)) : undefined
-        const knownTarget = known?.vst3Uid ? options.catalog?.get(known.vst3Uid) : undefined
+        const knownTarget = known?.vst3Uid ? sources.catalog?.get(known.vst3Uid) : undefined
         const vst3 = knownTarget
           ? { uid: known?.vst3Uid as string, name: knownTarget.name, verified: true }
           : target
@@ -163,15 +190,15 @@ export async function auditPlugins(host: Host, options: AuditOptions): Promise<A
           projects: new Set(),
           state,
           found,
-          failedBundle: state === 'missing' ? options.inventory.failedBundle(ref) : '',
-          alternatives: alternativesOf(ref, options.inventory),
+          failedBundle: state === 'missing' ? sources.inventory.failedBundle(ref) : '',
+          alternatives: alternativesOf(ref, sources.inventory),
           ...(vst3 ? { vst3 } : {}),
         }
         uses.set(useKey(ref), use)
       }
       use.instances += instances
-      use.sets.add(path)
-      use.projects.add(root)
+      use.sets.add(setPath)
+      use.projects.add(projectRoot)
     }
   }
   // Installed versions of a used plug-in in another format (e.g. the VST3 a VST2 can be upgraded
@@ -181,7 +208,7 @@ export async function auditPlugins(host: Host, options: AuditOptions): Promise<A
     used.add(productKey(u.ref.format, u.ref.ident))
     for (const a of u.alternatives) if (a.link !== 'name') used.add(productKey(a.format, a.ident))
   }
-  const unused = installedProducts(options.inventory).filter(
+  const unused = installedProducts(sources.inventory).filter(
     (p) => !used.has(productKey(p.format, p.ident)) && !isSystem(p) && isLivePlugin(p),
   )
   const list = [...uses.values()].sort(

@@ -2,9 +2,14 @@
  * The folders the user gives the page: chosen in the folder upload, or dropped. The browser's own
  * folder picker (File System Access API) is not used: its handles hide files with certain names.
  */
-import { type FolderSource, foldersFromDrop, foldersFromFiles } from '@livesaver/web'
+import {
+  type FolderSource,
+  foldersFromDrop,
+  foldersFromFiles,
+  holdsNames,
+  holdsOf,
+} from '@livesaver/web'
 import { useRef, useState } from 'preact/hooks'
-import { holdsNames, holdsOf } from './ableton.js'
 import { INSTALLED, LIBRARY_NAME, plural } from './format.js'
 import { CloseIcon, FolderIcon, PlusIcon } from './icons.js'
 import type { FolderInput, LocatedFolder } from './protocol.js'

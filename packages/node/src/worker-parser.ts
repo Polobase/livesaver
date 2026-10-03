@@ -12,13 +12,22 @@ import {
   type InspectedSet,
   inProcessParser,
   type ParsedSet,
+  type PluginUseCount,
   type SetInfo,
   type SetParser,
 } from '@livesaver/core'
 import { createNodeHost, nodeSearch } from './host.js'
 
 type Reply =
-  | { id: number; ok: true; xml: ArrayBuffer; gzipped: boolean; refs: FileRef[]; stat?: FileStat }
+  | {
+      id: number
+      ok: true
+      xml: ArrayBuffer
+      gzipped: boolean
+      refs: FileRef[]
+      plugins?: PluginUseCount[]
+      stat?: FileStat
+    }
   | { id: number; ok: true; info: SetInfo; refs: FileRef[]; stat?: FileStat; xml?: undefined }
   | { id: number; ok: false; error: string; stat?: FileStat }
 
@@ -80,6 +89,7 @@ export function createWorkerParser(options: WorkerParserOptions = {}): SetParser
               ok: true,
               doc: documentFromXml(new Uint8Array(reply.xml), reply.gzipped, false, nodeSearch),
               refs: reply.refs,
+              ...(reply.plugins ? { plugins: reply.plugins } : {}),
               ...(reply.stat ? { stat: reply.stat } : {}),
             }
           : { ok: false, error: reply.ok ? 'unexpected reply' : reply.error },

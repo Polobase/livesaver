@@ -125,7 +125,8 @@ content it moved between versions, and with it the page reports what the command
 - **Live's own matching.** Samples are identified the way Live identifies them: file size plus
   Live's CRC-16 over the first 16 KB. The name alone is never enough. Vendor re-saves and Ableton's
   in-place pack updates are handled explicitly. `--match-library-path` also accepts a library file
-  with other tags by its name and place in the library, and reports it as uncertain.
+  with other tags by its name and place in the library, and reports it as uncertain;
+  `--certain-only` takes no file that the fingerprint does not confirm.
 - **Every format.** Reads `.als`, `.adg`, `.adv`, `.alc` and `.agr` from Live 8.2 to 12, including
   old (Live 9/10) and new FileRef formats, macOS aliases and Windows paths.
 - **Safe by default.**
@@ -147,9 +148,10 @@ content it moved between versions, and with it the page reports what the command
 | [`@livesaver/plugins`](packages/plugins) | Plug-in identity and inventory (installed, native or Rosetta), byte-exact VST2→VST3 conversion |
 | [`@livesaver/catalog`](packages/catalog) | Catalog of sets, plug-ins and samples in SQLite (FTS5), incremental indexing, the `find` language |
 | [`@livesaver/node`](packages/node) | Node.js/Bun host: file system, gzip, worker threads, Finder tags and comments, Live setup discovery |
-| [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a read-only file system, worker-based parsing |
+| [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a read-only file system, worker-based parsing, a scan of samples and plug-ins in the page |
 | [`livesaver`](packages/cli) | The command-line tool |
 | [`apps/web`](apps/web) | The web app (not published) |
+| [`apps/web-next`](apps/web-next) | Its rewrite on Vite, Vue and Nuxt UI, in progress (not published) |
 
 ## Roadmap
 | Milestone | Delivers |

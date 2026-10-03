@@ -9,7 +9,8 @@ import { basename, dirname, join } from 'node:path'
 import { posix } from '@livesaver/core'
 import { createNodeHost, liveIsRunning } from '@livesaver/node'
 import { checkView, type DoctorEvent, isInside, readJournal, undoRun } from '@livesaver/ops'
-import { collectRun, type DoctorFlags } from '../commands/doctor.js'
+import { type CollectRun, collectRun, type DoctorFlags } from '../commands/doctor.js'
+import { type PluginSources, upgradablePlugins } from '../commands/plugins.js'
 import { absolute, type ResolvedConfig, resolveConfig, resolveStatusConfig } from '../config.js'
 import {
   acquireLock,
@@ -30,6 +31,7 @@ import type {
   WebLastFix,
   WebPlace,
   WebRequest,
+  WebResult,
   WebUndone,
 } from './protocol.js'
 
@@ -39,14 +41,28 @@ export interface WebSettings {
   readonly version?: string
   /** Write even while Live is running (for tests on copies; the page never asks for it). */
   readonly force?: boolean
+  /** What is installed and what Live knows, in place of looking it up on this computer. */
+  readonly plugins?: () => Promise<PluginSources>
+  /** Shows a file or folder in the system's file manager, in place of asking the system. */
+  readonly reveal?: (path: string) => Promise<void>
 }
 
-const LIVE_RUNNING = 'Ableton Live is running. Quit it first, so that no open set gets overwritten.'
+export const LIVE_RUNNING =
+  'Ableton Live is running. Quit it first, so that no open set gets overwritten.'
 
 /** The folders and options of the last check, which the page starts with next time. */
 interface Remembered extends WebRequest {}
 
 const rememberedPath = () => join(stateDir(), 'web.json')
+
+export function remember(request: WebRequest): Promise<void> {
+  const kept: Remembered = {
+    projects: request.projects,
+    search: request.search,
+    options: request.options,
+  }
+  return writeStateFile(rememberedPath(), JSON.stringify(kept))
+}
 
 function remembered(): Remembered | undefined {
   try {
@@ -57,7 +73,7 @@ function remembered(): Remembered | undefined {
   return undefined
 }
 
-const isFolder = (path: string) => {
+export const isFolder = (path: string) => {
   try {
     return statSync(path).isDirectory()
   } catch {
@@ -152,6 +168,8 @@ export async function webInfo(settings: WebSettings = {}): Promise<WebInfo> {
       packLimitMB: config.packCopyLimit / 1_000_000,
       matchLibraryPath: false,
     },
+    platform: process.platform,
+    upgradable: upgradablePlugins(),
   }
 }
 
@@ -204,16 +222,15 @@ export function webFolders(path: string): WebFolders {
   }
 }
 
-interface Prepared {
+export interface Prepared {
   readonly targets: string[]
   readonly flags: DoctorFlags
   readonly vendorLibraries: string[]
 }
 
-/** The request as the pipeline takes it; throws what the page should show if it cannot run. */
-function prepare(request: WebFixRequest, settings: WebSettings): Prepared {
-  if (!Array.isArray(request?.projects) || !Array.isArray(request.search) || !request.options)
-    throw new Error('The request names no folders or options.')
+/** The folders a run works on: every project folder, or the one project in them that was asked. */
+export function targetsOf(request: { projects?: readonly string[]; only?: string }): string[] {
+  if (!Array.isArray(request?.projects)) throw new Error('The request names no folders.')
   const projects = request.projects.map(absolute)
   if (projects.length === 0) throw new Error('No project folder was given.')
   for (const project of projects)
@@ -222,9 +239,18 @@ function prepare(request: WebFixRequest, settings: WebSettings): Prepared {
   if (only && !projects.some((project) => isInside(only, project)))
     throw new Error(`This folder is not in a project folder that was checked: ${only}`)
   if (only && !isFolder(only)) throw new Error(`This folder does not exist: ${only}`)
+  return only ? [only] : projects
+}
+
+/** The request as the pipeline takes it; throws what the page should show if it cannot run. */
+export function prepare(request: WebFixRequest, settings: WebSettings): Prepared {
+  if (!Array.isArray(request?.projects) || !Array.isArray(request.search) || !request.options)
+    throw new Error('The request names no folders or options.')
+  const targets = targetsOf(request)
+  const projects = request.projects.map(absolute)
   const search = request.search.map((folder) => searchFolder(absolute(folder.path)))
   return {
-    targets: only ? [only] : projects,
+    targets,
     flags: {
       // Exactly the folders of the page, the project folders among them: a single project is
       // fixed with the same files to choose from as when all were checked.
@@ -232,6 +258,7 @@ function prepare(request: WebFixRequest, settings: WebSettings): Prepared {
       defaultSearch: false,
       packLimit: String(Math.max(0, Number(request.options.packLimitMB) || 0)),
       matchLibraryPath: Boolean(request.options.matchLibraryPath),
+      certainOnly: Boolean(request.certainOnly),
       ...(settings.config ? { config: settings.config } : {}),
     },
     vendorLibraries: request.search
@@ -240,7 +267,7 @@ function prepare(request: WebFixRequest, settings: WebSettings): Prepared {
   }
 }
 
-function progress(emit: (event: WebEvent) => void, then: 'checking' | 'fixing') {
+export function progress(emit: (event: WebEvent) => void, then: 'checking' | 'fixing') {
   return (event: DoctorEvent) => {
     if (event.type === 'index') {
       emit({ type: 'indexed', files: event.files })
@@ -256,7 +283,26 @@ function progress(emit: (event: WebEvent) => void, then: 'checking' | 'fixing') 
   }
 }
 
-const message = (error: unknown) => (error as Error).message || String(error)
+export const message = (error: unknown) => (error as Error).message || String(error)
+
+/** A check's result as the page gets it. */
+export function sampleResult({
+  result,
+  env,
+  reports,
+}: Pick<CollectRun, 'result' | 'env' | 'reports'>): WebResult {
+  return {
+    ...checkView(result, env),
+    reports: reports ?? {},
+    unreadable: result.index.unreadable,
+    ableton: {
+      userLibrary: env.userLibrary,
+      factoryPacks: env.factoryPacks,
+      coreLibrary: env.coreLibrary,
+      remapEntries: env.config.remap.mapping.size,
+    },
+  }
+}
 
 /** A check, like `livesaver doctor`: nothing is written but livesaver's own notes. */
 export async function webCheck(
@@ -267,34 +313,14 @@ export async function webCheck(
   try {
     const { targets, flags, vendorLibraries } = prepare(request, settings)
     emit({ type: 'phase', phase: 'indexing' })
-    const { result, env, reports } = await collectRun('doctor', targets, flags, {
+    const checked = await collectRun('doctor', targets, flags, {
       vendorLibraries,
       reports: true,
       onEvent: progress(emit, 'checking'),
     })
     emit({ type: 'phase', phase: 'reporting' })
-    await writeStateFile(
-      rememberedPath(),
-      JSON.stringify({
-        projects: request.projects,
-        search: request.search,
-        options: request.options,
-      } satisfies Remembered),
-    )
-    emit({
-      type: 'done',
-      result: {
-        ...checkView(result, env),
-        reports: reports ?? {},
-        unreadable: result.index.unreadable,
-        ableton: {
-          userLibrary: env.userLibrary,
-          factoryPacks: env.factoryPacks,
-          coreLibrary: env.coreLibrary,
-          remapEntries: env.config.remap.mapping.size,
-        },
-      },
-    })
+    await remember(request)
+    emit({ type: 'done', result: sampleResult(checked) })
   } catch (error) {
     emit({ type: 'failed', message: message(error) })
   }

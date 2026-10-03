@@ -75,6 +75,30 @@ test('collect --apply under Node relinks and collects, undo restores', () => {
     })
     assert.equal(undo.status, 0, undo.stderr)
     assert.deepEqual(readFileSync(setPath), original)
+    // The run folder says what was asked, and the list of runs what became of it.
+    const record = JSON.parse(readFileSync(join(root, 'home', 'runs', out.run, 'run.json'), 'utf8'))
+    assert.deepEqual([record.command, record.apply, record.targets], ['collect', true, [project]])
+    assert.equal(record.outcome.written, 1)
+    const runs = spawnSync(process.execPath, [bin, 'runs'], { env, encoding: 'utf8' })
+    assert.match(runs.stdout, new RegExp(`${out.run}\\s+1 set written, 1 file copied · undone`))
+    // `--certain-only` is taken; a file of the stored size counts as certain where the
+    // reference stores no checksum, so this one is still repaired.
+    const certain = spawnSync(
+      process.execPath,
+      [
+        bin,
+        'doctor',
+        project,
+        '--no-default-search',
+        '--search',
+        join(root, 'library'),
+        '--certain-only',
+        '--json',
+      ],
+      { env, encoding: 'utf8' },
+    )
+    assert.equal(certain.status, 0, certain.stderr)
+    assert.equal(JSON.parse(certain.stdout).counts.found, 1)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -152,6 +176,12 @@ test('web under Node serves the page it ships with, and answers only that page',
       info.search.map((folder) => folder.path),
       [root],
     )
+    const ask = async (path) =>
+      (await fetch(`${url}${path}`, { headers: { 'x-livesaver-token': token } })).json()
+    assert.deepEqual(await ask('api/runs'), [])
+    assert.deepEqual(await ask('api/scan'), {})
+    const status = await ask('api/status')
+    assert.deepEqual([status.busy, status.lastScan], ['', ''])
   } finally {
     child.kill('SIGINT')
     rmSync(root, { recursive: true, force: true })

@@ -4,18 +4,37 @@
  * barrier that axe can find, in light and in dark.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tempDir } from '@livesaver/test-kit'
+import { startWeb, type WebServer } from 'livesaver'
 import type { Browser } from 'playwright'
-import { build } from '../build.js'
+import { build, DIST } from '../build.js'
 import { serve } from '../serve.js'
 import { barriers, ENGINES, watch } from './support.js'
 
 let server: { url: string; stop: () => void }
+/** The same files served by livesaver, which then stands behind the page. */
+let local: WebServer
+let tmp: { path: string; cleanup: () => void }
+const home = process.env.LIVESAVER_HOME
 
 beforeAll(async () => {
   await build()
   server = serve()
+  tmp = tempDir()
+  process.env.LIVESAVER_HOME = join(tmp.path, 'home')
+  const config = join(tmp.path, 'config.json')
+  writeFileSync(config, JSON.stringify({ appResources: '', vendorLibraries: [], searchRoots: [] }))
+  local = await startWeb({ assets: DIST, config })
 }, 120_000)
-afterAll(() => server?.stop())
+afterAll(async () => {
+  server?.stop()
+  await local?.close()
+  tmp?.cleanup()
+  if (home === undefined) delete process.env.LIVESAVER_HOME
+  else process.env.LIVESAVER_HOME = home
+})
 
 for (const [name, type] of ENGINES) {
   describe(`the shell in ${name}`, () => {
@@ -54,6 +73,21 @@ for (const [name, type] of ENGINES) {
       await page.getByRole('heading', { level: 1, name: 'History', exact: true }).waitFor()
       expect(problems).toEqual([])
       await page.context().close()
+    }, 60_000)
+
+    test('says where it runs: in the browser on its own, on this computer with livesaver', async () => {
+      const alone = await watch(browser, server.url)
+      await alone.page.goto(server.url)
+      await alone.page.getByTestId('where').getByText('In this browser').waitFor()
+      expect(alone.problems).toEqual([])
+      await alone.page.context().close()
+
+      const served = await watch(browser, local.url)
+      await served.page.goto(local.url)
+      await served.page.getByTestId('where').getByText('On this computer').waitFor()
+      expect(served.problems).toEqual([])
+      expect(served.outside).toEqual([])
+      await served.page.context().close()
     }, 60_000)
 
     for (const scheme of ['light', 'dark'] as const) {

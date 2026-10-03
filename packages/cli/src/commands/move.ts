@@ -18,7 +18,7 @@ import {
 } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute, resolveConfig } from '../config.js'
-import { acquireLock, newRun, readText } from '../state.js'
+import { acquireLock, endRun, newRun, readText } from '../state.js'
 
 export interface MoveFlags {
   readonly exclude?: string[]
@@ -48,11 +48,15 @@ export async function runMovePlan(folderArgs: string[], flags: MoveFlags): Promi
     (flags.exclude ?? []).map(absolute),
   )
   await parser.close()
-  const run = await newRun('move-plan', false)
+  const run = await newRun('move-plan', false, {
+    targets: folders,
+    options: { exclude: flags.exclude ?? [] },
+  })
   const dir = flags.reportDir ? absolute(flags.reportDir) : run.dir
   mkdirSync(dir, { recursive: true })
   const planPath = join(dir, MOVE_FILES.plan)
   writeFileSync(planPath, formatMovePlan(rows))
+  await endRun(run, { sets: rows.length })
   const base = posix.commonpath(folders)
   for (const r of rows)
     console.log(
@@ -78,7 +82,10 @@ async function runMoves(groups: [string, string[]][], flags: MoveFlags): Promise
       write: apply,
       ...(process.env.LIVESAVER_TRASH_DIR ? { trashDir: process.env.LIVESAVER_TRASH_DIR } : {}),
     })
-    const run = await newRun('move', apply)
+    const run = await newRun('move', apply, {
+      targets: groups.flatMap(([, sets]) => sets),
+      options: { into: groups.map(([target]) => target) },
+    })
     const journal = apply ? new Journal(host, run) : undefined
     const parser = createWorkerParser({ host })
     const ctx = { host, env: config.env, parser }
@@ -107,6 +114,10 @@ async function runMoves(groups: [string, string[]][], flags: MoveFlags): Promise
     const dir = flags.reportDir ? absolute(flags.reportDir) : run.dir
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, MOVE_FILES.report), moveReport(moves, base, apply))
+    await endRun(run, {
+      moves: moves.length,
+      problems: moves.filter((m) => m.problems.length).length,
+    })
     console.log(moveSummary(moves, apply, base))
     if (apply) console.log(pc.dim(`Undo: livesaver undo ${run.id}`))
     console.log(pc.dim(`Report: ${dir}`))

@@ -7,6 +7,7 @@ import { analyzeSet, type SetInfo } from './analyze.js'
 import { documentFromXml, type LiveDoc, openDocument } from './document.js'
 import { type FileRef, fileRefs } from './fileref.js'
 import type { Codec, FileStat, Host } from './host.js'
+import { type PluginUseCount, pluginUses } from './plugin-uses.js'
 import type { ByteSearch } from './search.js'
 
 export type ParsedSet =
@@ -14,10 +15,24 @@ export type ParsedSet =
       readonly ok: true
       readonly doc: LiveDoc
       readonly refs: readonly FileRef[]
+      /**
+       * The plug-ins the set uses, with their instance counts. Left out where they could not be
+       * read (a plug-in device that is not well-formed); the references are read all the same.
+       */
+      readonly plugins?: readonly PluginUseCount[]
       /** The file as it was when read; a write is refused if it changed since (stale plan). */
       readonly stat?: FileStat
     }
   | { readonly ok: false; readonly error: string }
+
+/** The plug-ins of a document, or nothing where its plug-in devices cannot be read. */
+export function pluginUsesOf(doc: LiveDoc): { plugins?: PluginUseCount[] } {
+  try {
+    return { plugins: pluginUses(doc) }
+  } catch {
+    return {}
+  }
+}
 
 /** A set measured for `status`: its analysis and references, without the XML. */
 export type InspectedSet =
@@ -58,7 +73,13 @@ export function inProcessParser(host: Host): SetParser {
         const stat = await host.fs.stat(path)
         const file = await host.fs.readFile(path)
         const doc = await openDocument(file, host.codec, host.search ? { search: host.search } : {})
-        return { ok: true, doc, refs: fileRefs(doc), ...(stat ? { stat } : {}) }
+        return {
+          ok: true,
+          doc,
+          refs: fileRefs(doc),
+          ...pluginUsesOf(doc),
+          ...(stat ? { stat } : {}),
+        }
       } catch (error) {
         return { ok: false, error: `unreadable: ${(error as Error).message}` }
       }

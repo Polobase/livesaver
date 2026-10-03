@@ -19,13 +19,16 @@ export {
 export {
   type AuditOptions,
   type AuditResult,
+  type AuditSources,
   auditPlugins,
+  auditSets,
   type InstalledProduct,
   installedProducts,
   isLivePlugin,
   LIVE_AU_TYPES,
   nativeAlternative,
   type PluginUse,
+  type SetPlugins,
   type UninstallImpact,
   uninstallImpact,
 } from './audit.js'
@@ -244,6 +247,7 @@ export { STATUS_FILES, WORDS as STATUS_WORDS, type Words as StatusWords } from '
 export { summary, totalCounts } from './summary.js'
 export { type UndoReport, undoRun } from './undo.js'
 export {
+  type CertainPlan,
   type ChangeRow,
   type CheckView,
   checkView,
@@ -252,6 +256,31 @@ export {
   type SetRow,
   type SourceRow,
 } from './view.js'
+export {
+  type AlternativeRow,
+  type BlockerCount,
+  type InstalledRow,
+  type PluginState,
+  type PluginsView,
+  type PluginUseRow,
+  pluginsView,
+  type UninstallView,
+  type UpgradePluginRow,
+  type UpgradeSetRow,
+  type UpgradeView,
+  uninstallView,
+  upgradeView,
+} from './view-plugins.js'
+export {
+  parseRunId,
+  type RunRecord,
+  type RunState,
+  type RunStep,
+  type RunSummary,
+  runSteps,
+  runSummary,
+  runText,
+} from './view-runs.js'
 export {
   type SetUpgrade,
   UPGRADE_REPORT,

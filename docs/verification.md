@@ -15,7 +15,11 @@ writes runs on temporary copies.
   tests that apply it in a temp folder and then run `undo`.
 - **Property tests** for the XML scanner and patcher: random edits are applied, written and read
   back; an empty patch round-trips byte-identically.
-- `bun run test:node` runs the built CLI under Node.js (collect + undo, status + undo).
+- `bun run test:node` runs the built CLI under Node.js (collect + undo, status + undo, the
+  web server).
+- **Output in a pipe**: `doctor --json` over 400 sets through a shell pipe must arrive whole.
+  (Under Bun, `console.log` dropped what a pipe could not take at once, 64 KB, as soon as
+  `process.stdout` had been looked at; the command line writes through the stream instead.)
 - `bun run test:web` runs the built web app in a headless browser: on its own (read-only), and
   with livesaver behind it, where it fixes one project, undoes, and fixes all on temporary
   copies. On a real library its report files are byte-identical to the command line's (see
@@ -23,12 +27,16 @@ writes runs on temporary copies.
 
 ## Corpus round trip
 `LIVESAVER_CORPUS=<folder> bun test corpus` (read-only): every Live document below the folder,
-backups included, must decode, scan and round-trip byte-identically through an empty patch.
+backups included, must decode, scan and round-trip byte-identically through an empty patch. On
+every 7th file the references are cross-checked against an independent regular expression, and
+the plug-ins read from the plug-in devices alone (`pluginUses`) against those of the full
+analysis.
 
 | Corpus | Files | XML | Result |
 |---|---:|---:|---|
-| a music folder (sets and backups) | 3,204 | 45.5 GB | all decode, scan, and round-trip byte-identically; 1,288,785 references; 458 files cross-checked against an independent regular expression |
+| a music folder (sets and backups) | 3,350 | 43.8 GB | all decode, scan, and round-trip byte-identically; 1,267,218 references; 479 files cross-checked against an independent regular expression, and their 1,210 plug-ins against the full analysis |
 | `~/Music/Ableton` (`.adg/.adv/.alc/.agr/.als`) | 10,100 | 8.0 GB | same; 13 old binary grooves reported as unsupported |
+| a music folder, every set and backup: `pluginUses` against `analyzeSet` | 3,350 | 43.8 GB | the same plug-ins and instance counts in every file (8,368 in all), in 11 s of CPU instead of 144 s |
 
 ## Speed
 On a library of 842 sets (804 MB gzipped, 11.9 GB of XML), Apple Silicon, 8 cores:
@@ -39,7 +47,11 @@ On a library of 842 sets (804 MB gzipped, 11.9 GB of XML), Apple Silicon, 8 core
 | `doctor`, reference search instead of a full scan | 14 s |
 | `doctor`, plus parse workers | **7.0 s** cold, 3.3 s with the complete-sets cache |
 | `status` (827 sets, dry run) | 12 s |
-| `plugins audit` (827 sets) | 12 s |
+| `plugins audit` (876 sets), full analysis of every set | 11 s |
+| `plugins audit`, plug-ins read from the plug-in devices alone | **3.4 s** |
+| `plugins upgrade` (876 sets, dry run), one set at a time | 8.4 s |
+| `plugins upgrade`, parse workers, rack and automation ids found by string search | 7.1 s |
+| a scan of the web app (samples and plug-ins, 876 sets) | 12.5 s |
 | `index` | 12.4 s the first time, **0.6 s** when nothing changed |
 | under Node (built `dist`) | same pipeline, worker threads included |
 

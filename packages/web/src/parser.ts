@@ -10,6 +10,8 @@ import {
   inProcessParser,
   openDocument,
   type ParsedSet,
+  type PluginUseCount,
+  pluginUsesOf,
   type SetParser,
 } from '@livesaver/core'
 import type { WebFs } from './fs.js'
@@ -21,7 +23,14 @@ interface ParseRequest {
 }
 
 type ParseReply =
-  | { id: number; ok: true; xml: ArrayBuffer; gzipped: boolean; refs: FileRef[] }
+  | {
+      id: number
+      ok: true
+      xml: ArrayBuffer
+      gzipped: boolean
+      refs: FileRef[]
+      plugins?: PluginUseCount[]
+    }
   | { id: number; ok: false; error: string }
 
 /** The part of a worker's global scope the parser needs. */
@@ -30,18 +39,21 @@ export interface ParseScope {
   postMessage(message: unknown, transfer: Transferable[]): void
 }
 
-/** Run inside a worker: read → gunzip → find references for one set per message. */
+/** Run inside a worker: read → gunzip → find references and plug-ins for one set per message. */
 export function serveParser(scope: ParseScope): void {
   scope.onmessage = async ({ data }: MessageEvent<ParseRequest>) => {
     const { id, file } = data
     try {
       const doc = await openDocument(new Uint8Array(await file.arrayBuffer()), webCodec)
       const refs = fileRefs(doc)
+      const { plugins } = pluginUsesOf(doc)
       const xml = doc.xml
       const own = xml.byteOffset === 0 && xml.byteLength === xml.buffer.byteLength
       // Transferred, not copied: a set's XML is tens of megabytes.
       const buffer = (own ? xml.buffer : xml.slice().buffer) as ArrayBuffer
-      scope.postMessage({ id, ok: true, xml: buffer, gzipped: doc.gzipped, refs }, [buffer])
+      scope.postMessage({ id, ok: true, xml: buffer, gzipped: doc.gzipped, refs, plugins }, [
+        buffer,
+      ])
     } catch (error) {
       scope.postMessage({ id, ok: false, error: `unreadable: ${(error as Error).message}` }, [])
     }
@@ -95,6 +107,7 @@ export function createWorkerParser(options: WorkerParserOptions): SetParser {
         ok: true,
         doc: documentFromXml(new Uint8Array(reply.xml), reply.gzipped, false),
         refs: reply.refs,
+        ...(reply.plugins ? { plugins: reply.plugins } : {}),
         ...(stat ? { stat } : {}),
       })
     }

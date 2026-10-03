@@ -42,6 +42,13 @@ export interface ChooseOptions {
    * The audio cannot be confirmed, so such a choice is unverified.
    */
   readonly matchLibraryPath?: boolean
+  /**
+   * Take a file only if the stored fingerprint confirms it. One found by other evidence (the same
+   * size in a pack, its place in a library, a reference that stores no fingerprint) is then left
+   * alone: the reference stays missing, reported like a file with other content, with the file
+   * as its candidate.
+   */
+  readonly certainOnly?: boolean
 }
 
 const APP_RESOURCES_RE = /^\/Applications\/Ableton Live [^/]*\.app\/Contents\/App-Resources\/(.+)$/
@@ -288,5 +295,7 @@ export async function choose(
     .sort(
       (a, b) => a.key[0] - b.key[0] || a.key[1] - b.key[1] || compareCodePoints(a.key[2], b.key[2]),
     )
-  return choice('found', { path: (ranked[0] as { c: string }).c, ...flags })
+  const path = (ranked[0] as { c: string }).c
+  if (options.certainOnly && !verified) return choice('mismatch', { candidates: [path], ...flags })
+  return choice('found', { path, ...flags })
 }

@@ -13,7 +13,7 @@ import {
 } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute } from '../config.js'
-import { acquireLock, newRun } from '../state.js'
+import { acquireLock, endRun, newRun } from '../state.js'
 
 export interface RunFlags {
   readonly apply?: boolean
@@ -108,7 +108,10 @@ export async function runRun(
       write: apply,
       ...(process.env.LIVESAVER_TRASH_DIR ? { trashDir: process.env.LIVESAVER_TRASH_DIR } : {}),
     })
-    const run = await newRun(`run-${codemod.name}`, apply)
+    const run = await newRun(`run-${codemod.name}`, apply, {
+      targets,
+      options: { ...options, exclude: flags.exclude ?? [] },
+    })
     const probe = new Probe(host.fs, host.hash)
     const tty = process.stderr.isTTY && !flags.json
     const result = await runCodemod(host, codemod, {
@@ -127,6 +130,11 @@ export async function runRun(
     writeFileSync(join(dir, 'codemod.csv'), report(result.results, result.base))
     const changed = result.results.filter((r) => r.changed)
     const errors = result.results.filter((r) => r.error)
+    await endRun(run, {
+      sets: result.results.length,
+      changed: changed.length,
+      errors: errors.length,
+    })
     if (flags.json) {
       console.log(
         JSON.stringify(

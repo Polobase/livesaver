@@ -10,6 +10,7 @@ import {
   type LiveDoc,
   nfc,
   norm,
+  type PluginUseCount,
   patchNew,
   patchOld,
   posix,
@@ -101,6 +102,8 @@ export interface SetResult {
   readonly files: string[]
   /** One entry per distinct reference (`FileRef.key`) with its outcome. */
   readonly decisions: Decision[]
+  /** The plug-ins the set uses (not known of a set that was skipped or could not be read). */
+  plugins?: readonly PluginUseCount[]
   backup: string
   written: boolean
   error: string
@@ -184,6 +187,8 @@ export class Project {
   copiedBytes = 0
   private readonly bySource = new Map<string, string>()
   private readonly claimed = new Map<string, string>()
+  /** The copies by destination: their size, and whether a change that is certain needs them. */
+  private readonly copies = new Map<string, { bytes: number; certain: boolean }>()
   private readonly choices = new Map<string, Promise<Choice>>()
 
   constructor(
@@ -211,11 +216,23 @@ export class Project {
     return c
   }
 
-  /** Destination of `source` in `folder` of the project (or at `wanted`); copies it when applying. */
-  async place(source: string, wanted = '', folder = IMPORTED_DIR): Promise<string> {
+  /** The copies that are still made when uncertain matches are left out (`certainOnly`). */
+  get certainCopies(): { files: number; bytes: number } {
+    const needed = [...this.copies.values()].filter((copy) => copy.certain)
+    return { files: needed.length, bytes: needed.reduce((n, copy) => n + copy.bytes, 0) }
+  }
+
+  /**
+   * Destination of `source` in `folder` of the project (or at `wanted`); copies it when applying.
+   * `certain`: the change that needs the file is no uncertain match.
+   */
+  async place(source: string, wanted = '', folder = IMPORTED_DIR, certain = true): Promise<string> {
     const key = norm(source)
     const known = this.bySource.get(key)
-    if (known !== undefined) return known
+    if (known !== undefined) {
+      this.need(known, certain)
+      return known
+    }
     const name = nfc(posix.basename(source))
     const [stem, ext] = posix.splitext(name)
     const dir = posix.join(this.root, folder)
@@ -246,12 +263,20 @@ export class Project {
     }
     if (chosen === undefined) throw new Error(`no free file name for ${name}`)
     this.bySource.set(key, chosen)
+    this.need(chosen, certain)
     return chosen
   }
 
+  private need(dst: string, certain: boolean): void {
+    const copy = this.copies.get(norm(dst))
+    if (copy && certain) copy.certain = true
+  }
+
   private async copy(source: string, dst: string): Promise<void> {
+    const bytes = await this.probe.size(source)
+    this.copies.set(norm(dst), { bytes, certain: false })
     this.copiedFiles++
-    this.copiedBytes += await this.probe.size(source)
+    this.copiedBytes += bytes
     if (!this.writer.apply) return
     await this.writer.copy(source, dst)
     this.probe.forget(dst)

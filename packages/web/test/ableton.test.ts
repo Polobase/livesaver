@@ -2,8 +2,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { join } from 'node:path'
 import { pickedFolder, tempDir, uploadedFolder, writeFile } from '@livesaver/test-kit'
-import type { FolderSource } from '@livesaver/web'
-import { holdsNames, holdsOf } from '../src/ableton.js'
+import { type FolderSource, holdsNames, holdsOf } from '../src/index.js'
 
 let tmp: { path: string; cleanup: () => void }
 beforeEach(() => {

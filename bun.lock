@@ -139,10 +139,11 @@
       "version": "0.0.0",
       "dependencies": {
         "@livesaver/core": "workspace:*",
+        "@livesaver/ops": "workspace:*",
+        "@livesaver/plugins": "workspace:*",
       },
       "devDependencies": {
         "@livesaver/node": "workspace:*",
-        "@livesaver/ops": "workspace:*",
         "@livesaver/test-kit": "workspace:*",
       },
     },

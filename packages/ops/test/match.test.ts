@@ -176,6 +176,17 @@ describe('choice', () => {
     expect(methodText(c).startsWith('same size only')).toBe(true)
   })
 
+  test('with certainOnly a file the fingerprint does not confirm is a candidate, not a choice', async () => {
+    const path = file('Drum Essentials/Kick/1.wav', repeat('x', 2000324))
+    const ref = { ...(await brokenRef()), packName: 'Drum Essentials' }
+    const c = await pick(ref, env(), tmp.path, { certainOnly: true })
+    expect([c.status, c.path, c.candidates, c.sizeOnly]).toEqual(['mismatch', '', [path], true])
+    // A confirmed file is taken as ever.
+    file('Lib1/Kick/1.wav', readFileSync(join(fixtures, 'samples', 'Lib1', 'Kick', '1.wav')))
+    const sure = await pick(await brokenRef(), env(), tmp.path, { certainOnly: true })
+    expect([sure.status, sure.verified]).toEqual(['found', true])
+  })
+
   test('vendor library file that grew slightly', async () => {
     const original = new Uint8Array(
       readFileSync(join(fixtures, 'samples', 'Lib1', 'Kick', '1.wav')),

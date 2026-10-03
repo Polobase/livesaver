@@ -16,6 +16,10 @@ A browser cannot do the fixing itself. Writing needs the File System Access API,
 Safari and Firefox do not offer and whose handles hide files (see below); and a page could
 neither keep a journal for an undo nor see that Live is running.
 
+**A rewrite is on its way** in `apps/web-next` (Vite, Vue, Nuxt UI): it will cover plug-ins and
+the history as well, and replace `apps/web`. Until then it is the shell, and the engines it
+talks to (see [One contract, two engines](#one-contract-two-engines)).
+
 ## On this computer
 `livesaver web` (`packages/cli/src/web/`) serves the page and answers it:
 
@@ -24,8 +28,15 @@ neither keep a journal for an undo nor see that Live is running.
 | `GET /api/info` | what the page starts with: the folders of the last check, else the settings of the command line (search folders, the projects folder of `status`), and the last fix that can still be undone |
 | `GET /api/folders?path=` | the folders in a folder: the page shows them to choose one, since a browser's own folder dialog never tells a path |
 | `POST /api/check` | `doctor` over the given folders; answers line by line (progress, then the result) |
-| `POST /api/fix` | `collect --apply` over all projects, or over one (`only`) |
+| `POST /api/scan` | the samples and the plug-ins of every set (see [A scan](#a-scan)); line by line |
+| `GET /api/scan` | the last scan, with what was scanned: a page that is opened again shows it without scanning |
+| `POST /api/upgrade/plan` | `plugins upgrade` as a dry run: what converts to VST3, and what blocks the rest |
+| `POST /api/fix` | `collect --apply` over all projects, or over one (`only`); `certainOnly` leaves uncertain matches out |
+| `POST /api/upgrade` | `plugins upgrade --apply`, of all plug-ins or of chosen ones, in all projects or in one |
 | `POST /api/undo` | `undo` of a run |
+| `GET /api/status` | whether Live is running, what runs right now and how far it is, and (`?path=`) the free space where a folder lies |
+| `GET /api/runs`, `/api/runs/<run>`, `/api/runs/<run>/reports/<file>` | the history: every run with what it did (as `livesaver runs`), its steps, its report files |
+| `POST /api/reveal` | shows a file in Finder |
 
 - **The same pipeline as the command line** (`collectRun`): settings, cache of complete sets,
   backups, journal, run folder and undo are those of `livesaver collect`. The result is shaped
@@ -36,6 +47,13 @@ neither keep a journal for an undo nor see that Live is running.
 - **A fix does what was checked.** The page asks first and says what will happen; if folders or
   options were changed after the check, the fix still uses those of the check, and says so.
 - **Live must not be running**, and only one run goes at a time, as on the command line.
+- **A run goes on when the page is closed.** A fix must not stop half-way, so the server finishes
+  it; the page asks `status` to see that something runs. A scan is kept until something is
+  written (a fix, an upgrade, an undo): what it found is no longer true then.
+- **A fix can leave the uncertain matches out.** The check's result says for every project what
+  a fix does with them and without (`certain` in `checkView`), from one check, so a page can
+  show both before it asks. On a real library the numbers without them (140 sets, 9,291
+  references, 1,968 copies) equal those of a check with `--certain-only`, for each of 299 projects.
 - **Only its own page may ask.** The server listens on this computer only. Every request must
   carry a token that is written into the page when it is served, come to this address
   (`127.0.0.1` or `localhost`: a name that merely points here is refused) and, if it names an
@@ -44,10 +62,43 @@ neither keep a journal for an undo nor see that Live is running.
   browser hands out remembered ticks by position, so an option could show the tick of another
   box while the page itself had it off.
 
+## A scan
+A scan is what the rewrite's screens are built on: the samples (as `doctor` reports them) and
+the plug-ins of every set (as `plugins audit` reports them).
+
+- **Every set is read once.** The parse workers return a set's plug-ins with its references
+  (`pluginUses` in `@livesaver/core` finds the plug-in devices by byte search and scans only
+  those, instead of the whole document), so the plug-ins cost no second pass. On a real library
+  (876 sets) a scan takes 12.5 s; the check alone takes 12 s, and the audit used to take
+  another 11 s.
+- **The upgrade plan is made when it is asked for.** It reads the sets with a VST2 plug-in an
+  upgrade says something about again (about 380 of 876), about 5 s, which a scan repeated after
+  every fix should not wait for. It is kept with the scan.
+- **No cache of complete sets**: a set that is skipped tells nothing about its plug-ins. Its
+  report files equal those of `doctor --full`.
+
+## One contract, two engines
+The rewrite talks to an `Engine` (`apps/web-next/src/engine/types.ts`): start, scan, plan an
+upgrade, fix, upgrade, undo, the history, status, reveal, list folders. Two engines implement it:
+
+| | `ComputerEngine` | `BrowserEngine` |
+|---|---|---|
+| what it is | livesaver on this computer, over the requests above | the browser: a worker over the folders the page was handed (`scanInWorker`, `serveEngine` in `@livesaver/web`) |
+| folders | by their paths | uploaded or dropped; where they lie is worked out |
+| can | everything | scan |
+| plug-ins | with what is installed | which are used, and where; installed or not is `unknown` |
+
+What an engine cannot do is in its `capabilities`, and asking for it fails as `Unsupported`, so
+a screen shows and explains it instead of hiding it. One suite of tests
+(`apps/web-next/test/engine.conformance.test.ts`) runs the same scenarios against both, and
+demands that both show the same for the same library.
+
 ## On its own: how it is built
 - **The page** (Preact) only holds the folders and shows the result.
-- **An engine worker** runs `doctor`, so the page stays responsive.
-- **Parse workers** (started by the engine worker) gunzip the sets and find their references.
+- **An engine worker** runs the scan (`scanFolders` in `@livesaver/web`), so the page stays
+  responsive.
+- **Parse workers** (started by the engine worker) gunzip the sets and find their references
+  and plug-ins.
 - `bun run build` in `apps/web` bundles the page and both workers with fixed names, because the
   page starts the workers by URL. `bun run web` serves it and rebuilds when the page is loaded
   after a source change.
@@ -104,8 +155,9 @@ With a stand-in path, a file that a set references by an absolute path into that
 the same repair, counted in another row.
 
 ## Ableton's own folders
-Recognised by name among the given folders (`apps/web/src/ableton.ts`), and named on their rows
-as soon as a folder is added; what is still missing is listed under the sample folders.
+Recognised by name among the given folders (`packages/web/src/engine/ableton.ts`), and named on
+their rows as soon as a folder is added; what is still missing is listed under the sample
+folders.
 
 - **User Library** and **Factory Packs**: a folder of that name, or the folder that holds it
   (`Music/Ableton` in the home folder).
@@ -139,11 +191,14 @@ there.
 - No preferred folders for ties between identical copies, no cache of complete sets.
 ## How it is tested
 - `packages/web/test`: `WebFs` over fake handles, uploads and listings; a `doctor` run over the
-  browser host equals a run over the Node host on the fixtures.
-- `apps/web/test`: the engine (locating, Ableton's folders, the Live app given as a folder, the
-  remap table, the shaped result).
+  browser host equals a run over the Node host on the fixtures; the scan (locating, Ableton's
+  folders, the Live app given as a folder, the remap table, the plug-ins, the shaped result);
+  and the conversation between the page and the engine's worker.
 - `packages/cli/test`: what the page asks of this computer, on temporary copies of the fixtures:
-  a check, a fix of all and of one project, undo, and that the server answers only its own page.
+  a check, a scan, a fix of all and of one project, with and without the uncertain matches, an
+  upgrade of plug-ins, undo, the history and its reports, and that the server answers only its
+  own page.
+- `apps/web-next/test`: the two engines against one suite (see above).
 - `bun run test:web`: the built page in a real headless browser, in both ways. On its own:
   folders are given through the folder upload and by drops (with names a handle would hide, and
   an app as a folder); the hints, the results, the tables and a downloaded report are read from
@@ -159,3 +214,6 @@ there.
   about 15 s in the browser (12 s on the command line).
 - With livesaver on the computer, the same library gives report files byte-identical to
   `livesaver doctor` as well (dry runs only: fixing is tested on temporary copies).
+- A scan of the same library equals the three commands it stands for: its report files those of
+  `doctor --full`, its 199 plug-ins (order, state, instances, sets) those of `plugins audit`, and
+  its upgrade plan (386 rows) that of `plugins upgrade`.

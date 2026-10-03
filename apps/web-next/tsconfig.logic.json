@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "types": ["vite/client", "bun"] },
-  "include": ["src/**/*.ts", "e2e/**/*.ts", "*.ts"],
+  "include": ["src/**/*.ts", "e2e/**/*.ts", "test/**/*.ts", "*.ts"],
   "exclude": ["src/main.ts", "src/router.ts"]
 }

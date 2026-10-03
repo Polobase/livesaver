@@ -1,7 +1,7 @@
 {
   "name": "@livesaver/web",
   "version": "0.0.0",
-  "description": "Browser host for livesaver: folders a page was given (folder upload, drag and drop, File System Access API) as a read-only file system, gzip, hashing and worker-based set parsing.",
+  "description": "Browser host for livesaver: folders a page was given (folder upload, drag and drop, File System Access API) as a read-only file system, gzip, hashing, worker-based set parsing, and a scan of samples and plug-ins that runs in the page.",
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
@@ -31,11 +31,12 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@livesaver/core": "workspace:*"
+    "@livesaver/core": "workspace:*",
+    "@livesaver/ops": "workspace:*",
+    "@livesaver/plugins": "workspace:*"
   },
   "devDependencies": {
     "@livesaver/node": "workspace:*",
-    "@livesaver/ops": "workspace:*",
     "@livesaver/test-kit": "workspace:*"
   },
   "publishConfig": {

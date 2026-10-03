@@ -4,7 +4,7 @@ import { createNodeHost, createWorkerParser, loadInstalledPlugins } from '@lives
 import { Journal, statusRun, statusSummary } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute, resolveConfig, resolveStatusConfig } from '../config.js'
-import { acquireLock, audioUnitsCachePath, newRun, sheetSnapshotPath } from '../state.js'
+import { acquireLock, audioUnitsCachePath, endRun, newRun, sheetSnapshotPath } from '../state.js'
 
 export interface StatusFlags {
   readonly apply?: boolean
@@ -58,7 +58,15 @@ export async function runStatus(targetArgs: string[], flags: StatusFlags): Promi
       write: apply,
       ...(process.env.LIVESAVER_TRASH_DIR ? { trashDir: process.env.LIVESAVER_TRASH_DIR } : {}),
     })
-    const run = await newRun('status', apply)
+    const run = await newRun('status', apply, {
+      targets,
+      options: {
+        exclude: flags.exclude ?? [],
+        comments: flags.comments !== false,
+        sheet: status.sheet || false,
+        exports: status.exports,
+      },
+    })
     const parser = createWorkerParser({
       host,
       ...(flags.workers !== undefined ? { workers: Number(flags.workers) } : {}),
@@ -93,6 +101,7 @@ export async function runStatus(targetArgs: string[], flags: StatusFlags): Promi
     const reportDir = flags.reportDir ? absolute(flags.reportDir) : run.dir
     mkdirSync(reportDir, { recursive: true })
     for (const [name, content] of result.reports) writeFileSync(join(reportDir, name), content)
+    await endRun(run, { projects: result.projects.length })
     const ms = performance.now() - started
     if (flags.json) {
       console.log(

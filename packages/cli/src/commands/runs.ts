@@ -1,46 +1,36 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createNodeHost, liveIsRunning } from '@livesaver/node'
-import { readJournal, undoRun } from '@livesaver/ops'
+import { type RunSummary, readJournal, runSummary, runText, undoRun } from '@livesaver/ops'
 import pc from 'picocolors'
 import { resolveConfig } from '../config.js'
-import { acquireLock, listRuns, runsDir } from '../state.js'
+import { acquireLock, listRuns, readRun, runsDir } from '../state.js'
+
+/** Every run folder as a summary, oldest first. */
+export async function runSummaries(): Promise<RunSummary[]> {
+  const host = createNodeHost()
+  const runs: RunSummary[] = []
+  for (const id of listRuns()) {
+    const entries = await readJournal(host, { id, dir: join(runsDir(), id) })
+    runs.push(runSummary(id, entries, readRun(id)))
+  }
+  return runs
+}
 
 export async function runRuns(): Promise<number> {
-  const host = createNodeHost()
-  const ids = listRuns()
-  if (ids.length === 0) {
+  const runs = await runSummaries()
+  if (runs.length === 0) {
     console.log(pc.dim(`no runs yet (${runsDir()})`))
     return 0
   }
-  for (const id of ids) {
-    const dir = join(runsDir(), id)
-    const entries = await readJournal(host, { id, dir })
-    const count = (op: string) => entries.filter((e) => e.t === 'end' && e.op === op).length
-    const sets = count('write-set')
-    const copies = count('copy')
-    const renames = count('rename')
-    const tags = count('tags')
-    const comments = entries
-      .filter((e) => e.t === 'begin' && e.op === 'comments')
-      .reduce((n, e) => n + (e.t === 'begin' && e.op === 'comments' ? e.items.length : 0), 0)
-    const begun = new Set(entries.filter((e) => e.t === 'begin').map((e) => e.id))
-    const ended = new Set(entries.filter((e) => e.t === 'end').map((e) => e.id))
-    const unfinished = [...begun].filter((x) => !ended.has(x)).length
-    const undone = entries.some((e) => e.t === 'undo')
-    const done = [
-      sets ? `${sets} sets written` : '',
-      copies ? `${copies} files copied` : '',
-      renames ? `${renames} moved` : '',
-      tags ? `${tags} tags set` : '',
-      comments ? `${comments} comments set` : '',
-    ].filter(Boolean)
+  for (const run of runs) {
     const bits = [
-      entries.length ? done.join(', ') || 'nothing changed' : 'dry run',
-      unfinished ? pc.yellow(`${unfinished} unfinished`) : '',
-      undone ? pc.cyan('undone') : '',
+      runText(run),
+      run.unfinished ? pc.yellow(`${run.unfinished} unfinished`) : '',
+      run.state === 'undone' ? pc.cyan('undone') : '',
+      run.state === 'partly-undone' ? pc.cyan('partly undone') : '',
     ].filter(Boolean)
-    console.log(`${id}  ${pc.dim(bits.join(' · '))}`)
+    console.log(`${run.id}  ${pc.dim(bits.join(' · '))}`)
   }
   return 0
 }

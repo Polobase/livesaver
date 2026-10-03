@@ -16,7 +16,7 @@ import {
 } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute, type ResolvedConfig, resolveConfig } from '../config.js'
-import { acquireLock, cachePath, newRun, readText, writeStateFile } from '../state.js'
+import { acquireLock, cachePath, endRun, newRun, readText, writeStateFile } from '../state.js'
 
 export interface DoctorFlags {
   readonly search?: string[]
@@ -25,6 +25,7 @@ export interface DoctorFlags {
   readonly exclude?: string[]
   readonly packLimit?: string
   readonly matchLibraryPath?: boolean
+  readonly certainOnly?: boolean
   readonly config?: string
   readonly json?: boolean
   readonly quiet?: boolean
@@ -83,7 +84,21 @@ export async function collectRun(
     write: apply,
     ...(process.env.LIVESAVER_TRASH_DIR ? { trashDir: process.env.LIVESAVER_TRASH_DIR } : {}),
   })
-  const run = command === 'collect' ? await newRun(command, apply) : undefined
+  const run =
+    command === 'collect'
+      ? await newRun(command, apply, {
+          targets,
+          options: {
+            search: config.searchRoots,
+            ignore: flags.ignore ?? [],
+            exclude: flags.exclude ?? [],
+            packLimit: config.packCopyLimit / 1_000_000,
+            matchLibraryPath: Boolean(flags.matchLibraryPath),
+            certainOnly: Boolean(flags.certainOnly),
+            vendorLibraries: config.env.vendorLibraries,
+          },
+        })
+      : undefined
   if (run) hooks.onRun?.(run)
   const probe = new Probe(host.fs, host.hash)
   const writer = apply && run ? applyWriter(host, run, probe) : undefined
@@ -102,6 +117,7 @@ export async function collectRun(
     env: config.env,
     packCopyLimit: config.packCopyLimit,
     matchLibraryPath: Boolean(flags.matchLibraryPath),
+    certainOnly: Boolean(flags.certainOnly),
     parser,
     probe,
     ...(cache ? { cache } : {}),
@@ -121,6 +137,15 @@ export async function collectRun(
         writeFileSync(join(reportDir, name), content)
     }
   }
+  if (run)
+    await endRun(run, {
+      sets: result.results.length,
+      changingSets: result.results.filter((set) => !set.error && set.changes.length > 0).length,
+      written: result.results.filter((set) => set.written).length,
+      files: result.projects.reduce((n, project) => n + project.copiedFiles, 0),
+      bytes: result.projects.reduce((n, project) => n + project.copiedBytes, 0),
+      errors: result.results.filter((set) => set.error).length,
+    })
   const env = result.projects[0]?.env ?? new Environment(config.env, probe)
   return { result, config, env, run, reportDir, reports }
 }

@@ -35,7 +35,9 @@ const PHASE: Record<Phase, string> = {
   locating: 'Finding out where the folders lie on disk',
   indexing: 'Listing audio files and Max devices',
   checking: 'Checking sets',
+  plugins: 'Reading the plug-ins',
   fixing: 'Fixing sets',
+  upgrading: 'Upgrading plug-ins',
   reporting: 'Writing the report',
 }
 

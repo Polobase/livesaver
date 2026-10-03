@@ -24,6 +24,7 @@ import { absolute, resolveConfig, resolveStatusConfig } from '../config.js'
 import {
   acquireLock,
   cachePath,
+  endRun,
   newRun,
   readText,
   sheetSnapshotPath,
@@ -79,11 +80,15 @@ export async function runReorgPlan(folderArgs: string[], flags: ReorgFlags): Pro
     status.profile,
     (flags.exclude ?? []).map(absolute),
   )
-  const run = await newRun('reorg-plan', false)
+  const run = await newRun('reorg-plan', false, {
+    targets: folders,
+    options: { into, exclude: flags.exclude ?? [] },
+  })
   const dir = flags.reportDir ? absolute(flags.reportDir) : run.dir
   mkdirSync(dir, { recursive: true })
   const planPath = join(dir, REORG_FILES.plan)
   writeFileSync(planPath, formatReorgPlan(rows))
+  await endRun(run, { projects: rows.length })
   for (const r of rows) {
     const target = r.target ? relative(into, r.target) : '–'
     console.log(
@@ -126,7 +131,7 @@ export async function runReorgRun(planArg: string, flags: ReorgFlags): Promise<n
       write: apply,
       ...(process.env.LIVESAVER_TRASH_DIR ? { trashDir: process.env.LIVESAVER_TRASH_DIR } : {}),
     })
-    const run = await newRun('reorg', apply)
+    const run = await newRun('reorg', apply, { targets: [planPath], options: { into } })
     const parser = createWorkerParser({ host })
     const cacheText = readText(cachePath())
     const cache = apply && cacheText !== undefined ? CompleteSets.parse(cacheText, 0) : undefined
@@ -140,6 +145,7 @@ export async function runReorgRun(planArg: string, flags: ReorgFlags): Promise<n
     await parser.close()
     if (!r.started) {
       console.error(`Finder comments unreadable (${r.commentError}) – nothing is moved.`)
+      await endRun(run, {}, `Finder comments unreadable (${r.commentError})`)
       return 1
     }
     if (cache) {
@@ -151,6 +157,10 @@ export async function runReorgRun(planArg: string, flags: ReorgFlags): Promise<n
     const dir = flags.reportDir ? absolute(flags.reportDir) : run.dir
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, REORG_FILES.report), reorgReport(moves, into))
+    await endRun(run, {
+      projects: moves.length,
+      problems: moves.filter((m) => m.problems.length).length,
+    })
     console.log(reorgSummary(moves, apply, into))
     if (apply) {
       const leftovers = await emptyFolders(host, [into])
