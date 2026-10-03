@@ -10,14 +10,14 @@ import { copyFixtures, tempDir, writeFile } from '@livesaver/test-kit'
 import type { Browser, Locator, Page } from 'playwright'
 import { build } from '../build.js'
 import { serve } from '../serve.js'
-import { barriers, ENGINES, textOf, textsOf, watch } from './support.js'
+import { barriers, ENGINES, giveFolder, PATIENCE, textOf, textsOf, watch } from './support.js'
 
 let server: { url: string; stop: () => void }
 
 beforeAll(async () => {
   await build()
   server = serve()
-}, 120_000)
+}, 120_000 * PATIENCE)
 afterAll(() => server?.stop())
 
 for (const [name, type] of ENGINES) {
@@ -39,14 +39,14 @@ for (const [name, type] of ENGINES) {
       ;({ page, problems, outside } = await watch(browser, server.url))
       await page.goto(server.url)
       await page.getByTestId('search-folders').waitFor()
-    }, 60_000)
+    }, 60_000 * PATIENCE)
     afterAll(async () => {
       await browser?.close()
       tmp?.cleanup()
     })
 
     const texts = (testId: string) => page.getByTestId(testId).allInnerTexts()
-    const scanned = () => page.getByTestId('fix-card').waitFor({ timeout: 30_000 })
+    const scanned = () => page.getByTestId('fix-card').waitFor({ timeout: 30_000 * PATIENCE })
     const goTo = async (place: string) => {
       // A panel left open by a test that failed must not stand in the way of the next.
       if (await page.getByRole('dialog').count()) await page.keyboard.press('Escape')
@@ -75,141 +75,178 @@ for (const [name, type] of ENGINES) {
     /** Only Chromium lets a test drop a folder (through its debugging protocol). */
     const withDrops = name === 'Chromium' ? test : test.skip
 
-    test('there is nothing to scan without a project folder', async () => {
-      expect(await page.getByTestId('scan-library').isDisabled()).toBe(true)
-      expect(await page.getByTestId('scan').isDisabled()).toBe(true)
-      expect(await page.getByTestId('needs-project').innerText()).toBe(
-        'Add a project folder to start.',
-      )
-      expect(await wanted()).toEqual(['your User Library and Factory Packs', "Live's own content"])
-      expect(await page.getByTestId('where').innerText()).toBe('In this browser')
-    }, 30_000)
+    test(
+      'there is nothing to scan without a project folder',
+      async () => {
+        expect(await page.getByTestId('scan-library').isDisabled()).toBe(true)
+        expect(await page.getByTestId('scan').isDisabled()).toBe(true)
+        expect(await page.getByTestId('needs-project').innerText()).toBe(
+          'Add a project folder to start.',
+        )
+        expect(await wanted()).toEqual([
+          'your User Library and Factory Packs',
+          "Live's own content",
+        ])
+        expect(await page.getByTestId('where').innerText()).toBe('In this browser')
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('uploaded folders are scanned, and the overview says what was found', async () => {
-      await page.getByTestId('projects-input').setInputFiles(join(tmp.path, 'projects'))
-      await page.getByTestId('search-input').setInputFiles(join(tmp.path, 'samples'))
-      expect(await texts('folder-name')).toEqual(['projects', 'samples'])
-      expect(await texts('folder-facts')).toEqual(['7 files', '3 files'])
-      await page.getByTestId('scan-library').click()
-      await scanned()
+    test(
+      'uploaded folders are scanned, and the overview says what was found',
+      async () => {
+        await giveFolder(page, 'projects-input', join(tmp.path, 'projects'))
+        await giveFolder(page, 'search-input', join(tmp.path, 'samples'))
+        expect(await texts('folder-name')).toEqual(['projects', 'samples'])
+        expect(await texts('folder-facts')).toEqual(['7 files', '3 files'])
+        await page.getByTestId('scan-library').click()
+        await scanned()
 
-      expect(await page.locator('#headline').innerText()).toBe('2 of 3 sets are complete')
-      expect(await page.getByTestId('headline-rest').innerText()).toBe(
-        '1 more will be after a fix.',
-      )
-      expect(await page.getByTestId('fixable').innerText()).toBe('1 set in 1 project')
-      expect(await page.getByTestId('missing-card').innerText()).toContain('Nothing')
-      expect(await page.getByTestId('found-sources').innerText()).toContain('samples/Lib1')
-      expect(await page.locator('[data-status=found]').innerText()).toBe('1')
-      expect(await page.getByTestId('no-live-content').innerText()).toContain(
-        "Live's own content was not among the folders",
-      )
-      // The page says why it has no button to fix, instead of having none without a word.
-      expect(await page.getByTestId('no-fix').innerText()).toContain('This page only reads.')
-      expect(await page.getByTestId('facts').innerText()).toContain(
-        'Scanned 3 sets against 3 audio files and Max devices',
-      )
-      expect(await page.getByTestId('facts').innerText()).toContain('in this browser')
-    }, 60_000)
+        expect(await page.locator('#headline').innerText()).toBe('2 of 3 sets are complete')
+        expect(await page.getByTestId('headline-rest').innerText()).toBe(
+          '1 more will be after a fix.',
+        )
+        expect(await page.getByTestId('fixable').innerText()).toBe('1 set in 1 project')
+        expect(await page.getByTestId('missing-card').innerText()).toContain('Nothing')
+        expect(await page.getByTestId('found-sources').innerText()).toContain('samples/Lib1')
+        expect(await page.locator('[data-status=found]').innerText()).toBe('1')
+        expect(await page.getByTestId('no-live-content').innerText()).toContain(
+          "Live's own content was not among the folders",
+        )
+        // The page says why it has no button to fix, instead of having none without a word.
+        expect(await page.getByTestId('no-fix').innerText()).toContain('This page only reads.')
+        expect(await page.getByTestId('facts').innerText()).toContain(
+          'Scanned 3 sets against 3 audio files and Max devices',
+        )
+        expect(await page.getByTestId('facts').innerText()).toContain('in this browser')
+      },
+      60_000 * PATIENCE,
+    )
 
-    test('the sets say where the project folder lies; the sample folder stays unplaced', async () => {
-      await goTo('Settings')
-      const places = page.getByTestId('folder-place')
-      expect([await textOf(places.first()), await textOf(places.last())]).toEqual([
-        '/Users/someone/livesaver/fixtures/projects (found from your sets) Change path',
-        'Set path',
-      ])
-    }, 30_000)
+    test(
+      'the sets say where the project folder lies; the sample folder stays unplaced',
+      async () => {
+        await goTo('Settings')
+        const places = page.getByTestId('folder-place')
+        expect([await textOf(places.first()), await textOf(places.last())]).toEqual([
+          '/Users/someone/livesaver/fixtures/projects (found from your sets) Change path',
+          'Set path',
+        ])
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('the tabs list the planned change, and filters narrow the rows', async () => {
-      await goTo('Samples')
-      await page.getByRole('tab', { name: /Changes/ }).click()
-      await rows().first().waitFor()
-      expect(await textsOf(rows().first().locator('td'))).toEqual([
-        'Repair',
-        '1.wav',
-        'Brokenpath Project/Brokenpath.als',
-        'Samples/Imported',
-        'Confirmed',
-      ])
-      await page.getByRole('tab', { name: /Sets/ }).click()
-      await rows().first().waitFor()
-      expect(await rows().count()).toBe(3)
-      await page.getByLabel('Filter sets').click()
-      await page.getByRole('option', { name: 'Can be fixed' }).click()
-      expect(await page.getByTestId('shown').innerText()).toBe('1 of 3')
-      expect(await rows().count()).toBe(1)
-      await page.getByLabel('Search sets').fill('nothing like this')
-      await page.getByText('Nothing matches.').waitFor()
-      expect(await page.getByTestId('shown').innerText()).toBe('0 of 3')
-    }, 30_000)
+    test(
+      'the tabs list the planned change, and filters narrow the rows',
+      async () => {
+        await goTo('Samples')
+        await page.getByRole('tab', { name: /Changes/ }).click()
+        await rows().first().waitFor()
+        expect(await textsOf(rows().first().locator('td'))).toEqual([
+          'Repair',
+          '1.wav',
+          'Brokenpath Project/Brokenpath.als',
+          'Samples/Imported',
+          'Confirmed',
+        ])
+        await page.getByRole('tab', { name: /Sets/ }).click()
+        await rows().first().waitFor()
+        expect(await rows().count()).toBe(3)
+        await page.getByLabel('Filter sets').click()
+        await page.getByRole('option', { name: 'Can be fixed' }).click()
+        expect(await page.getByTestId('shown').innerText()).toBe('1 of 3')
+        expect(await rows().count()).toBe(1)
+        await page.getByLabel('Search sets').fill('nothing like this')
+        await page.getByText('Nothing matches.').waitFor()
+        expect(await page.getByTestId('shown').innerText()).toBe('0 of 3')
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('a project opens from the side with what a fix changes in it', async () => {
-      await page.getByRole('tab', { name: /Projects/ }).click()
-      await page.getByText('Brokenpath Project', { exact: true }).click()
-      const panel = page.getByRole('dialog')
-      await panel.getByText('What a fix changes (1)').waitFor()
-      expect(await panel.getByRole('heading', { level: 2 }).innerText()).toBe('Brokenpath Project')
-      // A path keeps its end when there is no room; the whole of it is its title.
-      await panel.getByTitle('Samples/Imported/1.wav').waitFor()
-      expect(await textOf(panel)).toContain('Found by: fingerprint ok')
-      // Nothing can be fixed here, so the panel offers no fix.
-      expect(await panel.getByRole('button', { name: 'Fix this project' }).count()).toBe(0)
-      await page.keyboard.press('Escape')
-      await panel.waitFor({ state: 'hidden' })
-    }, 30_000)
+    test(
+      'a project opens from the side with what a fix changes in it',
+      async () => {
+        await page.getByRole('tab', { name: /Projects/ }).click()
+        await page.getByText('Brokenpath Project', { exact: true }).click()
+        const panel = page.getByRole('dialog')
+        await panel.getByText('What a fix changes (1)').waitFor()
+        expect(await panel.getByRole('heading', { level: 2 }).innerText()).toBe(
+          'Brokenpath Project',
+        )
+        // A path keeps its end when there is no room; the whole of it is its title.
+        await panel.getByTitle('Samples/Imported/1.wav').waitFor()
+        expect(await textOf(panel)).toContain('Found by: fingerprint ok')
+        // Nothing can be fixed here, so the panel offers no fix.
+        expect(await panel.getByRole('button', { name: 'Fix this project' }).count()).toBe(0)
+        await page.keyboard.press('Escape')
+        await panel.waitFor({ state: 'hidden' })
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('a report downloads as the command line writes it', async () => {
-      await goTo('Overview')
-      await page.getByTestId('reports').click()
-      const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        page.getByRole('menuitem', { name: /Planned changes/ }).click(),
-      ])
-      expect(download.suggestedFilename()).toBe('changes.csv')
-      const bytes = new Uint8Array(await Bun.file(await download.path()).arrayBuffer())
-      expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]) // the mark Excel needs
-      expect(new TextDecoder().decode(bytes).split('\r\n')[0]).toBe(
-        'Project,Set,Action,Sample,Old path,New path (in project),Copied from,Method,Confidence',
-      )
-    }, 30_000)
+    test(
+      'a report downloads as the command line writes it',
+      async () => {
+        await goTo('Overview')
+        await page.getByTestId('reports').click()
+        const [download] = await Promise.all([
+          page.waitForEvent('download'),
+          page.getByRole('menuitem', { name: /Planned changes/ }).click(),
+        ])
+        expect(download.suggestedFilename()).toBe('changes.csv')
+        const bytes = new Uint8Array(await Bun.file(await download.path()).arrayBuffer())
+        expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]) // the mark Excel needs
+        expect(new TextDecoder().decode(bytes).split('\r\n')[0]).toBe(
+          'Project,Set,Action,Sample,Old path,New path (in project),Copied from,Method,Confidence',
+        )
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('without the sample folder the sample is missing, with what to do about it', async () => {
-      await goTo('Settings')
-      await page.getByRole('button', { name: 'Remove samples' }).click()
-      await page.getByRole('button', { name: 'Remove projects' }).click()
-      await page
-        .getByTestId('projects-input')
-        .setInputFiles(join(tmp.path, 'projects', 'Brokenpath Project'))
-      await page.getByTestId('scan').click()
-      await goTo('Overview')
-      await page.getByTestId('missing').waitFor({ timeout: 30_000 })
-      expect(await page.locator('#headline').innerText()).toBe('0 of 1 set is complete')
-      expect(await page.getByTestId('missing').innerText()).toBe('1 sample from 1 source')
-      expect(await page.getByTestId('missing-card').innerText()).toContain(
-        'Find this folder or drive and add it as a sample folder.',
-      )
-      await page.getByRole('link', { name: 'See all missing samples' }).click()
-      await page.getByTestId('missing-groups').waitFor()
-      await page.getByTestId('missing-groups').getByRole('button', { expanded: false }).click()
-      await page.getByRole('cell', { name: '1.wav' }).click()
-      const panel = page.getByRole('dialog')
-      await panel.getByText('No file of this name is in the folders that were searched.').waitFor()
-      expect(await panel.innerText()).toContain('Brokenpath.als')
-      await page.keyboard.press('Escape')
-      await panel.waitFor({ state: 'hidden' })
-    }, 60_000)
+    test(
+      'without the sample folder the sample is missing, with what to do about it',
+      async () => {
+        await goTo('Settings')
+        await page.getByRole('button', { name: 'Remove samples' }).click()
+        await page.getByRole('button', { name: 'Remove projects' }).click()
+        await giveFolder(page, 'projects-input', join(tmp.path, 'projects', 'Brokenpath Project'))
+        await page.getByTestId('scan').click()
+        await goTo('Overview')
+        await page.getByTestId('missing').waitFor({ timeout: 30_000 * PATIENCE })
+        expect(await page.locator('#headline').innerText()).toBe('0 of 1 set is complete')
+        expect(await page.getByTestId('missing').innerText()).toBe('1 sample from 1 source')
+        expect(await page.getByTestId('missing-card').innerText()).toContain(
+          'Find this folder or drive and add it as a sample folder.',
+        )
+        await page.getByRole('link', { name: 'See all missing samples' }).click()
+        await page.getByTestId('missing-groups').waitFor()
+        await page.getByTestId('missing-groups').getByRole('button', { expanded: false }).click()
+        await page.getByRole('cell', { name: '1.wav' }).click()
+        const panel = page.getByRole('dialog')
+        await panel
+          .getByText('No file of this name is in the folders that were searched.')
+          .waitFor()
+        expect(await panel.innerText()).toContain('Brokenpath.als')
+        await page.keyboard.press('Escape')
+        await panel.waitFor({ state: 'hidden' })
+      },
+      60_000 * PATIENCE,
+    )
 
-    test('the button opens the folder upload, and says that a large folder takes a while', async () => {
-      await goTo('Settings')
-      const hint = page.getByTestId('folder-waiting').last()
-      const chooser = page.waitForEvent('filechooser')
-      await page.getByRole('button', { name: 'Add folder' }).last().click()
-      expect(await hint.innerText()).toBe('a large folder takes a few seconds to appear…')
-      await (await chooser).setFiles(join(tmp.path, 'samples'))
-      await page.getByTestId('folder-name').getByText('samples').waitFor()
-      expect(await hint.innerText()).toBe('or drop a folder here')
-    }, 30_000)
+    test(
+      'the button opens the folder upload, and says that a large folder takes a while',
+      async () => {
+        await goTo('Settings')
+        const hint = page.getByTestId('folder-waiting').last()
+        const chooser = page.waitForEvent('filechooser')
+        await page.getByRole('button', { name: 'Add folder' }).last().click()
+        expect(await hint.innerText()).toBe('a large folder takes a few seconds to appear…')
+        await (await chooser).setFiles(join(tmp.path, 'samples'))
+        await page.getByTestId('folder-name').getByText('samples').waitFor()
+        expect(await hint.innerText()).toBe('or drop a folder here')
+      },
+      30_000 * PATIENCE,
+    )
 
     withDrops(
       'dropped folders are listed entry by entry, with names a folder handle would hide',
@@ -248,36 +285,40 @@ for (const [name, type] of ENGINES) {
 
         await page.getByTestId('scan').click()
         await goTo('Overview')
-        await page.getByTestId('fixable').waitFor({ timeout: 30_000 })
+        await page.getByTestId('fixable').waitFor({ timeout: 30_000 * PATIENCE })
         expect(await page.locator('#headline').innerText()).toBe('2 of 3 sets are complete')
         expect(await page.getByTestId('facts').innerText()).toContain('against 4 audio files')
       },
       60_000,
     )
 
-    test('the library option says when no folder is marked as holding installed libraries', async () => {
-      await goTo('Settings')
-      const option = page.getByRole('switch', { name: /Also accept a library file/ })
-      const note = page.getByTestId('option-note')
-      expect(await note.count()).toBe(0)
-      await option.click()
-      expect(await note.innerText()).toContain('None of your sample folders is marked')
-      // A folder called like the place of Native Instruments' libraries is marked when added.
-      writeFile(join(tmp.path, 'Shared', 'Some Library', 'Samples', 'x.wav'), 'RIFF')
-      await page.getByTestId('search-input').setInputFiles(join(tmp.path, 'Shared'))
-      const marked = page
-        .getByTestId('folder-row')
-        .filter({ hasText: 'Shared' })
-        .getByRole('checkbox', { name: 'Contains installed libraries' })
-      await marked.waitFor()
-      expect(await marked.isChecked()).toBe(true)
-      expect(await note.count()).toBe(0)
-      await marked.click()
-      expect(await note.count()).toBe(1)
-      await marked.click()
-      await option.click()
-      expect(await option.isChecked()).toBe(false)
-    }, 30_000)
+    test(
+      'the library option says when no folder is marked as holding installed libraries',
+      async () => {
+        await goTo('Settings')
+        const option = page.getByRole('switch', { name: /Also accept a library file/ })
+        const note = page.getByTestId('option-note')
+        expect(await note.count()).toBe(0)
+        await option.click()
+        expect(await note.innerText()).toContain('None of your sample folders is marked')
+        // A folder called like the place of Native Instruments' libraries is marked when added.
+        writeFile(join(tmp.path, 'Shared', 'Some Library', 'Samples', 'x.wav'), 'RIFF')
+        await giveFolder(page, 'search-input', join(tmp.path, 'Shared'))
+        const marked = page
+          .getByTestId('folder-row')
+          .filter({ hasText: 'Shared' })
+          .getByRole('checkbox', { name: 'Contains installed libraries' })
+        await marked.waitFor()
+        expect(await marked.isChecked()).toBe(true)
+        expect(await note.count()).toBe(0)
+        await marked.click()
+        expect(await note.count()).toBe(1)
+        await marked.click()
+        await option.click()
+        expect(await option.isChecked()).toBe(false)
+      },
+      30_000 * PATIENCE,
+    )
 
     withDrops(
       'the Live app can be dropped as a folder, and the page says what it still wants',
@@ -298,7 +339,7 @@ for (const [name, type] of ENGINES) {
         // Live's own content always counts as installed: no box to tick on its row.
         expect(await row.getByRole('checkbox').count()).toBe(0)
         writeFile(join(tmp.path, 'Ableton', 'User Library', 'Samples', 'u.wav'), 'RIFF')
-        await page.getByTestId('search-input').setInputFiles(join(tmp.path, 'Ableton'))
+        await giveFolder(page, 'search-input', join(tmp.path, 'Ableton'))
         await page.getByTestId('folder-name').getByText('Ableton', { exact: true }).waitFor()
         expect(await page.getByTestId('wanted').count()).toBe(0)
 
@@ -316,56 +357,68 @@ for (const [name, type] of ENGINES) {
     )
 
     for (const scheme of ['light', 'dark'] as const) {
-      test(`the screens have no barrier in ${scheme}`, async () => {
-        await page.emulateMedia({ colorScheme: scheme })
-        for (const place of ['Overview', 'Samples', 'History', 'Settings']) {
-          await goTo(place)
-          expect([place, await barriers(page)]).toEqual([place, []])
-        }
-        for (const tab of ['Missing', 'Changes', 'Sets']) {
-          await goTo('Samples')
-          await page.getByRole('tab', { name: new RegExp(tab) }).click()
-          expect([tab, await barriers(page)]).toEqual([tab, []])
-        }
-      }, 60_000)
+      test(
+        `the screens have no barrier in ${scheme}`,
+        async () => {
+          await page.emulateMedia({ colorScheme: scheme })
+          for (const place of ['Overview', 'Samples', 'History', 'Settings']) {
+            await goTo(place)
+            expect([place, await barriers(page)]).toEqual([place, []])
+          }
+          for (const tab of ['Missing', 'Changes', 'Sets']) {
+            await goTo('Samples')
+            await page.getByRole('tab', { name: new RegExp(tab) }).click()
+            expect([tab, await barriers(page)]).toEqual([tab, []])
+          }
+        },
+        60_000 * PATIENCE,
+      )
     }
 
-    test('what only livesaver can do is explained, or not offered', async () => {
-      await goTo('History')
-      expect(await textOf(page.getByTestId('no-history'))).toContain('There is no history here')
-      // What needs livesaver says how to get it: a link to the guide, in a tab of its own.
-      const guide = page
-        .getByTestId('no-history')
-        .getByRole('link', { name: 'How to get livesaver' })
-      expect([await guide.getAttribute('href'), await guide.getAttribute('target')]).toEqual([
-        'https://polobase.github.io/livesaver/docs/guide/getting-started/#install-livesaver-on-your-mac',
-        '_blank',
-      ])
-      expect(await page.getByTestId('all-runs').count()).toBe(0)
-      await goTo('Settings')
-      // No settings of its own to go back to, and nothing of this computer it could have found.
-      expect(await page.getByTestId('reset-settings').count()).toBe(0)
-      expect(await page.getByTestId('found').count()).toBe(0)
-      expect(await page.getByRole('button', { name: /^Show in Finder/ }).count()).toBe(0)
-      expect(await textOf(page.locator('#about-title + dl'))).toContain(
-        'in this browser, on its own',
-      )
-      await goTo('Overview')
-      expect(await page.getByTestId('recent-runs').count()).toBe(0)
-    }, 30_000)
+    test(
+      'what only livesaver can do is explained, or not offered',
+      async () => {
+        await goTo('History')
+        expect(await textOf(page.getByTestId('no-history'))).toContain('There is no history here')
+        // What needs livesaver says how to get it: a link to the guide, in a tab of its own.
+        const guide = page
+          .getByTestId('no-history')
+          .getByRole('link', { name: 'How to get livesaver' })
+        expect([await guide.getAttribute('href'), await guide.getAttribute('target')]).toEqual([
+          'https://polobase.github.io/livesaver/docs/guide/getting-started/#install-livesaver-on-your-mac',
+          '_blank',
+        ])
+        expect(await page.getByTestId('all-runs').count()).toBe(0)
+        await goTo('Settings')
+        // No settings of its own to go back to, and nothing of this computer it could have found.
+        expect(await page.getByTestId('reset-settings').count()).toBe(0)
+        expect(await page.getByTestId('found').count()).toBe(0)
+        expect(await page.getByRole('button', { name: /^Show in Finder/ }).count()).toBe(0)
+        expect(await textOf(page.locator('#about-title + dl'))).toContain(
+          'in this browser, on its own',
+        )
+        await goTo('Overview')
+        expect(await page.getByTestId('recent-runs').count()).toBe(0)
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('coming back to the page shows its own state, not what the browser remembered', async () => {
-      // A browser restores form controls by their order: an option could get the tick of a
-      // folder's box, while the page itself starts with the option off.
-      await goTo('Settings')
-      await page.getByRole('switch', { name: /Also accept a library file/ }).click()
-      await page.goto('about:blank')
-      await page.goBack()
-      await page.getByTestId('search-folders').waitFor()
-      expect(await page.getByTestId('folder-row').count()).toBe(0)
-      const option = page.getByRole('switch', { name: /Also accept a library file/ })
-      expect(await option.isChecked()).toBe(false)
-    }, 30_000)
+    test(
+      'coming back to the page shows its own state, not what the browser remembered',
+      async () => {
+        // A browser restores form controls by their order: an option could get the tick of a
+        // folder's box, while the page itself starts with the option off.
+        await goTo('Settings')
+        await page.getByRole('switch', { name: /Also accept a library file/ }).click()
+        await page.goto('about:blank')
+        await page.goBack()
+        await page.getByTestId('search-folders').waitFor()
+        expect(await page.getByTestId('folder-row').count()).toBe(0)
+        const option = page.getByRole('switch', { name: /Also accept a library file/ })
+        expect(await option.isChecked()).toBe(false)
+      },
+      30_000 * PATIENCE,
+    )
 
     test('the page reported no errors, and asked nothing outside its own address', () => {
       expect(problems).toEqual([])

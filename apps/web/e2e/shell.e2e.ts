@@ -11,7 +11,7 @@ import { startWeb, type WebServer } from 'livesaver'
 import type { Browser } from 'playwright'
 import { build, DIST } from '../build.js'
 import { serve } from '../serve.js'
-import { barriers, commandKey, ENGINES, watch } from './support.js'
+import { barriers, commandKey, ENGINES, PATIENCE, watch } from './support.js'
 
 let server: { url: string; stop: () => void }
 /** The same files served by livesaver, which then stands behind the page. */
@@ -27,7 +27,7 @@ beforeAll(async () => {
   const config = join(tmp.path, 'config.json')
   writeFileSync(config, JSON.stringify({ appResources: '', vendorLibraries: [], searchRoots: [] }))
   local = await startWeb({ assets: DIST, config })
-}, 120_000)
+}, 120_000 * PATIENCE)
 afterAll(async () => {
   server?.stop()
   await local?.close()
@@ -41,81 +41,101 @@ for (const [name, type] of ENGINES) {
     let browser: Browser
     beforeAll(async () => {
       browser = await type.launch()
-    }, 60_000)
+    }, 60_000 * PATIENCE)
     afterAll(() => browser?.close())
 
-    test('loads, and every place is reached from the sidebar', async () => {
-      const { page, problems, outside } = await watch(browser, server.url)
-      await page.goto(server.url)
-      await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
-      for (const place of ['Samples', 'Plug-ins', 'History', 'Settings', 'Overview']) {
-        await page.getByRole('link', { name: place, exact: true }).click()
-        await page.getByRole('heading', { level: 1, name: place, exact: true }).waitFor()
-      }
-      expect(page.url()).toBe(`${server.url}#/`)
-      expect(problems).toEqual([])
-      expect(outside).toEqual([])
-      await page.context().close()
-    }, 60_000)
-
-    test('the keyboard reaches the places, and the palette finds them', async () => {
-      const { page, problems } = await watch(browser, server.url)
-      await page.goto(server.url)
-      await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
-      await page.keyboard.press('g')
-      await page.keyboard.press('s')
-      await page.getByRole('heading', { level: 1, name: 'Samples', exact: true }).waitFor()
-      await page.keyboard.press(`${await commandKey(page)}+k`)
-      await page.getByPlaceholder('Search or jump to…').fill('hist')
-      // The palette filters a moment after typing; Enter takes what is highlighted then.
-      await page.locator('[data-highlighted]', { hasText: 'History' }).waitFor()
-      await page.keyboard.press('Enter')
-      await page.getByRole('heading', { level: 1, name: 'History', exact: true }).waitFor()
-      expect(problems).toEqual([])
-      await page.context().close()
-    }, 60_000)
-
-    test('says where it runs: in the browser on its own, on this computer with livesaver', async () => {
-      const alone = await watch(browser, server.url)
-      await alone.page.goto(server.url)
-      await alone.page.getByTestId('where').getByText('In this browser').waitFor()
-      expect(alone.problems).toEqual([])
-      await alone.page.context().close()
-
-      const served = await watch(browser, local.url)
-      await served.page.goto(local.url)
-      await served.page.getByTestId('where').getByText('On this computer').waitFor()
-      expect(served.problems).toEqual([])
-      expect(served.outside).toEqual([])
-      await served.page.context().close()
-    }, 60_000)
-
-    test('a page comes in with a short motion, and with none for who asked for less', async () => {
-      const duration = async (reducedMotion: 'reduce' | 'no-preference') => {
-        const context = await browser.newContext({ reducedMotion })
-        const page = await context.newPage()
+    test(
+      'loads, and every place is reached from the sidebar',
+      async () => {
+        const { page, problems, outside } = await watch(browser, server.url)
         await page.goto(server.url)
         await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
-        const seconds = await page.evaluate(() => {
-          const content = document.querySelector('.page-in')
-          return content ? Number.parseFloat(getComputedStyle(content).animationDuration) : -1
-        })
-        await context.close()
-        return seconds
-      }
-      expect(await duration('no-preference')).toBeCloseTo(0.18)
-      expect(await duration('reduce')).toBeLessThan(0.001)
-      expect(await duration('reduce')).toBeGreaterThan(0)
-    }, 60_000)
+        for (const place of ['Samples', 'Plug-ins', 'History', 'Settings', 'Overview']) {
+          await page.getByRole('link', { name: place, exact: true }).click()
+          await page.getByRole('heading', { level: 1, name: place, exact: true }).waitFor()
+        }
+        expect(page.url()).toBe(`${server.url}#/`)
+        expect(problems).toEqual([])
+        expect(outside).toEqual([])
+        await page.context().close()
+      },
+      60_000 * PATIENCE,
+    )
+
+    test(
+      'the keyboard reaches the places, and the palette finds them',
+      async () => {
+        const { page, problems } = await watch(browser, server.url)
+        await page.goto(server.url)
+        await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
+        await page.keyboard.press('g')
+        await page.keyboard.press('s')
+        await page.getByRole('heading', { level: 1, name: 'Samples', exact: true }).waitFor()
+        await page.keyboard.press(`${await commandKey(page)}+k`)
+        await page.getByPlaceholder('Search or jump to…').fill('hist')
+        // The palette filters a moment after typing; Enter takes what is highlighted then.
+        await page.locator('[data-highlighted]', { hasText: 'History' }).waitFor()
+        await page.keyboard.press('Enter')
+        await page.getByRole('heading', { level: 1, name: 'History', exact: true }).waitFor()
+        expect(problems).toEqual([])
+        await page.context().close()
+      },
+      60_000 * PATIENCE,
+    )
+
+    test(
+      'says where it runs: in the browser on its own, on this computer with livesaver',
+      async () => {
+        const alone = await watch(browser, server.url)
+        await alone.page.goto(server.url)
+        await alone.page.getByTestId('where').getByText('In this browser').waitFor()
+        expect(alone.problems).toEqual([])
+        await alone.page.context().close()
+
+        const served = await watch(browser, local.url)
+        await served.page.goto(local.url)
+        await served.page.getByTestId('where').getByText('On this computer').waitFor()
+        expect(served.problems).toEqual([])
+        expect(served.outside).toEqual([])
+        await served.page.context().close()
+      },
+      60_000 * PATIENCE,
+    )
+
+    test(
+      'a page comes in with a short motion, and with none for who asked for less',
+      async () => {
+        const duration = async (reducedMotion: 'reduce' | 'no-preference') => {
+          const context = await browser.newContext({ reducedMotion })
+          const page = await context.newPage()
+          await page.goto(server.url)
+          await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
+          const seconds = await page.evaluate(() => {
+            const content = document.querySelector('.page-in')
+            return content ? Number.parseFloat(getComputedStyle(content).animationDuration) : -1
+          })
+          await context.close()
+          return seconds
+        }
+        expect(await duration('no-preference')).toBeCloseTo(0.18)
+        expect(await duration('reduce')).toBeLessThan(0.001)
+        expect(await duration('reduce')).toBeGreaterThan(0)
+      },
+      60_000 * PATIENCE,
+    )
 
     for (const scheme of ['light', 'dark'] as const) {
-      test(`has no barrier in ${scheme}`, async () => {
-        const { page } = await watch(browser, server.url, scheme)
-        await page.goto(server.url)
-        await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
-        expect(await barriers(page)).toEqual([])
-        await page.context().close()
-      }, 60_000)
+      test(
+        `has no barrier in ${scheme}`,
+        async () => {
+          const { page } = await watch(browser, server.url, scheme)
+          await page.goto(server.url)
+          await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
+          expect(await barriers(page)).toEqual([])
+          await page.context().close()
+        },
+        60_000 * PATIENCE,
+      )
     }
   })
 }

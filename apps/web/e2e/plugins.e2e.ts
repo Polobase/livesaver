@@ -22,7 +22,9 @@ import {
   barriers,
   cellsOf,
   ENGINES,
+  giveFolder,
   idle,
+  PATIENCE,
   restoreState,
   stateIn,
   textOf,
@@ -62,7 +64,7 @@ let alone: { url: string; stop: () => void }
 beforeAll(async () => {
   await build()
   alone = serve()
-}, 120_000)
+}, 120_000 * PATIENCE)
 afterAll(() => {
   alone?.stop()
   restoreState()
@@ -103,8 +105,8 @@ for (const [name, type] of ENGINES) {
       ;({ page, problems, outside } = await watch(browser, server.url))
       await page.goto(server.url)
       await page.getByTestId('scan-library').click()
-      await page.getByTestId('plugins-card').waitFor({ timeout: 30_000 })
-    }, 60_000)
+      await page.getByTestId('plugins-card').waitFor({ timeout: 30_000 * PATIENCE })
+    }, 60_000 * PATIENCE)
     afterAll(async () => {
       await browser?.close()
       if (server) await idle(server)
@@ -120,170 +122,207 @@ for (const [name, type] of ENGINES) {
       await page.getByRole('tab', { name: label }).click()
     }
 
-    test('the overview says how the plug-ins stand', async () => {
-      expect(await textOf(page.getByTestId('plugins-card'))).toBe(
-        'Plug-ins Your sets use 6 plug-ins. Not installed 3 Rosetta only 1 Can be upgraded to VST3 2 See the plug-ins',
-      )
-      await page.getByRole('link', { name: 'See the plug-ins' }).click()
-      await page.getByRole('heading', { level: 1, name: 'Plug-ins' }).waitFor()
-    }, 30_000)
+    test(
+      'the overview says how the plug-ins stand',
+      async () => {
+        expect(await textOf(page.getByTestId('plugins-card'))).toBe(
+          'Plug-ins Your sets use 6 plug-ins. Not installed 3 Rosetta only 1 Can be upgraded to VST3 2 See the plug-ins',
+        )
+        await page.getByRole('link', { name: 'See the plug-ins' }).click()
+        await page.getByRole('heading', { level: 1, name: 'Plug-ins' }).waitFor()
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('every plug-in of the sets with its state, what needs attention first', async () => {
-      await rows().first().waitFor()
-      // Plug-in, format, state, what can be done; then instances, sets, projects.
-      expect((await cellsOf(rows())).map((cells) => cells.slice(0, 4))).toEqual([
-        ['MassiveNiMa', 'VST2', 'Not installed', 'Can be upgraded to VST3'],
-        ['OmnisphereAmbr', 'VST2', 'Not installed', ''],
-        ['Omnisphere', 'VST3', 'Not installed', ''],
-        ['SerumXfsX', 'VST2', 'Rosetta only', 'Can be upgraded to VST3'],
-        ['Massive', 'VST3', 'Installed', ''],
-        ['Serum', 'VST3', 'Installed', ''],
-      ])
-      expect((await cellsOf(rows()))[0]?.slice(4)).toEqual(['1', '1', '1'])
-      await page.getByLabel('Filter plug-ins').click()
-      await page.getByRole('option', { name: 'Can be upgraded' }).click()
-      expect(await page.getByTestId('shown').innerText()).toBe('2 of 6')
-      await page.getByLabel('Search plug-ins').fill('serum')
-      expect(await page.getByTestId('shown').innerText()).toBe('1 of 6')
-    }, 30_000)
+    test(
+      'every plug-in of the sets with its state, what needs attention first',
+      async () => {
+        await rows().first().waitFor()
+        // Plug-in, format, state, what can be done; then instances, sets, projects.
+        expect((await cellsOf(rows())).map((cells) => cells.slice(0, 4))).toEqual([
+          ['MassiveNiMa', 'VST2', 'Not installed', 'Can be upgraded to VST3'],
+          ['OmnisphereAmbr', 'VST2', 'Not installed', ''],
+          ['Omnisphere', 'VST3', 'Not installed', ''],
+          ['SerumXfsX', 'VST2', 'Rosetta only', 'Can be upgraded to VST3'],
+          ['Massive', 'VST3', 'Installed', ''],
+          ['Serum', 'VST3', 'Installed', ''],
+        ])
+        expect((await cellsOf(rows()))[0]?.slice(4)).toEqual(['1', '1', '1'])
+        await page.getByLabel('Filter plug-ins').click()
+        await page.getByRole('option', { name: 'Can be upgraded' }).click()
+        expect(await page.getByTestId('shown').innerText()).toBe('2 of 6')
+        await page.getByLabel('Search plug-ins').fill('serum')
+        expect(await page.getByTestId('shown').innerText()).toBe('1 of 6')
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('a plug-in opens from the side with what to do, and leads to the upgrade', async () => {
-      await rows().first().click()
-      const panel = page.getByRole('dialog')
-      expect(await panel.getByRole('heading', { level: 2 }).innerText()).toBe('Serum')
-      expect(await textsOf(panel.getByTestId('plugin-advice').locator('li'))).toEqual([
-        'It contains Intel code only, so Live loads it only when Live itself runs under Rosetta.',
-        'Its VST3 is installed, and livesaver can switch the sets to it, keeping the sound: see Upgrade.',
-      ])
-      expect(await textOf(panel)).toContain('Used 1 time in 1 set')
-      expect(await textOf(panel)).toContain('VST2toVST3 Project/VST2toVST3.als')
-      expect(await textOf(panel)).toContain('VST3 · Serum runs natively')
-      expect(await barriers(page)).toEqual([])
-      await panel.getByRole('button', { name: 'Go to Upgrade' }).click()
-      await page.getByTestId('upgrade-plugins').waitFor({ timeout: 30_000 })
-    }, 60_000)
+    test(
+      'a plug-in opens from the side with what to do, and leads to the upgrade',
+      async () => {
+        await rows().first().click()
+        const panel = page.getByRole('dialog')
+        expect(await panel.getByRole('heading', { level: 2 }).innerText()).toBe('Serum')
+        expect(await textsOf(panel.getByTestId('plugin-advice').locator('li'))).toEqual([
+          'It contains Intel code only, so Live loads it only when Live itself runs under Rosetta.',
+          'Its VST3 is installed, and livesaver can switch the sets to it, keeping the sound: see Upgrade.',
+        ])
+        expect(await textOf(panel)).toContain('Used 1 time in 1 set')
+        expect(await textOf(panel)).toContain('VST2toVST3 Project/VST2toVST3.als')
+        expect(await textOf(panel)).toContain('VST3 · Serum runs natively')
+        expect(await barriers(page)).toEqual([])
+        await panel.getByRole('button', { name: 'Go to Upgrade' }).click()
+        await page.getByTestId('upgrade-plugins').waitFor({ timeout: 30_000 * PATIENCE })
+      },
+      60_000 * PATIENCE,
+    )
 
-    test('what is installed, and what breaks if it is uninstalled', async () => {
-      await tab(/Installed/)
-      await rows().first().waitFor()
-      // Plug-in, format, how it runs, version, known to Live, used by.
-      expect(await cellsOf(rows())).toEqual([
-        ['Massive', 'VST3', 'Natively', '', 'Yes', '1 set'],
-        ['Never Used', 'VST3', 'Natively', '', 'Yes', 'no set'],
-        ['Serum', 'VST2', 'Rosetta only', '', 'Yes', '1 set'],
-        ['Serum', 'VST3', 'Natively', '', 'Yes', '1 set'],
-      ])
-      await page.getByLabel('Filter installed plug-ins').click()
-      await page.getByRole('option', { name: 'Used by no set' }).click()
-      expect((await cellsOf(rows())).map((cells) => cells[0])).toEqual(['Never Used'])
-      await rows().first().click()
-      const panel = page.getByRole('dialog')
-      expect(await textOf(panel.getByTestId('uninstall'))).toContain(
-        'Nothing breaks: no set relies on it.',
-      )
-      await page.keyboard.press('Escape')
-      await page.getByLabel('Filter installed plug-ins').click()
-      await page.getByRole('option', { name: 'Rosetta only' }).click()
-      await rows().first().click()
-      expect(await textOf(panel.getByTestId('uninstall'))).toContain(
-        'in 2 formats (VST2, VST3). 1 set in 1 project would open with a placeholder instead of it.',
-      )
-      await page.keyboard.press('Escape')
-    }, 30_000)
+    test(
+      'what is installed, and what breaks if it is uninstalled',
+      async () => {
+        await tab(/Installed/)
+        await rows().first().waitFor()
+        // Plug-in, format, how it runs, version, known to Live, used by.
+        expect(await cellsOf(rows())).toEqual([
+          ['Massive', 'VST3', 'Natively', '', 'Yes', '1 set'],
+          ['Never Used', 'VST3', 'Natively', '', 'Yes', 'no set'],
+          ['Serum', 'VST2', 'Rosetta only', '', 'Yes', '1 set'],
+          ['Serum', 'VST3', 'Natively', '', 'Yes', '1 set'],
+        ])
+        await page.getByLabel('Filter installed plug-ins').click()
+        await page.getByRole('option', { name: 'Used by no set' }).click()
+        expect((await cellsOf(rows())).map((cells) => cells[0])).toEqual(['Never Used'])
+        await rows().first().click()
+        const panel = page.getByRole('dialog')
+        expect(await textOf(panel.getByTestId('uninstall'))).toContain(
+          'Nothing breaks: no set relies on it.',
+        )
+        await page.keyboard.press('Escape')
+        await page.getByLabel('Filter installed plug-ins').click()
+        await page.getByRole('option', { name: 'Rosetta only' }).click()
+        await rows().first().click()
+        expect(await textOf(panel.getByTestId('uninstall'))).toContain(
+          'in 2 formats (VST2, VST3). 1 set in 1 project would open with a placeholder instead of it.',
+        )
+        await page.keyboard.press('Escape')
+      },
+      30_000 * PATIENCE,
+    )
 
-    test('the upgrade says per plug-in what converts and what stands in the way', async () => {
-      await tab(/Upgrade to VST3/)
-      await page.getByTestId('upgrade-plugins').waitFor({ timeout: 30_000 })
-      expect(await page.getByTestId('upgrade-headline').innerText()).toBe(
-        '1 set can be upgraded: 2 instances of 2 plug-ins',
-      )
-      const cards = page.getByTestId('upgrade-plugins').locator(':scope > li')
-      expect(await Promise.all([0, 1, 2].map((i) => textOf(cards.nth(i))))).toEqual([
-        'Massive 1 of 1 Converts in 1 of 1 set.',
-        'Omnisphere 0 of 1 Converts in none of its 1 set. 1 instance: VST3 not installed',
-        'Serum 1 of 1 Converts in 1 of 1 set.',
-      ])
-      expect(await cellsOf(rows())).toEqual([
-        ['VST2toVST3 Project/VST2toVST3.als', 'Omnisphere', '1', 'VST3 not installed'],
-        ['VST2toVST3 Project/VST2toVST3.als', 'Serum', '1', 'Converts to VST3'],
-        ['VST2toVST3 Project/VST2toVST3.als', 'Massive', '1', 'Converts to VST3'],
-      ])
-      // Unticking a plug-in takes it out of what is upgraded.
-      await page.getByRole('checkbox', { name: 'Massive' }).click()
-      expect(await page.getByTestId('upgrade-headline').innerText()).toBe(
-        '1 set can be upgraded: 1 instance of 1 plug-in',
-      )
-    }, 60_000)
+    test(
+      'the upgrade says per plug-in what converts and what stands in the way',
+      async () => {
+        await tab(/Upgrade to VST3/)
+        await page.getByTestId('upgrade-plugins').waitFor({ timeout: 30_000 * PATIENCE })
+        expect(await page.getByTestId('upgrade-headline').innerText()).toBe(
+          '1 set can be upgraded: 2 instances of 2 plug-ins',
+        )
+        const cards = page.getByTestId('upgrade-plugins').locator(':scope > li')
+        expect(await Promise.all([0, 1, 2].map((i) => textOf(cards.nth(i))))).toEqual([
+          'Massive 1 of 1 Converts in 1 of 1 set.',
+          'Omnisphere 0 of 1 Converts in none of its 1 set. 1 instance: VST3 not installed',
+          'Serum 1 of 1 Converts in 1 of 1 set.',
+        ])
+        expect(await cellsOf(rows())).toEqual([
+          ['VST2toVST3 Project/VST2toVST3.als', 'Omnisphere', '1', 'VST3 not installed'],
+          ['VST2toVST3 Project/VST2toVST3.als', 'Serum', '1', 'Converts to VST3'],
+          ['VST2toVST3 Project/VST2toVST3.als', 'Massive', '1', 'Converts to VST3'],
+        ])
+        // Unticking a plug-in takes it out of what is upgraded.
+        await page.getByRole('checkbox', { name: 'Massive' }).click()
+        expect(await page.getByTestId('upgrade-headline').innerText()).toBe(
+          '1 set can be upgraded: 1 instance of 1 plug-in',
+        )
+      },
+      60_000 * PATIENCE,
+    )
 
-    test('an upgrade is reviewed, rewrites the set, and its undo brings it back exactly', async () => {
-      const before = readFileSync(vstSet())
-      expect(vst3Devices()).toBe(3)
-      await page.getByTestId('review-upgrade').click()
-      const dialog = page.getByRole('dialog')
-      expect(await textsOf(dialog.getByTestId('upgrade-plan').locator('dl > div'))).toEqual([
-        '1set rewritten, in 1 project',
-        '1instance switched to VST3',
-      ])
-      expect(await dialog.getByLabel('Plug-ins that are upgraded').locator('li').count()).toBe(1)
-      expect(await barriers(page)).toEqual([])
-      await dialog.getByTestId('upgrade-continue').click()
-      expect(await textOf(dialog.getByTestId('upgrade-ready'))).toContain('Ableton Live is closed')
-      await dialog.getByRole('button', { name: 'Upgrade 1 set' }).click()
-      await dialog.getByTestId('upgrade-done').waitFor({ timeout: 30_000 })
-      expect(await textOf(dialog.getByTestId('upgrade-result'))).toContain(
-        'Upgraded: 1 set rewritten.',
-      )
-      await dialog.getByTestId('upgrade-done').click()
-      expect(vst3Devices()).toBe(4)
+    test(
+      'an upgrade is reviewed, rewrites the set, and its undo brings it back exactly',
+      async () => {
+        const before = readFileSync(vstSet())
+        expect(vst3Devices()).toBe(3)
+        await page.getByTestId('review-upgrade').click()
+        const dialog = page.getByRole('dialog')
+        expect(await textsOf(dialog.getByTestId('upgrade-plan').locator('dl > div'))).toEqual([
+          '1set rewritten, in 1 project',
+          '1instance switched to VST3',
+        ])
+        expect(await dialog.getByLabel('Plug-ins that are upgraded').locator('li').count()).toBe(1)
+        expect(await barriers(page)).toEqual([])
+        await dialog.getByTestId('upgrade-continue').click()
+        expect(await textOf(dialog.getByTestId('upgrade-ready'))).toContain(
+          'Ableton Live is closed',
+        )
+        await dialog.getByRole('button', { name: 'Upgrade 1 set' }).click()
+        await dialog.getByTestId('upgrade-done').waitFor({ timeout: 30_000 * PATIENCE })
+        expect(await textOf(dialog.getByTestId('upgrade-result'))).toContain(
+          'Upgraded: 1 set rewritten.',
+        )
+        await dialog.getByTestId('upgrade-done').click()
+        expect(vst3Devices()).toBe(4)
 
-      // Scanned and planned again: only Massive is left to upgrade.
-      await page.getByTestId('upgrade-headline').getByText('1 instance of 1 plug-in').waitFor({
-        timeout: 30_000,
-      })
-      await page.getByRole('checkbox', { name: 'Massive' }).waitFor()
-      expect(await page.getByRole('checkbox', { name: 'Serum' }).count()).toBe(0)
+        // Scanned and planned again: only Massive is left to upgrade.
+        await page.getByTestId('upgrade-headline').getByText('1 instance of 1 plug-in').waitFor({
+          timeout: 30_000,
+        })
+        await page.getByRole('checkbox', { name: 'Massive' }).waitFor()
+        expect(await page.getByRole('checkbox', { name: 'Serum' }).count()).toBe(0)
 
-      await page.getByTestId('upgraded').getByRole('button', { name: 'Undo this upgrade' }).click()
-      await page.getByTestId('upgrade-undone').waitFor({ timeout: 30_000 })
-      expect(readFileSync(vstSet()).equals(before)).toBe(true)
-      await page.getByRole('checkbox', { name: 'Serum' }).waitFor({ timeout: 30_000 })
-    }, 90_000)
+        await page
+          .getByTestId('upgraded')
+          .getByRole('button', { name: 'Undo this upgrade' })
+          .click()
+        await page.getByTestId('upgrade-undone').waitFor({ timeout: 30_000 * PATIENCE })
+        expect(readFileSync(vstSet()).equals(before)).toBe(true)
+        await page.getByRole('checkbox', { name: 'Serum' }).waitFor({ timeout: 30_000 * PATIENCE })
+      },
+      90_000 * PATIENCE,
+    )
 
-    test('after a reload the plan is there, and the last upgrade can still be undone', async () => {
-      await page.getByTestId('review-upgrade').click()
-      const dialog = page.getByRole('dialog')
-      await dialog.getByTestId('upgrade-continue').click()
-      await dialog.getByRole('button', { name: 'Upgrade 1 set' }).click()
-      await dialog.getByTestId('upgrade-done').waitFor({ timeout: 30_000 })
-      await dialog.getByTestId('upgrade-done').click()
-      expect(vst3Devices()).toBe(5)
-      await page.getByTestId('upgrade-headline').getByText('Nothing to upgrade').waitFor({
-        timeout: 30_000,
-      })
+    test(
+      'after a reload the plan is there, and the last upgrade can still be undone',
+      async () => {
+        await page.getByTestId('review-upgrade').click()
+        const dialog = page.getByRole('dialog')
+        await dialog.getByTestId('upgrade-continue').click()
+        await dialog.getByRole('button', { name: 'Upgrade 1 set' }).click()
+        await dialog.getByTestId('upgrade-done').waitFor({ timeout: 30_000 * PATIENCE })
+        await dialog.getByTestId('upgrade-done').click()
+        expect(vst3Devices()).toBe(5)
+        await page.getByTestId('upgrade-headline').getByText('Nothing to upgrade').waitFor({
+          timeout: 30_000,
+        })
 
-      await page.reload()
-      await page.getByTestId('last-upgrade').waitFor({ timeout: 30_000 })
-      expect(await page.getByTestId('upgrade-headline').innerText()).toBe('Nothing to upgrade')
-      expect(await textOf(page.getByTestId('last-upgrade'))).toMatch(
-        /^The last upgrade, \d\d:\d\d, rewrote 1 set\./,
-      )
-      await page.getByTestId('last-upgrade').getByRole('button', { name: /Undo/ }).click()
-      await page.getByTestId('upgrade-undone').waitFor({ timeout: 30_000 })
-      expect(vst3Devices()).toBe(3)
-      await page.getByTestId('upgrade-headline').getByText('2 instances of 2 plug-ins').waitFor({
-        timeout: 30_000,
-      })
-    }, 90_000)
+        await page.reload()
+        await page.getByTestId('last-upgrade').waitFor({ timeout: 30_000 * PATIENCE })
+        expect(await page.getByTestId('upgrade-headline').innerText()).toBe('Nothing to upgrade')
+        expect(await textOf(page.getByTestId('last-upgrade'))).toMatch(
+          /^The last upgrade, \d\d:\d\d, rewrote 1 set\./,
+        )
+        await page.getByTestId('last-upgrade').getByRole('button', { name: /Undo/ }).click()
+        await page.getByTestId('upgrade-undone').waitFor({ timeout: 30_000 * PATIENCE })
+        expect(vst3Devices()).toBe(3)
+        await page.getByTestId('upgrade-headline').getByText('2 instances of 2 plug-ins').waitFor({
+          timeout: 30_000,
+        })
+      },
+      90_000 * PATIENCE,
+    )
 
     for (const scheme of ['light', 'dark'] as const) {
-      test(`the plug-in screens have no barrier in ${scheme}`, async () => {
-        await page.emulateMedia({ colorScheme: scheme })
-        for (const label of [/In your sets/, /Installed/, /Upgrade to VST3/]) {
-          await tab(label)
-          await page.waitForTimeout(200)
-          expect([String(label), await barriers(page)]).toEqual([String(label), []])
-        }
-      }, 60_000)
+      test(
+        `the plug-in screens have no barrier in ${scheme}`,
+        async () => {
+          await page.emulateMedia({ colorScheme: scheme })
+          for (const label of [/In your sets/, /Installed/, /Upgrade to VST3/]) {
+            await tab(label)
+            await page.waitForTimeout(200)
+            expect([String(label), await barriers(page)]).toEqual([String(label), []])
+          }
+        },
+        60_000 * PATIENCE,
+      )
     }
 
     test('the page reported no errors, and asked nothing outside its own address', () => {
@@ -304,35 +343,39 @@ for (const [name, type] of ENGINES) {
       browser = await type.launch()
       ;({ page, problems } = await watch(browser, alone.url))
       await page.goto(alone.url)
-      await page.getByTestId('projects-input').setInputFiles(projects)
+      await giveFolder(page, 'projects-input', projects)
       await page.getByTestId('scan-library').click()
-      await page.getByTestId('plugins-card').waitFor({ timeout: 30_000 })
-    }, 60_000)
+      await page.getByTestId('plugins-card').waitFor({ timeout: 30_000 * PATIENCE })
+    }, 60_000 * PATIENCE)
     afterAll(async () => {
       await browser?.close()
       tmp?.cleanup()
     })
 
-    test('says which plug-ins the sets use, and why it cannot say more', async () => {
-      expect(await textOf(page.getByTestId('plugins-used'))).toBe(
-        'Your sets use 6 plug-ins; whether they are installed is not known here.',
-      )
-      await page.getByRole('link', { name: 'See the plug-ins' }).click()
-      await page.locator('table tbody tr[data-slot=tr]').first().waitFor()
-      expect(await page.getByTestId('no-inventory').innerText()).toContain(
-        'Whether they are installed, a page in a browser cannot see',
-      )
-      expect(await page.getByText('Not known').count()).toBe(6)
-      await page.getByRole('tab', { name: /Installed/ }).click()
-      expect(await page.getByTestId('no-installed').innerText()).toContain(
-        'What is installed is not known here',
-      )
-      await page.getByRole('tab', { name: /Upgrade to VST3/ }).click()
-      expect(await page.getByTestId('no-upgrade').innerText()).toContain(
-        'Upgrading needs livesaver on your computer',
-      )
-      expect(await barriers(page)).toEqual([])
-      expect(problems).toEqual([])
-    }, 60_000)
+    test(
+      'says which plug-ins the sets use, and why it cannot say more',
+      async () => {
+        expect(await textOf(page.getByTestId('plugins-used'))).toBe(
+          'Your sets use 6 plug-ins; whether they are installed is not known here.',
+        )
+        await page.getByRole('link', { name: 'See the plug-ins' }).click()
+        await page.locator('table tbody tr[data-slot=tr]').first().waitFor()
+        expect(await page.getByTestId('no-inventory').innerText()).toContain(
+          'Whether they are installed, a page in a browser cannot see',
+        )
+        expect(await page.getByText('Not known').count()).toBe(6)
+        await page.getByRole('tab', { name: /Installed/ }).click()
+        expect(await page.getByTestId('no-installed').innerText()).toContain(
+          'What is installed is not known here',
+        )
+        await page.getByRole('tab', { name: /Upgrade to VST3/ }).click()
+        expect(await page.getByTestId('no-upgrade').innerText()).toContain(
+          'Upgrading needs livesaver on your computer',
+        )
+        expect(await barriers(page)).toEqual([])
+        expect(problems).toEqual([])
+      },
+      60_000 * PATIENCE,
+    )
   })
 }

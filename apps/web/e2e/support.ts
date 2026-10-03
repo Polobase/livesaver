@@ -19,6 +19,12 @@ export const ENGINES: readonly (readonly [name: string, type: BrowserType])[] = 
   ['Firefox', firefox],
 ]
 
+/**
+ * A machine of a CI is shared, and slower in spurts: what is waited for there gets more time.
+ * (Nothing is waited for longer when it is there in time.)
+ */
+export const PATIENCE = process.env.CI ? 3 : 1
+
 export interface Watched {
   readonly page: Page
   /** Errors of the page and its console. */
@@ -43,7 +49,7 @@ export async function watch(
   })
   const page = await context.newPage()
   // Something that never appears fails with what was waited for, not with a test's time limit.
-  page.setDefaultTimeout(15_000)
+  page.setDefaultTimeout(15_000 * PATIENCE)
   const problems: string[] = []
   const outside: string[] = []
   page.on('pageerror', (error) => problems.push(error.message))
@@ -65,6 +71,25 @@ export async function watch(
  */
 export async function commandKey(page: Page): Promise<'Meta' | 'Control'> {
   return (await page.evaluate(() => navigator.userAgent.includes('Macintosh'))) ? 'Meta' : 'Control'
+}
+
+/**
+ * Hands a folder to the page through one of its folder inputs, as choosing it in the dialog
+ * does. A browser on a busy machine does not always take the folder at once: it is handed
+ * again, unless a row for it has appeared in the meantime.
+ */
+export async function giveFolder(page: Page, input: string, folder: string): Promise<void> {
+  const rows = page.getByTestId('folder-row')
+  const before = await rows.count()
+  for (let tries = 1; ; tries++) {
+    try {
+      await page.getByTestId(input).setInputFiles(folder, { timeout: 10_000 })
+      return
+    } catch (error) {
+      if ((await rows.count()) > before) return
+      if (tries === 3) throw error
+    }
+  }
 }
 
 /** Findings of axe that keep someone from using the page (serious and critical). */

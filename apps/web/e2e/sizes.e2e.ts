@@ -17,6 +17,7 @@ import {
   eventually,
   idle,
   noPlugins,
+  PATIENCE,
   restoreState,
   stateIn,
   textOf,
@@ -30,8 +31,8 @@ const ROWS_IN_PAGE = 80
  * Generous: a browser on a busy machine takes its time. Building every row of the longest
  * table, which is what these limits guard against, takes many times as long.
  */
-const AT_ONCE = 3000
-const SMOOTH = 500
+const AT_ONCE = 3000 * PATIENCE
+const SMOOTH = 500 * PATIENCE
 
 const pad = (n: number) => String(n).padStart(4, '0')
 const times = <T>(n: number, make: (i: number) => T): T[] =>
@@ -96,7 +97,7 @@ function inflate(kept: WebLastScan): WebLastScan {
 
 beforeAll(async () => {
   await build()
-}, 120_000)
+}, 120_000 * PATIENCE)
 afterAll(restoreState)
 
 for (const [name, type] of ENGINES) {
@@ -144,7 +145,7 @@ for (const [name, type] of ENGINES) {
         route.request().method() === 'GET' ? route.fulfill({ json: big }) : route.continue(),
       )
       await page.goto(`${server.url}#/samples?tab=changes`)
-    }, 120_000)
+    }, 120_000 * PATIENCE)
     afterAll(async () => {
       await browser?.close()
       if (server) await idle(server)
@@ -179,80 +180,92 @@ for (const [name, type] of ENGINES) {
         return worst
       })
 
-    test('thousands of planned changes: only the rows in view are built', async () => {
-      await rows().first().waitFor()
-      expect(await shown()).toBe('9,305 of 9,305')
-      expect(await rows().count()).toBeLessThan(ROWS_IN_PAGE)
-      expect(await firstRow()).toContain('Sample 0000.wav')
-      // To the end of the list and back, without a frame that makes one wait.
-      expect(await worstFrame()).toBeLessThan(SMOOTH)
-      await rows().filter({ hasText: 'Sample 9304.wav' }).waitFor()
-      expect(await rows().count()).toBeLessThan(ROWS_IN_PAGE)
-    }, 60_000)
-
-    test('they are sorted and searched at once', async () => {
-      const sample = page.getByRole('button', { name: 'Sample', exact: true })
-      // Ascending is the order they are in; descending turns nine thousand rows around.
-      await sample.click()
-      const sorted = await timed(async () => {
-        await sample.click()
-        await rows().first().getByText('Sample 9304.wav').waitFor()
-      })
-      expect(sorted).toBeLessThan(AT_ONCE)
-
-      // Every word of the search has to occur in a row, as in the app.
-      const words = ['sample', '930']
-      const expected = big.scan.samples.changes.filter((row) => {
-        const text =
-          `${row.project} ${row.set} ${row.name} ${row.oldPath} ${row.newPath} ${row.source}`.toLowerCase()
-        return words.every((word) => text.includes(word))
-      }).length
-      expect(expected).toBeGreaterThan(5)
-      const wanted = `${expected} of 9,305`
-      const searched = await timed(async () => {
-        await page.getByLabel('Search planned changes').fill(words.join(' '))
-        expect(await eventually(shown, wanted)).toBe(wanted)
-      })
-      expect(searched).toBeLessThan(AT_ONCE)
-      expect(await rows().count()).toBe(expected)
-      await page.getByLabel('Search planned changes').fill('')
-      expect(await eventually(shown, '9,305 of 9,305')).toBe('9,305 of 9,305')
-    }, 60_000)
-
-    test('the projects, the sets, the missing samples and the plug-ins come as fast', async () => {
-      for (const [tab, all] of [
-        ['Projects', '299 of 299'],
-        ['Sets', '876 of 876'],
-      ] as const) {
-        const opened = await timed(async () => {
-          await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).click()
-          expect(await eventually(shown, all)).toBe(all)
-          await rows().first().waitFor()
-        })
-        expect([tab, opened < AT_ONCE]).toEqual([tab, true])
+    test(
+      'thousands of planned changes: only the rows in view are built',
+      async () => {
+        await rows().first().waitFor()
+        expect(await shown()).toBe('9,305 of 9,305')
         expect(await rows().count()).toBeLessThan(ROWS_IN_PAGE)
-        expect([tab, (await worstFrame()) < SMOOTH]).toEqual([tab, true])
-      }
+        expect(await firstRow()).toContain('Sample 0000.wav')
+        // To the end of the list and back, without a frame that makes one wait.
+        expect(await worstFrame()).toBeLessThan(SMOOTH)
+        await rows().filter({ hasText: 'Sample 9304.wav' }).waitFor()
+        expect(await rows().count()).toBeLessThan(ROWS_IN_PAGE)
+      },
+      60_000 * PATIENCE,
+    )
 
-      // The missing samples are listed by where they came from, a page of each source at a time.
-      await page.getByRole('tab', { name: /^Missing/ }).click()
-      expect(await eventually(shown, '2,243 of 2,243')).toBe('2,243 of 2,243')
-      const group = page.getByTestId('missing-groups').locator('> li').first()
-      const openedGroup = await timed(async () => {
-        await group.getByRole('button', { expanded: false }).click()
-        await group.locator('tbody tr').first().waitFor()
-      })
-      expect(openedGroup).toBeLessThan(AT_ONCE)
-      expect(await group.locator('tbody tr').count()).toBe(50)
-      expect(await textOf(group.getByRole('button', { name: /^Show more/ }))).toMatch(
-        /^Show more \([\d,]+ left\)$/,
-      )
+    test(
+      'they are sorted and searched at once',
+      async () => {
+        const sample = page.getByRole('button', { name: 'Sample', exact: true })
+        // Ascending is the order they are in; descending turns nine thousand rows around.
+        await sample.click()
+        const sorted = await timed(async () => {
+          await sample.click()
+          await rows().first().getByText('Sample 9304.wav').waitFor()
+        })
+        expect(sorted).toBeLessThan(AT_ONCE)
 
-      await page.getByRole('link', { name: 'Plug-ins', exact: true }).click()
-      expect(await eventually(shown, '199 of 199')).toBe('199 of 199')
-      await rows().first().waitFor()
-      expect(await rows().count()).toBeLessThan(ROWS_IN_PAGE)
-      expect(problems).toEqual([])
-    }, 90_000)
+        // Every word of the search has to occur in a row, as in the app.
+        const words = ['sample', '930']
+        const expected = big.scan.samples.changes.filter((row) => {
+          const text =
+            `${row.project} ${row.set} ${row.name} ${row.oldPath} ${row.newPath} ${row.source}`.toLowerCase()
+          return words.every((word) => text.includes(word))
+        }).length
+        expect(expected).toBeGreaterThan(5)
+        const wanted = `${expected} of 9,305`
+        const searched = await timed(async () => {
+          await page.getByLabel('Search planned changes').fill(words.join(' '))
+          expect(await eventually(shown, wanted)).toBe(wanted)
+        })
+        expect(searched).toBeLessThan(AT_ONCE)
+        expect(await rows().count()).toBe(expected)
+        await page.getByLabel('Search planned changes').fill('')
+        expect(await eventually(shown, '9,305 of 9,305')).toBe('9,305 of 9,305')
+      },
+      60_000 * PATIENCE,
+    )
+
+    test(
+      'the projects, the sets, the missing samples and the plug-ins come as fast',
+      async () => {
+        for (const [tab, all] of [
+          ['Projects', '299 of 299'],
+          ['Sets', '876 of 876'],
+        ] as const) {
+          const opened = await timed(async () => {
+            await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).click()
+            expect(await eventually(shown, all)).toBe(all)
+            await rows().first().waitFor()
+          })
+          expect([tab, opened < AT_ONCE]).toEqual([tab, true])
+          expect(await rows().count()).toBeLessThan(ROWS_IN_PAGE)
+          expect([tab, (await worstFrame()) < SMOOTH]).toEqual([tab, true])
+        }
+
+        // The missing samples are listed by where they came from, a page of each source at a time.
+        await page.getByRole('tab', { name: /^Missing/ }).click()
+        expect(await eventually(shown, '2,243 of 2,243')).toBe('2,243 of 2,243')
+        const group = page.getByTestId('missing-groups').locator('> li').first()
+        const openedGroup = await timed(async () => {
+          await group.getByRole('button', { expanded: false }).click()
+          await group.locator('tbody tr').first().waitFor()
+        })
+        expect(openedGroup).toBeLessThan(AT_ONCE)
+        expect(await group.locator('tbody tr').count()).toBe(50)
+        expect(await textOf(group.getByRole('button', { name: /^Show more/ }))).toMatch(
+          /^Show more \([\d,]+ left\)$/,
+        )
+
+        await page.getByRole('link', { name: 'Plug-ins', exact: true }).click()
+        expect(await eventually(shown, '199 of 199')).toBe('199 of 199')
+        await rows().first().waitFor()
+        expect(await rows().count()).toBeLessThan(ROWS_IN_PAGE)
+        expect(problems).toEqual([])
+      },
+      90_000 * PATIENCE,
+    )
   })
 }

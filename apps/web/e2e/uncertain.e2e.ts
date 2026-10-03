@@ -13,6 +13,7 @@ import {
   barriers,
   idle,
   noPlugins,
+  PATIENCE,
   restoreState,
   stateIn,
   textOf,
@@ -22,7 +23,7 @@ import {
 
 beforeAll(async () => {
   await build()
-}, 120_000)
+}, 120_000 * PATIENCE)
 afterAll(restoreState)
 
 describe('a library with uncertain matches (Chromium)', () => {
@@ -50,7 +51,7 @@ describe('a library with uncertain matches (Chromium)', () => {
     ;({ page } = await watch(browser, server.url))
     await page.goto(server.url)
     await page.getByTestId('search-folders').waitFor()
-  }, 60_000)
+  }, 60_000 * PATIENCE)
   afterAll(async () => {
     await browser?.close()
     if (server) await idle(server)
@@ -58,62 +59,77 @@ describe('a library with uncertain matches (Chromium)', () => {
     tmp?.cleanup()
   })
 
-  test('the settings of the command line fill in the folders, and the vendor folder is marked', async () => {
-    expect(await page.getByTestId('folder-name').allInnerTexts()).toEqual([
-      'Projects',
-      'Samples',
-      'Native Instruments',
-    ])
-    const library = page.getByTestId('folder-row').filter({ hasText: 'Native Instruments' })
-    expect(await library.getByRole('checkbox').isChecked()).toBe(true)
-  }, 30_000)
+  test(
+    'the settings of the command line fill in the folders, and the vendor folder is marked',
+    async () => {
+      expect(await page.getByTestId('folder-name').allInnerTexts()).toEqual([
+        'Projects',
+        'Samples',
+        'Native Instruments',
+      ])
+      const library = page.getByTestId('folder-row').filter({ hasText: 'Native Instruments' })
+      expect(await library.getByRole('checkbox').isChecked()).toBe(true)
+    },
+    30_000 * PATIENCE,
+  )
 
-  test('the review says what a fix does with the uncertain matches and without', async () => {
-    await page.getByRole('switch', { name: /Also accept a library file/ }).click()
-    await page.getByTestId('scan-library').click()
-    await page.getByTestId('fix-card').waitFor({ timeout: 30_000 })
-    expect(await textOf(page.getByTestId('fix-card'))).toContain('Uncertain matches 1')
-    await page.getByTestId('review').click()
-    const dialog = page.getByRole('dialog')
-    const numbers = () => textsOf(dialog.getByTestId('review-plan').locator('dl dd'))
-    const withThem = await numbers()
-    await dialog.getByRole('switch', { name: 'Leave out the 1 uncertain match' }).click()
-    const without = await numbers()
-    // One reference and one copy fewer; the set of the uncertain match still changes for its
-    // other sample.
-    expect([
-      Number(withThem[1]) - Number(without[1]),
-      Number(withThem[2]) - Number(without[2]),
-    ]).toEqual([1, 1])
-    expect(withThem[0]).toBe(without[0] as string)
-    expect(await textOf(dialog)).toContain('stay missing')
-    await dialog.getByTestId('review-continue').click()
-    await dialog.getByTestId('review-apply').click()
-    await dialog.getByTestId('review-done').waitFor({ timeout: 30_000 })
-    await dialog.getByTestId('review-done').click()
-    // The uncertain match was left alone: it is still there to fix.
-    await page.getByTestId('fixable').getByText('1 set in 1 project').waitFor({ timeout: 30_000 })
-    expect(await textOf(page.getByTestId('fix-card'))).toContain('Uncertain matches 1')
-  }, 60_000)
+  test(
+    'the review says what a fix does with the uncertain matches and without',
+    async () => {
+      await page.getByRole('switch', { name: /Also accept a library file/ }).click()
+      await page.getByTestId('scan-library').click()
+      await page.getByTestId('fix-card').waitFor({ timeout: 30_000 * PATIENCE })
+      expect(await textOf(page.getByTestId('fix-card'))).toContain('Uncertain matches 1')
+      await page.getByTestId('review').click()
+      const dialog = page.getByRole('dialog')
+      const numbers = () => textsOf(dialog.getByTestId('review-plan').locator('dl dd'))
+      const withThem = await numbers()
+      await dialog.getByRole('switch', { name: 'Leave out the 1 uncertain match' }).click()
+      const without = await numbers()
+      // One reference and one copy fewer; the set of the uncertain match still changes for its
+      // other sample.
+      expect([
+        Number(withThem[1]) - Number(without[1]),
+        Number(withThem[2]) - Number(without[2]),
+      ]).toEqual([1, 1])
+      expect(withThem[0]).toBe(without[0] as string)
+      expect(await textOf(dialog)).toContain('stay missing')
+      await dialog.getByTestId('review-continue').click()
+      await dialog.getByTestId('review-apply').click()
+      await dialog.getByTestId('review-done').waitFor({ timeout: 30_000 * PATIENCE })
+      await dialog.getByTestId('review-done').click()
+      // The uncertain match was left alone: it is still there to fix.
+      await page
+        .getByTestId('fixable')
+        .getByText('1 set in 1 project')
+        .waitFor({ timeout: 30_000 * PATIENCE })
+      expect(await textOf(page.getByTestId('fix-card'))).toContain('Uncertain matches 1')
+    },
+    60_000 * PATIENCE,
+  )
 
-  test('missing samples are grouped by where they came from, each with what to do', async () => {
-    await page.getByRole('link', { name: 'See all missing samples' }).click()
-    const groups = page.getByTestId('missing-groups').locator(':scope > li')
-    await groups.first().waitFor()
-    const starts = [
-      'Vintage Heat LibraryNI expansionInstall it in Native Access',
-      '/Volumes/Old Drive/Sample Packs/Vintage BreaksFolderFind this folder or drive',
-      'Drum EssentialsAbleton packInstall the pack in Live',
-      'Samples/OldUser Library (old)They were in an older User Library',
-    ]
-    expect(
-      (await textsOf(groups)).map((group, i) => group.startsWith(starts[i] as string)),
-    ).toEqual([true, true, true, true])
-    // Where a folder is what helps, it can be added right there.
-    expect(await groups.nth(1).getByRole('button', { name: 'Add its folder' }).count()).toBe(1)
-    expect(await groups.nth(0).getByRole('button', { name: 'Add its folder' }).count()).toBe(0)
-    await page.getByLabel('Search missing samples').fill('break')
-    expect(await page.getByTestId('shown').innerText()).toBe('2 of 7')
-    expect(await barriers(page)).toEqual([])
-  }, 30_000)
+  test(
+    'missing samples are grouped by where they came from, each with what to do',
+    async () => {
+      await page.getByRole('link', { name: 'See all missing samples' }).click()
+      const groups = page.getByTestId('missing-groups').locator(':scope > li')
+      await groups.first().waitFor()
+      const starts = [
+        'Vintage Heat LibraryNI expansionInstall it in Native Access',
+        '/Volumes/Old Drive/Sample Packs/Vintage BreaksFolderFind this folder or drive',
+        'Drum EssentialsAbleton packInstall the pack in Live',
+        'Samples/OldUser Library (old)They were in an older User Library',
+      ]
+      expect(
+        (await textsOf(groups)).map((group, i) => group.startsWith(starts[i] as string)),
+      ).toEqual([true, true, true, true])
+      // Where a folder is what helps, it can be added right there.
+      expect(await groups.nth(1).getByRole('button', { name: 'Add its folder' }).count()).toBe(1)
+      expect(await groups.nth(0).getByRole('button', { name: 'Add its folder' }).count()).toBe(0)
+      await page.getByLabel('Search missing samples').fill('break')
+      expect(await page.getByTestId('shown').innerText()).toBe('2 of 7')
+      expect(await barriers(page)).toEqual([])
+    },
+    30_000 * PATIENCE,
+  )
 })
