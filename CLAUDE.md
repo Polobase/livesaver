@@ -8,9 +8,8 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 - `bun test`: all tests. `LIVESAVER_CORPUS=<folder> bun test corpus` runs the read-only corpus round trip.
 - `bun run check`: Biome plus a typecheck of every package (run `build` first)
 - `bun run test:node`: the built CLI under Node.js (after `build`)
-- `bun run web`: the web app on `http://127.0.0.1:5173/` as `livesaver web` serves it, so it can also fix (rebuilt when the page is reloaded after a change)
-- `bun run web:next`: the rewrite of the web app (`apps/web-next`: Vite, Vue, Nuxt UI) on `http://localhost:5174/`, with the same API behind it
-- `bun run test:web`: both web apps in real, headless browsers: the current one in an installed Chromium-based browser (`LIVESAVER_BROWSER` = its executable if none is found), the new one in Playwright's Chromium, WebKit and Firefox (`bunx playwright install chromium webkit firefox` in `apps/web-next`)
+- `bun run web`: the web app while working on it (Vite's development server on `http://localhost:5173/`, with livesaver's API behind it: Fix and Undo there write for real)
+- `bun run test:web`: the built web app in Playwright's Chromium, WebKit and Firefox (`bunx playwright install chromium webkit firefox` in `apps/web`, once)
 - `bench/`: performance measurements only (see `bench/README.md`)
 - CLI tests outside the real library: set `LIVESAVER_HOME` (run folders) and `LIVESAVER_TRASH_DIR` (undo's Trash).
 
@@ -25,8 +24,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 | `@livesaver/node` | Node/Bun host: fs, gzip, workers, xattr, Finder comments, SQLite, Live setup and plug-in database | Node/Bun |
 | `@livesaver/web` | browser host: uploaded/dropped/picked folders as a read-only file system, gzip, hash, worker-based parsing, and the scan (samples and plug-ins) that runs in a page | browser |
 | `livesaver` (packages/cli) | the CLI; `livesaver web` serves the web app and checks, fixes and undoes for it (`src/web/`) | Node/Bun |
-| `livesaver-web` (apps/web) | the web app: Preact page; with livesaver behind it it can fix, on its own it checks in workers, read-only (private) | browser |
-| `livesaver-web-next` (apps/web-next) | the rewrite of the web app, which replaces `apps/web` when it can do the same: Vite, Vue, Nuxt UI (private). `.vue` files are type-checked by `vue-tsc` under Node.js (TypeScript 6 in this workspace) | browser |
+| `livesaver-web` (apps/web) | the web app: Vite, Vue, Nuxt UI; with livesaver behind it it scans and fixes, on its own it scans in workers, read-only (private). `.vue` files are type-checked by `vue-tsc` under Node.js (TypeScript 6 in this workspace) | browser |
 | `@livesaver/test-kit` | fixture builders (private) | tests |
 
 ## Hard rules
@@ -34,7 +32,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 2. **Never write to the real library from tests.** Tests work in temp dirs only. Corpus tests are read-only.
 3. **Never run `--apply` against a real library** (the user's projects, see `CLAUDE.local.md`, or `~/Music/Ableton`) **without the user's explicit OK** in the current conversation. This includes `status --apply` (Finder tags, comments, the rating sheet), `reorg run --apply`, `move run/sets --apply`, `run <codemod> --apply`, and Fix, Upgrade or Undo in the web app (its `/api/fix`, `/api/upgrade` and `/api/undo`): try those on temporary copies only.
 4. **The repo is self-contained and public.** No references to private tools, scripts or folders outside the repo, and no personal data: no user names, home folders, or project and song names from a real library in code, tests, docs or fixtures. Tests use `fixtures/` (sets saved by Live, anonymized with `scripts/anonymize-fixture.ts`) and the builders in `@livesaver/test-kit`. When a case needs a set only Live can produce, ask the user to save one and add it to `fixtures/` (see the wanted list in `fixtures/README.md`).
-5. **Runtime-agnostic packages** (xml, core, plugins, ops, catalog; also `@livesaver/web` and the web apps' `src`, which may use browser APIs):
+5. **Runtime-agnostic packages** (xml, core, plugins, ops, catalog; also `@livesaver/web` and the web app's `src`, which may use browser APIs):
    - no `node:*`/`bun` imports and no `Buffer`/`process`/`Bun` (Biome enforces this)
    - `Uint8Array` in public APIs
    - I/O only through the Host ports in `@livesaver/core`

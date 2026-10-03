@@ -7,14 +7,24 @@
     <!-- Filled in when livesaver serves the page from this computer: then it can also fix. -->
     <meta name="livesaver-local" content="">
     <title>livesaver</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3.5' fill='%230b0b0b'/%3E%3Cpath d='M4.2 8.4l2.6 2.6 5-5.6' fill='none' stroke='%23fcfcfb' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    <meta
+      name="description"
+      content="Find and fix missing samples and plug-in problems in your Ableton Live projects."
     >
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <script>
+    // Before the first paint, so the page does not flash in the other colour scheme.
+    ;(() => {
+      const mode = localStorage.getItem('vueuse-color-scheme') || 'auto'
+      const dark =
+        mode === 'dark' ||
+        (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      if (dark) document.documentElement.classList.add('dark')
+    })()
+    </script>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="./main.js"></script>
+    <div id="app" class="isolate"></div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

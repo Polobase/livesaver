@@ -77,8 +77,8 @@ export interface WebRequest {
 }
 
 export interface WebFixRequest extends WebRequest {
-  /** The one project folder to fix; without it, every project is fixed. */
-  readonly only?: string
+  /** The project folder, or folders, to fix; without it, every project is fixed. */
+  readonly only?: string | readonly string[]
   /** Leave uncertain matches out: their samples stay missing. */
   readonly certainOnly?: boolean
 }
@@ -106,8 +106,8 @@ export interface WebUpgradeRequest {
   readonly projects: readonly string[]
   /** Only these plug-ins, by name; without it, every plug-in that can be converted. */
   readonly plugins?: readonly string[]
-  /** The one project folder to upgrade; without it, every project. */
-  readonly only?: string
+  /** The project folder, or folders, to upgrade; without it, every project. */
+  readonly only?: string | readonly string[]
 }
 
 export interface WebUpgraded {

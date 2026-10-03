@@ -9,9 +9,12 @@ export interface WebFlags {
   readonly config?: string
 }
 
+/** L-I-V-E on a phone's keys: a port that other tools on a developer's computer leave alone. */
+export const DEFAULT_PORT = 5483
+
 /** `livesaver web`: the web app on this computer, until it is stopped. */
 export async function runWeb(flags: WebFlags, version: string): Promise<number> {
-  const port = Number(flags.port ?? 5173)
+  const port = Number(flags.port ?? DEFAULT_PORT)
   let server: Awaited<ReturnType<typeof startWeb>>
   try {
     server = await startWeb({

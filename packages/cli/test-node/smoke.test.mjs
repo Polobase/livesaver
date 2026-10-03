@@ -1,7 +1,7 @@
 // Node.js smoke test of the built packages (run after `bun run build`): `bun run test:node`.
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
@@ -165,9 +165,26 @@ test('web under Node serves the page it ships with, and answers only that page',
     const page = await (await fetch(url)).text()
     const token = /name="livesaver-local" content="([0-9a-f]+)"/.exec(page)?.[1]
     assert.ok(token, 'the served page carries the token')
-    assert.match(page, /<script type="module" src="\.\/main\.js">/)
-    assert.equal((await fetch(`${url}main.js`)).status, 200)
-    assert.equal((await fetch(`${url}engine.worker.js`)).status, 200)
+    // The page's script, its styles and the workers of a scan in the browser are shipped along.
+    const script = /<script type="module"[^>]* src="\.\/(assets\/[^"]+\.js)"/.exec(page)?.[1]
+    assert.ok(script, 'the page names its script')
+    const shipped = readdirSync(join(dirname(bin), 'web-app', 'assets'))
+    const worker = shipped.find((name) => /^engine\.worker-.*\.js$/.test(name))
+    assert.ok(worker, 'the engine worker is shipped')
+    for (const [file, type] of [
+      [script, 'text/javascript; charset=utf-8'],
+      [`assets/${worker}`, 'text/javascript; charset=utf-8'],
+      [`assets/${shipped.find((name) => name.endsWith('.css'))}`, 'text/css; charset=utf-8'],
+      [`assets/${shipped.find((name) => name.endsWith('.woff2'))}`, 'font/woff2'],
+    ]) {
+      const answer = await fetch(`${url}${file}`)
+      assert.deepEqual([file, answer.status, answer.headers.get('content-type')], [file, 200, type])
+    }
+    assert.equal(
+      shipped.some((name) => name.endsWith('.map')),
+      false,
+      'no source maps',
+    )
     assert.equal((await fetch(`${url}api/info`)).status, 403)
     const info = await (
       await fetch(`${url}api/info`, { headers: { 'x-livesaver-token': token } })

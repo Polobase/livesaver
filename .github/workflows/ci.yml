@@ -43,12 +43,11 @@ jobs:
         run: bun run check
       - name: Test
         run: bun test
-      # The current web app in the runner's own Chrome; the new one in Playwright's Chromium,
-      # WebKit and Firefox.
+      # The web app in Playwright's Chromium, WebKit and Firefox.
       - name: Install the test browsers
         run: bunx playwright install --with-deps chromium webkit firefox
-        working-directory: apps/web-next
-      - name: Test the web apps in browsers
+        working-directory: apps/web
+      - name: Test the web app in browsers
         run: bun run test:web
 
   node:

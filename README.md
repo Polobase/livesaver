@@ -6,7 +6,7 @@ library, all without Live running. Fast, byte-exact, and safe by default.
 
 > Status: **0.1.0 in preparation** (milestones M0–M7 done, M8 begun): `doctor`, `collect [--apply]`,
 > `undo`, `plugins upgrade|list|audit`, `status`, `reorg`, `move`, `index`, `find`, `sql`, `run`,
-> and a web app that checks your projects in the browser.
+> and a web app that scans your projects, reviews a fix with you, fixes and undoes.
 > Tested against sets saved by Live itself and on a real 842-set library (read-only round trips
 > of 13,000 Live documents). See [docs/verification.md](docs/verification.md).
 
@@ -18,7 +18,7 @@ livesaver collect ~/Music/Projects     # dry run of "Collect All and Save" for e
 livesaver collect ~/Music/Projects --apply   # really do it (quit Live first)
 livesaver runs                         # past runs, with their reports and journals
 livesaver undo <run>                   # restore the sets of a run; unused copies go to the Trash
-livesaver web                          # all of the above in the browser, with a Fix button per project
+livesaver web                          # scan, review, fix and undo in the browser
 livesaver plugins upgrade ~/Music/Projects [--apply]   # VST2 → VST3 for verified plug-ins
 livesaver index ~/Music/Projects               # catalog every set (later runs read only changed sets)
 livesaver find plugin:serum bpm:120..128 stage:arranged missing:samples
@@ -103,21 +103,24 @@ your Live setup):
 ```
 
 ### In the browser
-`livesaver web` opens the web app (from the repository: `bun run web`, on
-`http://127.0.0.1:5173/`). It shows what `doctor` finds: what is complete, what can be collected
-or repaired, what is missing and where it came from, per project and per set, with the same
-report files to download. **Fix all** does what `collect --apply` does, and every project has a
-**Fix** of its own; the page asks first, and a fix can be undone there, like `livesaver undo`.
+`livesaver web` opens the web app (from the repository: `bun run web`). It scans like `doctor`
+and `plugins audit` in one go and shows the whole picture: how many sets are complete, what a
+fix would do, what stays missing and where it came from, with advice per source; every project,
+set, planned change and missing sample in tables you can search. **Review and fix** does what
+`collect --apply` does, for all projects, a selection or one: it shows first what will change,
+lets you leave uncertain matches out, checks that Live is closed and that there is room, and a
+fix can be undone there, like `livesaver undo`.
 
-The page talks to livesaver on your computer, which reads and writes the files with your
+The app talks to livesaver on your computer, which reads and writes the files with your
 settings: nothing leaves the computer, and only the page that livesaver served can ask it for
 anything.
 
-The same page also runs without livesaver behind it, on its own in a browser. Then you choose or
-drop the folders and it checks them by itself, read-only. A browser does not tell a page where a
-folder lies on disk: livesaver works that out for project folders from the sets themselves. Drop
-the Ableton Live app on the page as well: it holds the Core Library and Live's own list of
-content it moved between versions, and with it the page reports what the command line reports.
+The same app also runs without livesaver behind it, on its own in a browser (Chrome, Safari,
+Firefox). Then you choose or drop the folders and it scans them by itself, read-only. A browser
+does not tell a page where a folder lies on disk: livesaver works that out for project folders
+from the sets themselves. Drop the Ableton Live app on the page as well: it holds the Core
+Library and Live's own list of content it moved between versions, and with it the page reports
+what the command line reports.
 
 ## Why livesaver
 - **Byte-exact edits.** Only the bytes that must change do change; everything else in a Live Set
@@ -150,8 +153,7 @@ content it moved between versions, and with it the page reports what the command
 | [`@livesaver/node`](packages/node) | Node.js/Bun host: file system, gzip, worker threads, Finder tags and comments, Live setup discovery |
 | [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a read-only file system, worker-based parsing, a scan of samples and plug-ins in the page |
 | [`livesaver`](packages/cli) | The command-line tool |
-| [`apps/web`](apps/web) | The web app (not published) |
-| [`apps/web-next`](apps/web-next) | Its rewrite on Vite, Vue and Nuxt UI, in progress (not published) |
+| [`apps/web`](apps/web) | The web app: Vite, Vue, Nuxt UI (not published) |
 
 ## Roadmap
 | Milestone | Delivers |
@@ -163,7 +165,7 @@ content it moved between versions, and with it the page reports what the command
 | ✅ M5 | plug-in inventory and audit (`plugins list`, `plugins audit`) |
 | ✅ M6 | catalog and search (`index`, `find`, `sql`) |
 | ✅ M7 | codemods (`livesaver run`) |
-| 🚧 M8 | web app (read-only check: done), Finder Quick Actions |
+| 🚧 M8 | web app (samples: scan, review, fix, undo: done; plug-ins, history and a site: next), Finder Quick Actions |
 
 ## Development
 ```sh
@@ -173,8 +175,8 @@ bun run build      # tsc, dependency order
 bun test           # unit, property and end-to-end tests
 bun run check      # biome + typecheck
 bun run test:node  # the built CLI under Node.js
-bun run web        # the web app on http://127.0.0.1:5173/
-bun run test:web   # the web app in a real browser (needs a Chromium-based browser)
+bun run web        # the web app while working on it, on http://localhost:5173/
+bun run test:web   # the web app in Chromium, WebKit and Firefox (bunx playwright install, once)
 ```
 
 ## License

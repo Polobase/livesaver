@@ -228,18 +228,24 @@ export interface Prepared {
   readonly vendorLibraries: string[]
 }
 
-/** The folders a run works on: every project folder, or the one project in them that was asked. */
-export function targetsOf(request: { projects?: readonly string[]; only?: string }): string[] {
+/** The folders a run works on: every project folder, or the projects in them that were asked. */
+export function targetsOf(request: {
+  projects?: readonly string[]
+  only?: string | readonly string[]
+}): string[] {
   if (!Array.isArray(request?.projects)) throw new Error('The request names no folders.')
   const projects = request.projects.map(absolute)
   if (projects.length === 0) throw new Error('No project folder was given.')
   for (const project of projects)
     if (!existsSync(project)) throw new Error(`This folder does not exist: ${project}`)
-  const only = request.only ? absolute(request.only) : ''
-  if (only && !projects.some((project) => isInside(only, project)))
-    throw new Error(`This folder is not in a project folder that was checked: ${only}`)
-  if (only && !isFolder(only)) throw new Error(`This folder does not exist: ${only}`)
-  return only ? [only] : projects
+  const asked = request.only === undefined || request.only === '' ? [] : [request.only].flat()
+  const only = asked.map((folder) => absolute(String(folder)))
+  for (const folder of only) {
+    if (!projects.some((project) => isInside(folder, project)))
+      throw new Error(`This folder is not in a project folder that was checked: ${folder}`)
+    if (!isFolder(folder)) throw new Error(`This folder does not exist: ${folder}`)
+  }
+  return only.length ? only : projects
 }
 
 /** The request as the pipeline takes it; throws what the page should show if it cannot run. */

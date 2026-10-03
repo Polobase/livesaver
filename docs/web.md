@@ -1,24 +1,48 @@
 # The web app
 
-`apps/web` is one page that runs in two ways:
+`apps/web` is one app (Vite, Vue, Nuxt UI) that runs in two situations:
 
 - **With livesaver on the same computer** (`livesaver web`, or `bun run web` in the repository):
-  the computer reads the folders by their paths and checks them like `livesaver doctor`, and it
-  can fix what it finds like `livesaver collect --apply`: all projects, or one. See
+  the computer reads the folders by their paths and scans them like `livesaver doctor` and
+  `livesaver plugins audit`, and it can fix what it finds like `livesaver collect --apply`: all
+  projects, a selection, or one, after a review, with an undo. See
   [On this computer](#on-this-computer).
-- **On its own in a browser** (any static host): it is given folders, checks them itself with
-  the same engine (`@livesaver/ops`) on a browser host (`@livesaver/web`), and never writes. The
-  sections from [How it is built](#on-its-own-how-it-is-built) to
+- **On its own in a browser** (any static host): it is handed folders, scans them itself with
+  the same code (`@livesaver/ops`) on a browser host (`@livesaver/web`), and never writes. The
+  sections from [How it is built](#how-it-is-built) to
   [What differs from the command line](#on-its-own-what-differs-from-the-command-line) are
   about this.
 
-A browser cannot do the fixing itself. Writing needs the File System Access API, which Brave,
-Safari and Firefox do not offer and whose handles hide files (see below); and a page could
-neither keep a journal for an undo nor see that Live is running.
+The same files serve both: relative URLs and hash routes, so they run at any path. What the app
+cannot do where it runs is shown and explained, not hidden: on its own it says that fixing needs
+livesaver, and how to get it.
 
-**A rewrite is on its way** in `apps/web-next` (Vite, Vue, Nuxt UI): it will cover plug-ins and
-the history as well, and replace `apps/web`. Until then it is the shell, and the engines it
-talks to (see [One contract, two engines](#one-contract-two-engines)).
+A browser cannot do the fixing itself today. Writing needs the File System Access API, which
+Brave, Safari and Firefox do not offer and whose handles hide files (see below); and a page
+could neither keep a journal for an undo nor see that Live is running.
+
+## The screens
+| Place | What it shows | What can be done |
+|---|---|---|
+| **Overview**, before a scan | what livesaver does in three steps, the project folders and sample folders, the options | add folders, scan |
+| **Overview**, after a scan | how many sets are complete, can be fixed, or have samples that stay missing (one bar); what a fix would do; what is missing, by source, with what to do about the largest; every reference by state; where found samples lie | review and fix, download the reports, undo the last fix |
+| **Samples › Projects** | every project: state, sets, what a fix changes, what stays missing, what is copied | fix one, a selection, or all; a project opens from the side with its sets, its changes (old place → new place) and its gaps; show it in Finder |
+| **Samples › Missing** | missing samples grouped by where they came from, each group with advice | add the folder that has them, copy the list, open a sample |
+| **Samples › Changes** | every planned change: how the file was found, and whether the fingerprint confirms it | search, filter (uncertain only), open a change |
+| **Samples › Sets** | every set with what its samples are | search, filter, open a set |
+| **Settings** | the folders and options of a scan, the appearance, what was detected | change them; the app says when a scan is older than they are |
+
+- **Nothing is written without a review.** A fix goes through three steps: what will happen
+  (sets, references, copies, per project; with a switch that leaves the uncertain matches out),
+  whether everything is ready (Live closed, enough free space, where the backups go), then the
+  fix and what it did, with its undo.
+- **A fix does what was scanned.** If folders or options were changed after the scan, the app
+  says so, and a fix still uses those of the scan.
+- **The tables hold a library.** Only the rows in view are in the page: 9,305 planned changes of
+  a real library scroll without a slow frame, and a search over them takes 27 ms.
+- **States are never told by colour alone.** Fine, can be fixed, missing: each has an icon of its
+  own shape and a label in the text colour; the three colours are checked for colour-vision
+  deficiencies against the light and the dark surfaces.
 
 ## On this computer
 `livesaver web` (`packages/cli/src/web/`) serves the page and answers it:
@@ -63,8 +87,8 @@ talks to (see [One contract, two engines](#one-contract-two-engines)).
   box while the page itself had it off.
 
 ## A scan
-A scan is what the rewrite's screens are built on: the samples (as `doctor` reports them) and
-the plug-ins of every set (as `plugins audit` reports them).
+A scan is what the screens are built on: the samples (as `doctor` reports them) and the
+plug-ins of every set (as `plugins audit` reports them).
 
 - **Every set is read once.** The parse workers return a set's plug-ins with its references
   (`pluginUses` in `@livesaver/core` finds the plug-in devices by byte search and scans only
@@ -78,8 +102,8 @@ the plug-ins of every set (as `plugins audit` reports them).
   report files equal those of `doctor --full`.
 
 ## One contract, two engines
-The rewrite talks to an `Engine` (`apps/web-next/src/engine/types.ts`): start, scan, plan an
-upgrade, fix, upgrade, undo, the history, status, reveal, list folders. Two engines implement it:
+The app talks to an `Engine` (`apps/web/src/engine/types.ts`): start, scan, plan an upgrade,
+fix, upgrade, undo, the history, status, reveal, list folders. Two engines implement it:
 
 | | `ComputerEngine` | `BrowserEngine` |
 |---|---|---|
@@ -90,18 +114,25 @@ upgrade, fix, upgrade, undo, the history, status, reveal, list folders. Two engi
 
 What an engine cannot do is in its `capabilities`, and asking for it fails as `Unsupported`, so
 a screen shows and explains it instead of hiding it. One suite of tests
-(`apps/web-next/test/engine.conformance.test.ts`) runs the same scenarios against both, and
-demands that both show the same for the same library.
+(`apps/web/test/engine.conformance.test.ts`) runs the same scenarios against both, and demands
+that both show the same for the same library.
 
-## On its own: how it is built
-- **The page** (Preact) only holds the folders and shows the result.
+## How it is built
+- **The page** (Vue, Pinia, Nuxt UI in Vue mode, Tailwind) holds the state in three stores
+  (library, scan, fix) that talk to the engine; the stores and everything they compute are plain
+  TypeScript, tested without a browser.
 - **An engine worker** runs the scan (`scanFolders` in `@livesaver/web`), so the page stays
-  responsive.
+  responsive. The files of the folders stay with the page; the worker asks for each one it reads.
 - **Parse workers** (started by the engine worker) gunzip the sets and find their references
   and plug-ins.
-- `bun run build` in `apps/web` bundles the page and both workers with fixed names, because the
-  page starts the workers by URL. `bun run web` serves it and rebuilds when the page is loaded
-  after a source change.
+- **Nothing is fetched from elsewhere.** Icons and the font are part of the build, and a test
+  fails on any request that leaves the page's own address: the app promises that nothing leaves
+  the computer.
+- **For everyone.** Every scrolling area can take the keyboard's focus, the whole flow from scan
+  to undo works without a mouse, and axe finds no barrier on any screen, in light and dark.
+- `bun run web` is Vite's development server with livesaver's API behind it. `bun run build`
+  builds the app and copies it (without source maps) into the command line's package, which is
+  what `livesaver web` serves.
 
 ## Folders in a browser
 A page gets a folder in one of three ways (`packages/web/src/source.ts`):
@@ -185,6 +216,7 @@ there.
 ## On its own: what differs from the command line
 - Read-only: nothing is collected or rewritten, and patched sets are only counted, not scanned
   strictly (`quickPlan`).
+- Plug-ins: which are used and where, not whether they are installed (a page cannot see that).
 - Only the given folders are seen. The command line sees the whole disk.
 - Symbolic links are not seen: a browser leaves them out of a dropped folder. The command line
   indexes links to files.
@@ -195,25 +227,32 @@ there.
   folders, the Live app given as a folder, the remap table, the plug-ins, the shaped result);
   and the conversation between the page and the engine's worker.
 - `packages/cli/test`: what the page asks of this computer, on temporary copies of the fixtures:
-  a check, a scan, a fix of all and of one project, with and without the uncertain matches, an
-  upgrade of plug-ins, undo, the history and its reports, and that the server answers only its
-  own page.
-- `apps/web-next/test`: the two engines against one suite (see above).
-- `bun run test:web`: the built page in a real headless browser, in both ways. On its own:
-  folders are given through the folder upload and by drops (with names a handle would hide, and
-  an app as a folder); the hints, the results, the tables and a downloaded report are read from
-  the page. With livesaver: a folder is chosen in the page, one project is fixed, the fix is
-  undone, all are fixed, and after a reload the last fix is undone; the files on disk are
-  compared each time.
-- `bun run test:node`: the built `livesaver web` under Node.js serves the page it ships with.
-- On a real library (876 sets, 138,662 indexed files), given the project folder and the four
-  folders the command line searches, with their paths typed, the five report files of the page
-  are byte-identical to those of `livesaver doctor`, apart from the time stamp. That holds for
-  uploaded and for dropped folders. With the Live app dropped and no path typed, the numbers of
-  the result equal the command line's, with and without `--match-library-path`. The check takes
-  about 15 s in the browser (12 s on the command line).
-- With livesaver on the computer, the same library gives report files byte-identical to
-  `livesaver doctor` as well (dry runs only: fixing is tested on temporary copies).
-- A scan of the same library equals the three commands it stands for: its report files those of
-  `doctor --full`, its 199 plug-ins (order, state, instances, sets) those of `plugins audit`, and
-  its upgrade plan (386 rows) that of `plugins upgrade`.
+  a check, a scan, a fix of all, of some and of one project, with and without the uncertain
+  matches, an upgrade of plug-ins, undo, the history and its reports, and that the server
+  answers only its own page.
+- `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
+  review, fix, undo, a page that is opened again) against both engines; the app's own sums and
+  words (states, plans, advice).
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 95 tests.
+  - On its own: folders through the folder upload and by drops (with names a handle would hide,
+    and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
+    overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
+  - With livesaver: a folder chosen in the page, a fix of one project after its review, undo, a
+    selection fixed in one run, all fixed, the scan and the last fix still there after a reload,
+    the uncertain matches left out; the files on disk are compared each time.
+  - The whole flow from scan to undo with the keyboard alone; no barrier that axe can find on
+    any screen, in light and dark; no error in the page; no request to another address.
+  - The tests load the production build: a test runner's `NODE_ENV` would otherwise make Vite
+    build Vue's development version.
+- `bun run test:node`: the built `livesaver web` under Node.js serves the app it ships with.
+- On a real library (876 sets, 138,662 indexed files), read-only:
+  - A scan in the app takes 13 s and shows the numbers of the command line: what `doctor`
+    counts, and for a fix without the uncertain matches what `doctor --certain-only` counts.
+  - A scan equals the three commands it stands for: its report files those of `doctor --full`,
+    its 199 plug-ins (order, state, instances, sets) those of `plugins audit`, and its upgrade
+    plan (386 rows) that of `plugins upgrade`.
+  - On its own, given the project folder and the folders the command line searches with their
+    paths typed, the report files are byte-identical to those of `livesaver doctor`, apart from
+    the time stamp; with the Live app dropped and no path typed, the numbers equal the command
+    line's. (Measured with the page this app replaced; the engine is the same code.)
+  - Fixing is never tried there: it is tested on temporary copies.

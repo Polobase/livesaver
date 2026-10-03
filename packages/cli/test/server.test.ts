@@ -134,7 +134,7 @@ test('only the page that was served may ask: token, address and origin must be i
 })
 
 test('a development server may stand in front: its address is allowed, the token still needed', async () => {
-  const front = 'http://localhost:5174'
+  const front = 'http://localhost:5173'
   const api = await startWeb({ assets: false, origins: [front] })
   const get = (headers: Record<string, string>) =>
     fetch(`${api.url}api/info`, { headers }).then((answer) => answer.status)

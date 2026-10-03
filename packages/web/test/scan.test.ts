@@ -93,6 +93,7 @@ describe('a scan in the page', () => {
       {
         project: 'Brokenpath Project',
         set: 'Brokenpath.als',
+        setPath: 'Brokenpath Project/Brokenpath.als',
         action: 'repaired',
         name: '1.wav',
         oldPath: '/Users/someone/livesaver/fixtures/samples/brokenpath/Lib1/Kick/1.wav',
@@ -103,7 +104,7 @@ describe('a scan in the page', () => {
       },
     ])
     expect(result.foundSources).toEqual([
-      { kind: 'Folder', name: 'samples/Lib1', samples: 1, projects: 1, hint: '' },
+      { kind: 'Folder', name: 'samples/Lib1', samples: 1, projects: 1, hint: '', advice: '' },
     ])
     expect(result.setRows.map((s) => [s.path, s.live, s.changes])).toEqual([
       ['Brokenpath Project/Brokenpath.als', '12.4.6', 1],
@@ -128,6 +129,13 @@ describe('a scan in the page', () => {
     expect(result.missing.map((m) => [m.status, m.name, m.sets, m.projects])).toEqual([
       ['not-found', '1.wav', 1, 1],
     ])
+    // A missing sample names the sets that use it and the source it is counted under.
+    expect(result.missing[0]).toMatchObject({
+      usedBy: ['Brokenpath.als'],
+      sourceKind: result.missingSources[0]?.kind,
+      sourceName: result.missingSources[0]?.name,
+    })
+    expect(result.missingSources[0]?.advice).toBe('folder')
     expect(result.missingSources).toHaveLength(1)
     expect(result.missingSources[0]?.hint).toContain('Find the folder or drive')
     expect([result.sets, result.completeSets, result.completeProjects]).toEqual([1, 0, 0])

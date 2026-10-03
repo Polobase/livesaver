@@ -13,7 +13,9 @@ import {
   foundSources,
   HINTS,
   KIND_NAMES,
+  type LibraryKind,
   libraryGroups,
+  libraryOf,
   missingGroups,
 } from './sources.js'
 import { totalCounts } from './summary.js'
@@ -25,6 +27,11 @@ export interface SourceRow {
   readonly projects: number
   /** What to do about it (sources of missing samples only). */
   readonly hint: string
+  /**
+   * What kind of advice the hint is, for a user interface that words it itself: the kind of
+   * library the samples came from (sources of missing samples only, else '').
+   */
+  readonly advice: LibraryKind | ''
 }
 
 /** What a fix does when uncertain matches are left out (`certainOnly`). */
@@ -73,15 +80,22 @@ export interface MissingRow {
   readonly name: string
   readonly path: string
   readonly source: string
+  /** The source it is counted under: `kind` and `name` of its row in `missingSources`. */
+  readonly sourceKind: string
+  readonly sourceName: string
   readonly size: number
   readonly sets: number
   readonly projects: number
+  /** The sets that use it (their `path` in `setRows`). */
+  readonly usedBy: readonly string[]
   readonly candidates: readonly string[]
 }
 
 export interface ChangeRow {
   readonly project: string
+  /** The set's file name, and its `path` in `setRows` (names repeat within a project). */
   readonly set: string
+  readonly setPath: string
   readonly action: Action
   readonly name: string
   readonly oldPath: string
@@ -189,6 +203,7 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
       samples: lib.samples,
       projects: lib.projects.size,
       hint: HINTS[lib.kind],
+      advice: lib.kind,
     })),
     foundSources: foundSources(r.results, env, r.index.roots).map((f) => ({
       kind: FOUND_NAMES[f.kind],
@@ -196,6 +211,7 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
       samples: f.files.size,
       projects: f.projects.size,
       hint: '',
+      advice: '' as const,
     })),
     projectRows,
     setRows: r.results.map((s) => ({
@@ -207,21 +223,28 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
       changes: s.changes.length,
       error: s.error,
     })),
-    missing: groups.map((g) => ({
-      status: g.status,
-      device: g.kind === 'device',
-      name: g.name,
-      path: g.path,
-      source: g.source,
-      size: g.size,
-      sets: g.sets.size,
-      projects: g.projects.size,
-      candidates: g.choice.candidates.slice(0, 10),
-    })),
+    missing: groups.map((g) => {
+      const [kind, name] = libraryOf(g)
+      return {
+        status: g.status,
+        device: g.kind === 'device',
+        name: g.name,
+        path: g.path,
+        source: g.source,
+        sourceKind: KIND_NAMES[kind],
+        sourceName: name,
+        size: g.size,
+        sets: g.sets.size,
+        projects: g.projects.size,
+        usedBy: [...g.sets].map(rel),
+        candidates: g.choice.candidates.slice(0, 10),
+      }
+    }),
     changes: r.results.flatMap((s) =>
       s.changes.map((c) => ({
         project: rel(s.projectRoot),
         set: posix.basename(s.setPath),
+        setPath: rel(s.setPath),
         action: c.action,
         name: c.name,
         oldPath: c.oldPath,

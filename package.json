@@ -18,8 +18,7 @@
     "release:sync-lock": "bun scripts/sync-lock-versions.ts .",
     "test:node": "node --test packages/cli/test-node/smoke.test.mjs",
     "web": "bun run --cwd apps/web dev",
-    "web:next": "bun run --cwd apps/web-next dev",
-    "test:web": "bun run --cwd apps/web test:e2e && bun run --cwd apps/web-next test:e2e"
+    "test:web": "bun run --cwd apps/web test:e2e"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

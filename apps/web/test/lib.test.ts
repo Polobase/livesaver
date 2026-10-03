@@ -1,0 +1,203 @@
+/** The app's own words and sums: states, plans, numbers, advice. */
+import { describe, expect, test } from 'bun:test'
+import type { ProjectRow, SetRow } from '@livesaver/ops'
+import type { Scan } from '../src/engine/types.js'
+import { bytes, count, percent, plural, seconds, splitPath, when } from '../src/lib/format.js'
+import { projectHealth, setHealth, tally } from '../src/lib/health.js'
+import { requestKey, wantedOf } from '../src/lib/library.js'
+import { FREE_SPACE_MARGIN, fits, planOf } from '../src/lib/plan.js'
+import { advance, starting } from '../src/lib/progress.js'
+import { adviceFor } from '../src/lib/words.js'
+
+const set = (extra: Partial<SetRow> & { missing?: number } = {}): SetRow => ({
+  path: 'A Project/A.als',
+  project: 'A Project',
+  name: 'A.als',
+  live: '12.4.6',
+  counts: {
+    ok: 3,
+    kept: 0,
+    external: 0,
+    found: 0,
+    'not-found': extra.missing ?? 0,
+    ambiguous: 0,
+    mismatch: 0,
+  },
+  changes: 0,
+  error: '',
+  ...extra,
+})
+
+const project = (path: string, extra: Partial<ProjectRow> = {}): ProjectRow => ({
+  root: `/music/${path}`,
+  path,
+  sets: 2,
+  completeSets: 2,
+  changingSets: 0,
+  changes: 0,
+  uncertain: 0,
+  missing: 0,
+  copyFiles: 0,
+  copyBytes: 0,
+  certain: { changingSets: 0, changes: 0, copyFiles: 0, copyBytes: 0 },
+  errors: 0,
+  ...extra,
+})
+
+describe('the state of a set and of a project', () => {
+  test('missing wins over fixable: it is what a fix does not end', () => {
+    expect(setHealth(set())).toBe('fine')
+    expect(setHealth(set({ changes: 2 }))).toBe('fixable')
+    expect(setHealth(set({ changes: 2, missing: 1 }))).toBe('missing')
+    expect(setHealth(set({ error: 'unreadable: not gzip' }))).toBe('unreadable')
+    expect(projectHealth(project('A'))).toBe('fine')
+    expect(projectHealth(project('A', { changes: 1, changingSets: 1 }))).toBe('fixable')
+    expect(projectHealth(project('A', { changes: 1, missing: 1 }))).toBe('missing')
+    // A set that cannot be read says nothing about its samples.
+    expect(projectHealth(project('A', { errors: 1 }))).toBe('unreadable')
+    expect(projectHealth(project('A', { errors: 1, missing: 2 }))).toBe('missing')
+  })
+
+  test('a tally counts every row once', () => {
+    const rows = [set(), set({ changes: 1 }), set({ missing: 2 }), set({ error: 'x' }), set()]
+    expect(tally(rows, setHealth)).toEqual({ fine: 2, fixable: 1, missing: 1, unreadable: 1 })
+  })
+})
+
+describe('what a fix would do', () => {
+  const rows = [
+    project('Both', {
+      changingSets: 2,
+      changes: 5,
+      uncertain: 2,
+      copyFiles: 3,
+      copyBytes: 3000,
+      certain: { changingSets: 1, changes: 3, copyFiles: 2, copyBytes: 2000 },
+      missing: 1,
+    }),
+    project('Uncertain only', {
+      changingSets: 1,
+      changes: 1,
+      uncertain: 1,
+      copyFiles: 1,
+      copyBytes: 500,
+    }),
+    project('Fine'),
+  ]
+  const scan = { samples: { projectRows: rows } } as unknown as Scan
+
+  test('to all projects, and to chosen ones', () => {
+    const all = planOf(scan, undefined, false)
+    expect(all.projects.map((p) => p.path)).toEqual(['Both', 'Uncertain only'])
+    expect([all.sets, all.changes, all.uncertain, all.copyFiles, all.copyBytes]).toEqual([
+      3, 6, 3, 4, 3500,
+    ])
+    const one = planOf(scan, ['/music/Uncertain only'], false)
+    expect([one.projects.length, one.sets, one.copyBytes]).toEqual([1, 1, 500])
+    expect(planOf(scan, ['/music/Fine'], false).projects).toEqual([])
+  })
+
+  test('without the uncertain matches: fewer sets and copies, and more that stays missing', () => {
+    const certain = planOf(scan, undefined, true)
+    expect(certain.projects.map((p) => p.path)).toEqual(['Both'])
+    expect([certain.sets, certain.changes, certain.uncertain]).toEqual([1, 3, 0])
+    expect([certain.copyFiles, certain.copyBytes]).toEqual([2, 2000])
+    // The three matches that are left out stay missing, beside the one that was missing anyway.
+    expect([planOf(scan, undefined, false).missing, certain.missing]).toEqual([1, 4])
+  })
+
+  test('the copies must fit, with room to spare', () => {
+    const plan = planOf(scan, undefined, false)
+    expect(fits(plan, undefined)).toBeUndefined()
+    expect(fits(plan, 3500 + FREE_SPACE_MARGIN)).toBe(true)
+    expect(fits(plan, 3499 + FREE_SPACE_MARGIN)).toBe(false)
+  })
+})
+
+describe('numbers, sizes and times', () => {
+  test('are written the same everywhere', () => {
+    expect([
+      count(1234567),
+      plural(1, 'set'),
+      plural(2, 'set'),
+      plural(2, 'library', 'libraries'),
+    ]).toEqual(['1,234,567', '1 set', '2 sets', '2 libraries'])
+    expect([bytes(999), bytes(2_000_324), bytes(1_940_000_000)]).toEqual([
+      '999 bytes',
+      '2.0 MB',
+      '1.94 GB',
+    ])
+    expect([percent(0, 10), percent(1, 3000), percent(1, 20), percent(1, 3)]).toEqual([
+      '0%',
+      '<0.1%',
+      '5.0%',
+      '33%',
+    ])
+    expect([seconds(1.26), seconds(12.5), seconds(200)]).toEqual(['1.3 s', '13 s', '3 min'])
+    expect(splitPath('Songs/A Project/A.als')).toEqual({ folder: 'Songs/A Project', name: 'A.als' })
+    expect(splitPath('A.als')).toEqual({ folder: '', name: 'A.als' })
+    expect(splitPath('E:\\Library\\Kick.wav')).toEqual({ folder: 'E:\\Library', name: 'Kick.wav' })
+  })
+
+  test('a time of today is a clock time, an older one has its day', () => {
+    const now = new Date(2026, 9, 3, 16, 0)
+    expect(when(new Date(2026, 9, 3, 14, 30).toISOString(), now)).toBe('14:30')
+    expect(when(new Date(2026, 9, 1, 9, 5).toISOString(), now)).toBe('1 Oct, 09:05')
+    expect(when('not a date', now)).toBe('')
+  })
+})
+
+describe('how far a run is', () => {
+  test('a new phase starts its count anew, the listed files stay', () => {
+    let run = starting('indexing')
+    run = advance(run, { type: 'indexed', files: 1200 })
+    run = advance(run, { type: 'phase', phase: 'checking' })
+    run = advance(run, { type: 'progress', done: 3, total: 10, name: 'A.als' })
+    expect(run).toEqual({ phase: 'checking', files: 1200, done: 3, total: 10, name: 'A.als' })
+    run = advance(run, { type: 'phase', phase: 'reporting' })
+    expect([run.done, run.total, run.name, run.files]).toEqual([0, 0, '', 1200])
+    expect(advance(run, { type: 'located', folders: [] })).toBe(run)
+  })
+})
+
+describe('the library', () => {
+  test('says what a complete scan still wants among the sample folders', () => {
+    expect(wantedOf([])).toEqual({ libraries: true, live: true })
+    expect(wantedOf([{ holds: ['User Library'] }])).toEqual({ libraries: false, live: true })
+    expect(wantedOf([{ holds: ['Factory Packs'] }, { holds: ["Live's own content"] }])).toEqual({
+      libraries: false,
+      live: false,
+    })
+  })
+
+  test('two requests are the same scan if folders, their marks and the options are', () => {
+    const request = {
+      projects: [{ id: 'p', path: '/p', name: 'p', vendor: false }],
+      search: [{ id: 's', path: '/s', name: 's', vendor: false }],
+      options: { packLimitMB: 50, matchLibraryPath: false },
+    }
+    expect(requestKey(request)).toBe(requestKey(structuredClone(request)))
+    const marked = {
+      ...request,
+      search: [{ ...request.search[0], id: 's', path: '/s', vendor: true }],
+    }
+    expect(requestKey(marked)).not.toBe(requestKey(request))
+    const other = { ...request, options: { ...request.options, matchLibraryPath: true } }
+    expect(requestKey(other)).not.toBe(requestKey(request))
+  })
+})
+
+describe('advice for missing samples', () => {
+  test('is said in the app’s terms, and knows when a folder is what helps', () => {
+    expect(adviceFor({ advice: 'folder', hint: 'pass it with --search' })).toEqual({
+      text: 'Find this folder or drive and add it as a sample folder.',
+      addFolder: true,
+    })
+    expect(adviceFor({ advice: 'pack', hint: '' }).addFolder).toBe(false)
+    // A source without a known kind keeps the words it came with.
+    expect(adviceFor({ advice: '', hint: 'as it came' })).toEqual({
+      text: 'as it came',
+      addFolder: false,
+    })
+  })
+})

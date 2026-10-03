@@ -54,8 +54,7 @@
         "packages/plugins/src/**",
         "packages/catalog/src/**",
         "packages/web/src/**",
-        "apps/web/src/**",
-        "apps/web-next/src/**"
+        "apps/web/src/**"
       ],
       "linter": {
         "rules": {
@@ -110,6 +109,16 @@
           "nursery": {
             "noFloatingPromises": "error",
             "noMisusedPromises": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/src/components/common/ScrollRegion.vue"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noNoninteractiveTabindex": "off"
           }
         }
       }

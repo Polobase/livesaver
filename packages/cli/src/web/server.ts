@@ -30,12 +30,10 @@ export interface WebServerOptions extends WebSettings {
   /** The folder with the built page; found next to this file if not given. `false`: no page. */
   readonly assets?: string | false
   /**
-   * Other addresses a page may come from, e.g. `http://localhost:5174` when a development
+   * Other addresses a page may come from, e.g. `http://localhost:5173` when a development
    * server serves the page and passes its requests on. They need the token all the same.
    */
   readonly origins?: readonly string[]
-  /** Called before the page is served, e.g. to rebuild it after a change. */
-  readonly beforePage?: () => Promise<void>
 }
 
 export interface WebServer {
@@ -51,7 +49,11 @@ const TYPES: Readonly<Record<string, string>> = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.map': 'application/json',
+  '.json': 'application/json',
   '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
 }
 
 /** The built page: shipped with the package, or in the repository when run from source. */
@@ -195,7 +197,7 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
       const known =
         scanned !== undefined &&
         JSON.stringify(request.projects) === JSON.stringify(scanned.request.projects)
-      const whole = known && !request.only && !request.plugins?.length
+      const whole = known && ![request.only ?? []].flat().length && !request.plugins?.length
       return stream(res, 'plan', (emit) =>
         webUpgradePlan(
           request,
@@ -249,7 +251,6 @@ export async function startWeb(options: WebServerOptions = {}): Promise<WebServe
     const name = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1))
     const path = normalize(join(assets, name))
     if (!path.startsWith(assets + sep)) return send(res, 404, 'not found', 'text/plain')
-    if (name === 'index.html') await options.beforePage?.()
     if (!existsSync(path) || !statSync(path).isFile())
       return send(res, 404, 'not found', 'text/plain')
     const type = TYPES[extname(path)] ?? 'application/octet-stream'

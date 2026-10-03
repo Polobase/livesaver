@@ -240,11 +240,15 @@ describe('an upgrade of plug-ins', () => {
     expect((await webRuns())[0]).toMatchObject({ state: 'undone', canUndo: false })
   })
 
-  test('of chosen plug-ins, or of one project; what cannot be asked is refused', async () => {
+  test('of chosen plug-ins, or of some projects; what cannot be asked is refused', async () => {
     const { upgraded } = await upgrade({ plugins: ['serum'] })
     expect(upgraded.upgrade.rows.map((r) => [r.plugin, r.converted])).toEqual([['Serum', true]])
     const other = await upgrade({ only: join(projects, 'Fixed Path Project') })
     expect([other.upgraded.sets, other.upgraded.upgrade.sets]).toEqual([0, 1])
+    const two = await upgrade({
+      only: [join(projects, 'Fixed Path Project'), join(projects, 'Brokenpath Project')],
+    })
+    expect(two.upgraded.upgrade.sets).toBe(2)
 
     const refused = async (extra: object) => {
       const events: WebEvent[] = []
