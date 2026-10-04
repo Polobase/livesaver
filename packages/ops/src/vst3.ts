@@ -118,6 +118,11 @@ export async function upgradePlugins(
       result.plugins = converted.outcomes
       result.unchecked = converted.unchecked
       result.changed = converted.text !== undefined
+      // The host cannot rewrite this set (a browser, for some names): the plan says so.
+      if (result.changed && probe.refuses(setPath))
+        throw new Error(
+          'this set cannot be rewritten here: its name, or that of a folder it lies in, is one the browser does not write',
+        )
       if (converted.text !== undefined && writer.apply) {
         const data = await encodeDocument(
           parsed.doc,

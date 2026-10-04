@@ -39,14 +39,19 @@ export function serveEngine(scope: EngineScope, options: EngineWorkerOptions): v
 
   const folder = (wire: WireFolder): FolderInput => {
     const { source } = wire
-    if (source.kind === 'handle') return { ...wire, source }
     const open = (index: number) =>
       new Promise<File | undefined>((resolve) => {
         const request = requests++
         waiting.set(request, resolve)
         scope.postMessage({ type: 'open', request, folder: wire.id, index })
       })
-    return { ...wire, source: { ...source, open } }
+    if (source.kind === 'listing') return { ...wire, source: { ...source, open } }
+    // (Of a folder behind a handle, the files the handle hides are asked for the same way.)
+    const { kind, name, handle, hidden } = source
+    return {
+      ...wire,
+      source: { kind, name, handle, ...(hidden ? { hidden: { paths: hidden.paths, open } } : {}) },
+    }
   }
   const folders = (wire: WireRequest) => ({
     projects: wire.projects.map(folder),

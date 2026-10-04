@@ -175,9 +175,10 @@ const keepsDrops = keepsDroppedFolders()
       </template>
       <template v-else>The folders themselves have to be added again then.</template>
       <template v-if="writing.on">
-        A project folder is chosen for editing instead, and your browser hides files with some names
-        in it (a “/” as Finder shows it, or a space at the start or end of the name): samples named
-        like that count as missing.
+        A project folder is added to be edited instead. Drop it rather than choosing it with “Add
+        folder”: in a folder it lets a page edit, your browser hides files with some names (a “/” as
+        Finder shows it, or a space at the start or end of the name), and a drop shows this page
+        every file.
       </template>
     </p>
     <ScanOptions :disabled="scans.running" />

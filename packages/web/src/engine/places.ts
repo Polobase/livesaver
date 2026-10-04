@@ -22,7 +22,7 @@ import {
   type StoredPath,
   versionNumber,
 } from '../locate.js'
-import type { FolderSource } from '../source.js'
+import { type FolderSource, hiddenByHandle } from '../source.js'
 import type { FolderInput, LocatedFolder, ScanRequest } from './protocol.js'
 
 /** Sets read to learn where a project folder lies; their stored paths agree, so a few suffice. */
@@ -166,11 +166,17 @@ async function placedBySets(
   return placeByLeads(confirmed) ?? ''
 }
 
-/** Names directly in a folder (`inside` = in one of its subfolders), sorted. */
+/**
+ * Names directly in a folder (`inside` = in one of its subfolders), sorted. Only the names a
+ * browser shows behind a handle: the same folder is compared as a handle and as an upload.
+ */
 async function namesIn(source: FolderSource, inside = ''): Promise<string[]> {
   const fs = new WebFs([{ path: '/folder', source }])
   const entries = await fs.listDir(posix.join('/folder', inside))
-  return (entries ?? []).map((e) => e.name).sort()
+  return (entries ?? [])
+    .map((e) => e.name)
+    .filter((name) => !hiddenByHandle(name))
+    .sort()
 }
 
 const sameNames = (a: readonly string[], b: readonly string[]) =>
@@ -229,7 +235,15 @@ export async function locate(request: ScanRequest): Promise<LocatedFolder[]> {
         if (!path && own.landmarks.length) path = await placedBySets(folder, own.landmarks, samples)
       }
     }
-    if (!path || taken.has(path)) {
+    // A project folder that was chosen for editing, given once more as an upload or a drop:
+    // that one shows the names the handle hides, and is read at the same place.
+    const again =
+      !sample &&
+      folder.source.kind !== 'handle' &&
+      request.projects.some(
+        (project, k) => project.source.kind === 'handle' && located[k]?.path === path,
+      )
+    if (!path || (taken.has(path) && !again)) {
       // Unknown: a stand-in path. Paths stored in sets then never lead into this folder by
       // accident; its files are still found by name and fingerprint.
       how = 'unknown'

@@ -5,7 +5,7 @@
 import { CORE_LIBRARY_PACK_ID, type FileRef, norm, posix, REL_USER_LIBRARY } from '@livesaver/core'
 import type { SetResult } from './collect.js'
 import { type Environment, isInside } from './env.js'
-import type { Choice, Status } from './match.js'
+import type { Blind, Choice, Status } from './match.js'
 
 /** Where a missing sample originally came from. */
 export function sourceOf(ref: FileRef): string {
@@ -32,6 +32,10 @@ export function sourceOf(ref: FileRef): string {
   return 'unknown'
 }
 
+/**
+ * The last three are no place a sample came from: what the host kept livesaver from (`Blind`).
+ * Such a sample need not be missing, so it is not counted with the source it came from.
+ */
 export type LibraryKind =
   | 'pack'
   | 'core-library'
@@ -40,6 +44,7 @@ export type LibraryKind =
   | 'ni-expansion'
   | 'user-library'
   | 'old-project'
+  | Blind
 
 /** Names of the kinds (they also define the sort order). */
 export const KIND_NAMES: Record<LibraryKind, string> = {
@@ -50,6 +55,16 @@ export const KIND_NAMES: Record<LibraryKind, string> = {
   'ni-expansion': 'NI expansion',
   'user-library': 'User Library (old)',
   'old-project': 'Old project',
+  unseen: 'Browser limit',
+  unmade: 'Browser limit',
+  locked: 'Browser limit',
+}
+
+/** What the samples are counted under that the host kept livesaver from. */
+export const BLIND_SOURCES: Readonly<Record<Blind, string>> = {
+  unseen: 'Files the browser does not show',
+  unmade: 'Names the browser does not make',
+  locked: 'Sets the browser cannot rewrite',
 }
 
 /** What to do about missing samples of each kind. */
@@ -62,6 +77,12 @@ export const HINTS: Record<LibraryKind, string> = {
   'project-samples':
     "The project's own samples are missing: look for an older copy of the project folder",
   folder: 'Find the folder or drive and pass it with --search',
+  unseen:
+    'They may be where the sets expect them: in a folder chosen for editing, a browser shows a page no file or folder with such a name. Give the page the project folder once more, by a drop, or use livesaver on the computer',
+  unmade:
+    'They were found, but a browser makes no file with such a name: livesaver on the computer copies them in',
+  locked:
+    'They were found, but a browser cannot rewrite a set with such a name, or in such a folder: livesaver on the computer fixes it',
 }
 
 /** The option that takes library files with another fingerprint, as the command line names it. */
@@ -98,7 +119,8 @@ export function missingGroups(results: readonly SetResult[]): MissingGroup[] {
   for (const res of results) {
     for (const { ref, choice } of res.missing) {
       const original = ref.path || ref.hintPath || ref.relPath || ref.name
-      const key = `${choice.status}\u0000${norm(original)}`
+      // (What the host kept livesaver from in one set may be plainly missing in another.)
+      const key = `${choice.status}\u0000${choice.blind}\u0000${norm(original)}`
       let group = groups.get(key)
       if (!group) {
         group = {
@@ -129,9 +151,13 @@ export function missingGroups(results: readonly SetResult[]): MissingGroup[] {
 
 /** (kind, name) of the pack, expansion, project or folder a missing sample came from. */
 export function libraryOf(
-  group: Pick<MissingGroup, 'source' | 'path' | 'pack'>,
+  group: Pick<MissingGroup, 'source' | 'path' | 'pack'> & {
+    readonly choice?: Pick<Choice, 'blind'>
+  },
 ): [LibraryKind, string] {
   const { source, path } = group
+  const blind = group.choice?.blind
+  if (blind) return [blind, BLIND_SOURCES[blind]]
   if (source.startsWith('Live Pack: ')) return ['pack', group.pack]
   if (source.startsWith('Ableton Core Library'))
     return ['core-library', 'Core Library of older Live versions']

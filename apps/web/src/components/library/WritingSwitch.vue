@@ -33,7 +33,7 @@ const LIMITS = [
   },
   {
     title: 'Your browser hides files with some names from a page.',
-    text: 'A name with a “/” as Finder shows it, or with a space at its start or end. Such samples count as missing here, and a fix cannot copy a file to such a name.',
+    text: 'A name with a “/” as Finder shows it, or with a space at its start or end. Drop your project folder instead of choosing it with “Add folder”, and this page sees such files all the same. It cannot make one: a sample that would be copied to such a name is left where it is.',
   },
   {
     title: 'A page has no Trash.',

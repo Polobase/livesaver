@@ -52,6 +52,37 @@ function csvRows(text: string): Record<string, string>[] {
 }
 
 describe('VST3 runs', () => {
+  test('a set the host cannot rewrite is said in the plan, and not tried', async () => {
+    // (A browser writes no file with certain names; such a host says where, see `FsRead`.)
+    const narrow = host()
+    const fs = Object.assign(Object.create(narrow.fs), {
+      refuses: (path: string) => path === setPath,
+    })
+    const before = readFileSync(setPath)
+    for (const apply of [false, true]) {
+      const probe = new Probe(fs, narrow.hash)
+      const run = { id: `run-${apply}`, dir: join(tmp.path, `run-${apply}`) }
+      const r = await upgradePlugins(
+        { ...narrow, fs },
+        {
+          targets: [project],
+          catalog: CATALOG,
+          probe,
+          ...(apply ? { writer: applyWriter(narrow, run, probe) } : {}),
+        },
+      )
+      expect(r.results.map((set) => [set.written, set.error])).toEqual([
+        [
+          false,
+          'this set cannot be rewritten here: its name, or that of a folder it lies in, is one the browser does not write',
+        ],
+      ])
+      // What it would upgrade is still told.
+      expect(r.results[0]?.plugins.length).toBeGreaterThan(0)
+    }
+    expect(readFileSync(setPath)).toEqual(before)
+  })
+
   test('a dry run changes nothing', async () => {
     const before = readFileSync(setPath)
     const oldBackups = backups()

@@ -81,12 +81,14 @@ export {
   SKIP_DIRS,
 } from './file-index.js'
 export {
+  type Blind,
   type Check,
   type Choice,
   type ChooseOptions,
   checkOf,
   choose,
   classify,
+  expectedPlaces,
   isPackSample,
   LIBRARY_PATH_BYTES,
   LIBRARY_PATH_LEVELS,

@@ -50,7 +50,13 @@ test('an uploaded folder travels as the paths of its files; a handle travels as 
   )
   expect(Object.keys(upload.source)).toEqual(['kind', 'name', 'paths'])
   const handle = { id: 'h', source: pickedFolder(projects), path: '', vendor: false }
-  expect(wireFolder(handle).source).toBe(handle.source)
+  expect(wireFolder(handle).source).toEqual(handle.source)
+  // What its handle hides (of a folder that was dropped to be edited) travels as paths too:
+  // a worker can be sent no function.
+  const hidden = { paths: [' lead.wav'], open: async () => undefined }
+  const dropped = wireFolder({ ...handle, source: { ...handle.source, hidden } }).source
+  expect(dropped).toEqual({ ...handle.source, hidden: { paths: [' lead.wav'] } })
+  expect(() => structuredClone(dropped.kind === 'handle' && dropped.hidden)).not.toThrow()
 })
 
 test('the scan runs in the worker with the files the page hands over, then the worker is given up', async () => {

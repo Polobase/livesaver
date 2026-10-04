@@ -2,7 +2,7 @@
  * The state of a set, a project or a reference, in the app's three words: fine, can be fixed,
  * missing. A state is never told by colour alone: each has an icon of its own shape and a label.
  */
-import type { ProjectRow, SetRow, Status } from '@livesaver/ops'
+import type { Blind, MissingRow, ProjectRow, SetRow, Status } from '@livesaver/ops'
 
 export type Health = 'fine' | 'fixable' | 'missing' | 'unreadable'
 
@@ -89,6 +89,34 @@ export const STATUS_WHY: Readonly<Record<'not-found' | 'ambiguous' | 'mismatch',
   ambiguous: 'Several files of this name fit, with different audio: livesaver does not guess.',
   mismatch: 'A file of this name was found, but it is not the same audio.',
 }
+
+/**
+ * A browser shows a page no file or folder with certain names in a folder that was chosen for
+ * editing, and makes none: what it kept the page from, for a sample that is left alone.
+ */
+export const BLIND_LABEL: Readonly<Record<Blind, string>> = {
+  unseen: 'Hidden by browser',
+  unmade: 'Found, not copied',
+  locked: 'Found, set locked',
+}
+
+const ODD_NAME =
+  'a “/” in it (as Finder shows it), or a space at its start or end, or another sign a browser does not allow'
+
+export const BLIND_WHY: Readonly<Record<Blind, string>> = {
+  unseen: `Your browser shows this page no file at a place the set names for it: the name of the file, or of a folder on the way, has ${ODD_NAME}. The file may well be there, so no other file is taken for it.`,
+  unmade: `The file was found. It would be copied into the project, and your browser makes no file with such a name: ${ODD_NAME}. livesaver on your computer copies it in.`,
+  locked:
+    'The file was found, but this page cannot rewrite the set: the set, or a folder it lies in, has a name your browser hides. The page reads it through the other folder you gave. livesaver on your computer fixes it.',
+}
+
+/** Why a sample is listed as missing, in a few words (an older livesaver says no `blind`). */
+export const whyLabel = (row: Pick<MissingRow, 'status'> & { readonly blind?: Blind | '' }) =>
+  row.blind ? BLIND_LABEL[row.blind] : STATUS_LABEL[row.status]
+
+/** The same in full, for someone who wants to do something about it. */
+export const whyText = (row: Pick<MissingRow, 'status'> & { readonly blind?: Blind | '' }) =>
+  row.blind ? BLIND_WHY[row.blind] : STATUS_WHY[row.status as keyof typeof STATUS_WHY]
 
 export const ACTION_LABEL: Readonly<Record<string, string>> = {
   collected: 'Collect',

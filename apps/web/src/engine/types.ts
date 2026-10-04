@@ -226,6 +226,11 @@ export interface KnownFolder extends LibraryFolder {
    * this many of its files then (their names). That is why it was not kept.
    */
   readonly lost?: number
+  /**
+   * In a browser, of a folder that was dropped to be edited: this many of its files the handle
+   * hides, and the page reads from what the drop listed (counted as `lost` is).
+   */
+  readonly hidden?: number
 }
 
 /** Where things are on this computer, as livesaver found them. */

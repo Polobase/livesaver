@@ -5,8 +5,21 @@
  */
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
-import { copyFixtures, memoryFolder, tempDir, uploadedFolder, writeFile } from '@livesaver/test-kit'
-import { type FolderSource, folderFromHandle, localEngineWorker } from '@livesaver/web'
+import {
+  copyFixtures,
+  droppedFolder,
+  memoryFolder,
+  tempDir,
+  uploadedFolder,
+  writeFile,
+} from '@livesaver/test-kit'
+import {
+  editable,
+  type FolderSource,
+  folderFromHandle,
+  hiddenByHandle,
+  localEngineWorker,
+} from '@livesaver/web'
 import { createPinia, setActivePinia } from 'pinia'
 import type { ScanOptions } from '../src/engine/index.js'
 import { BrowserEngine } from '../src/engine/index.js'
@@ -61,16 +74,7 @@ async function page() {
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 /** A folder as a drop hands it over where the browser also gives a handle for it. */
-function dropped(dir: string): FolderSource {
-  const { name, files } = uploadedFolder(dir)
-  return {
-    kind: 'listing',
-    name,
-    paths: files.map((file) => file.path),
-    open: async (index) => files[index]?.file,
-    kept: memoryFolder(dir),
-  }
-}
+const dropped = (dir: string): FolderSource => droppedFolder(dir, memoryFolder(dir))
 
 const rows = (
   folders: readonly { name: string; path: string; vendor: boolean; waits?: string }[],
@@ -177,6 +181,45 @@ describe('the folders of a page after a reload', () => {
       ['samples', true, 0],
       ['Odd', false, 1],
     ])
+  })
+
+  test('a project folder dropped to be edited is read in full, and is to be dropped again', async () => {
+    // A sample of a project with a name its handle hides: a drop lists it.
+    writeFile(join(projects, 'Fixed Path Project', 'Samples', ' lead.wav'), 'RIFF lead')
+    const handle = memoryFolder(projects)
+    handle.hides = hiddenByHandle
+    const first = await page()
+    first.library.addSources('projects', [editable(droppedFolder(projects, handle))])
+    expect(first.library.projects.map(({ name, hidden }) => [name, hidden])).toEqual([
+      ['projects', 1],
+    ])
+    expect(await first.scans.run()).toBe(true)
+    // (The scan counts the file the handle hides: it is read from what the drop listed.)
+    const seen = first.scans.scan?.samples.indexedFiles ?? 0
+    await settled()
+    expect(kept.map((folder) => [folder.name, folder.handle !== undefined, folder.lost])).toEqual([
+      ['projects', true, 1],
+    ])
+
+    // Read through its handle alone it would show less: it waits, and says why.
+    const again = await page()
+    expect(
+      again.library.projects.map(({ name, waits, lost }) => [name, waits ?? 'there', lost ?? 0]),
+    ).toEqual([['projects', 'folder', 1]])
+    expect(again.library.canScan).toBe(false)
+    again.library.addSources('projects', [editable(droppedFolder(projects, handle))])
+    expect(rows(again.library.projects)).toEqual([['projects', '', false, 'there']])
+    expect(await again.scans.run()).toBe(true)
+    expect(again.scans.scan?.samples.indexedFiles).toBe(seen)
+
+    // Chosen with the dialog, the same folder shows one file fewer, and is kept as it is.
+    const chosen = await page()
+    chosen.library.remove('projects', chosen.library.projects[0]?.id as string)
+    chosen.library.addSources('projects', [folderFromHandle(handle)])
+    expect(await chosen.scans.run()).toBe(true)
+    expect(chosen.scans.scan?.samples.indexedFiles).toBe(seen - 1)
+    await settled()
+    expect(rows((await page()).library.projects)).toEqual([['projects', '', false, 'there']])
   })
 
   test('a page without a database for it remembers nothing, and works as before', async () => {

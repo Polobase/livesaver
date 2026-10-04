@@ -159,10 +159,14 @@ export async function prepare(
     probe,
     targets,
     // Of the Live app's own folder only the Core Library holds samples to relink to; the rest
-    // (built-in devices, lessons, Max) is Live's business.
-    searchRoots: mounts.map((m) =>
-      m.path === liveFolder ? posix.join(config.appResources, 'Core Library') : m.path,
-    ),
+    // (built-in devices, lessons, Max) is Live's business. (A folder given twice is one place.)
+    searchRoots: [
+      ...new Set(
+        mounts.map((m) =>
+          m.path === liveFolder ? posix.join(config.appResources, 'Core Library') : m.path,
+        ),
+      ),
+    ],
     config,
     parser,
   }

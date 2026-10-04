@@ -33,8 +33,26 @@ export interface FolderFile {
   readonly file: File
 }
 
+/**
+ * The files of a folder that its handle does not show, as a drop listed them: by their paths in
+ * the folder ('/'-separated), each fetched when it is read.
+ */
+export interface HiddenFiles {
+  readonly paths: readonly string[]
+  readonly open: (index: number) => Promise<File | undefined>
+}
+
 export type FolderSource =
-  | { readonly kind: 'handle'; readonly name: string; readonly handle: DirectoryHandleLike }
+  | {
+      readonly kind: 'handle'
+      readonly name: string
+      readonly handle: DirectoryHandleLike
+      /**
+       * Where the folder was dropped: what the handle hides. The page then reads the folder in
+       * full, and still writes through the handle.
+       */
+      readonly hidden?: HiddenFiles
+    }
   | { readonly kind: 'files'; readonly name: string; readonly files: readonly FolderFile[] }
   /**
    * A folder known by the paths of its files only (relative to the folder, '/'-separated); a
@@ -86,9 +104,35 @@ export function folderFromHandle(handle: DirectoryHandleLike): FolderSource {
 }
 
 /**
- * The folders of a drop as handles (Chromium): what a page needs to write into them, once its
- * user allows that. Call it inside the `drop` handler: the items are only readable while the
- * event is being handled, so every handle is asked for before the first `await`.
+ * A dropped folder as the handle the browser gave for it, to be edited through, with what that
+ * handle hides taken from the listing of the drop. A folder the browser gave no handle for
+ * stays what it is: it can be read, not edited.
+ */
+export function editable(source: FolderSource): FolderSource {
+  if (source.kind !== 'listing' || !source.kept) return source
+  const { open } = source
+  const at: number[] = []
+  const paths: string[] = []
+  for (const [index, path] of source.paths.entries()) {
+    if (!path.split('/').some(hiddenByHandle)) continue
+    at.push(index)
+    paths.push(path)
+  }
+  const hidden: HiddenFiles = { paths, open: (index) => open(at[index] ?? -1) }
+  return {
+    kind: 'handle',
+    name: source.name,
+    handle: source.kept,
+    ...(paths.length ? { hidden } : {}),
+  }
+}
+
+/**
+ * The folders of a drop as handles alone (Chromium), without listing them: what a page needs to
+ * write into them, once its user allows that. Such a folder shows less than there is (see
+ * above); `editableFromDrop` also lists it. Call it inside the `drop` handler: the items are
+ * only readable while the event is being handled, so every handle is asked for before the
+ * first `await`.
  */
 export function handlesFromDrop(items: DataTransferItemList): Promise<FolderSource[]> {
   const asked: Promise<{ kind?: string } | null>[] = []
@@ -219,4 +263,16 @@ export function foldersFromDrop(
     }
     return folders
   })()
+}
+
+/**
+ * The folders of a drop that a page is to edit (Chromium hands out a handle for a dropped
+ * folder): each as its handle, with what the handle hides from the listing of the drop. Call it
+ * inside the `drop` handler, like `foldersFromDrop`.
+ */
+export function editableFromDrop(
+  items: DataTransferItemList,
+  onFiles: (count: number) => void = () => {},
+): Promise<FolderSource[]> {
+  return foldersFromDrop(items, onFiles).then((folders) => folders.map(editable))
 }

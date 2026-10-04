@@ -2,8 +2,17 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import { copyFixtures, tempDir, uploadedFolder, writeFile } from '@livesaver/test-kit'
 import {
+  copyFixtures,
+  droppedFolder,
+  memoryFolder,
+  tempDir,
+  uploadedFolder,
+  writeFile,
+} from '@livesaver/test-kit'
+import {
+  editable,
+  editableFromDrop,
   type FolderSource,
   foldersFromDrop,
   hiddenByHandle,
@@ -182,4 +191,39 @@ test('which names a handle hides, and how many files of a folder that costs', ()
     ]),
   ).toBe(3)
   expect(lostBehindHandle(['Kick/1.wav', 'Loops/2.wav'])).toBe(0)
+})
+
+test('a dropped folder that is to be edited: its handle, with what the handle hides from the drop', async () => {
+  writeFile(join(samples, 'Claps:Snares', 'clap.wav'), 'RIFF clap')
+  writeFile(join(samples, 'Lib1', ' lead.wav'), 'RIFF lead')
+  const handle = memoryFolder(samples)
+  const [source] = await editableFromDrop([
+    { ...folder(samples), getAsFileSystemHandle: async () => handle },
+  ] as unknown as DataTransferItemList)
+  if (source?.kind !== 'handle') throw new Error('expected a handle')
+  expect([source.name, source.handle === handle]).toEqual(['samples', true])
+  // Of everything the drop listed, only what the handle will not show is kept beside it.
+  expect([...(source.hidden?.paths ?? [])].sort()).toEqual([
+    'Claps:Snares/clap.wav',
+    'Lib1/ lead.wav',
+  ])
+  const at = source.hidden?.paths.indexOf('Lib1/ lead.wav') ?? -1
+  expect(fetched).toEqual([])
+  expect(await (await source.hidden?.open(at))?.text()).toBe('RIFF lead')
+  expect(fetched).toEqual([' lead.wav'])
+  expect(await source.hidden?.open(99)).toBeUndefined()
+})
+
+test('a folder with no such name is its handle alone; one without a handle stays a listing', () => {
+  const handle = memoryFolder(samples)
+  expect(editable(droppedFolder(samples, handle))).toEqual({
+    kind: 'handle',
+    name: 'samples',
+    handle,
+  })
+  // (Firefox and Safari hand out no handle: the folder can be read, not edited.)
+  const listed = droppedFolder(samples)
+  expect(editable(listed)).toBe(listed)
+  const uploaded = uploadedFolder(samples)
+  expect(editable(uploaded)).toBe(uploaded)
 })

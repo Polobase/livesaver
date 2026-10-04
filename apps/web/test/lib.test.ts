@@ -3,11 +3,11 @@ import { describe, expect, test } from 'bun:test'
 import type { ProjectRow, SetRow } from '@livesaver/ops'
 import type { Scan } from '../src/engine/types.js'
 import { bytes, count, percent, plural, seconds, splitPath, when } from '../src/lib/format.js'
-import { projectHealth, setHealth, tally } from '../src/lib/health.js'
+import { projectHealth, setHealth, tally, whyLabel, whyText } from '../src/lib/health.js'
 import { requestKey, wantedOf } from '../src/lib/library.js'
 import { FREE_SPACE_MARGIN, fits, planOf } from '../src/lib/plan.js'
 import { advance, starting } from '../src/lib/progress.js'
-import { hiddenFromPage, isReady, pageReadiness } from '../src/lib/ready.js'
+import { isReady, pageReadiness } from '../src/lib/ready.js'
 import { adviceFor } from '../src/lib/words.js'
 
 const set = (extra: Partial<SetRow> & { missing?: number } = {}): SetRow => ({
@@ -230,6 +230,36 @@ describe('advice for missing samples', () => {
   })
 })
 
+describe('a sample the browser kept the page from', () => {
+  test('says so in its row, and is no sample to go and look for', () => {
+    expect(whyLabel({ status: 'not-found', blind: '' })).toBe('Not found')
+    expect(whyLabel({ status: 'mismatch' })).toBe('Different content')
+    expect(
+      (['unseen', 'unmade', 'locked'] as const).map((blind) =>
+        whyLabel({ status: 'not-found', blind }),
+      ),
+    ).toEqual(['Hidden by browser', 'Found, not copied', 'Found, set locked'])
+    expect(whyText({ status: 'not-found' })).toBe(
+      'No file of this name is in the folders that were searched.',
+    )
+    expect(whyText({ status: 'not-found', blind: 'unseen' })).toContain(
+      'The file may well be there, so no other file is taken for it.',
+    )
+    // What helps is the folder that shows every name; the other two need livesaver itself.
+    expect(adviceFor({ advice: 'unseen', hint: '' })).toMatchObject({
+      addFolder: true,
+      accept: false,
+    })
+    expect(adviceFor({ advice: 'unseen', hint: '' }).text).toContain(
+      'Drop your project folder onto the sample folders as well: a dropped folder shows every name.',
+    )
+    for (const advice of ['unmade', 'locked'] as const) {
+      expect(adviceFor({ advice, hint: '' }).addFolder).toBe(false)
+      expect(adviceFor({ advice, hint: '' }).text).toContain('livesaver on your computer')
+    }
+  })
+})
+
 describe('what a fix in a browser needs before it starts', () => {
   const folder = (id: string, extra: object = {}) => ({
     id,
@@ -317,12 +347,5 @@ describe('what a fix in a browser needs before it starts', () => {
       'Projects',
       'Old Projects',
     ])
-  })
-
-  test('names a browser hides from a page, in a folder that was chosen for editing', () => {
-    const hidden = ['Claps:Snares.wav', 'Claps/Snares.wav', ' Kick.wav', 'Kick.wav ', 'a?b.aif']
-    const shown = ['Kick 1.wav', '.hidden.wav', 'Kick-01 (Take 2).wav', 'Ünïcödé – kick.wav']
-    expect(hidden.filter(hiddenFromPage)).toEqual(hidden)
-    expect(shown.filter(hiddenFromPage)).toEqual([])
   })
 })

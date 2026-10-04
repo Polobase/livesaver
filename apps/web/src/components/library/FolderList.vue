@@ -5,7 +5,7 @@
  * dialog (File System Access API) is used for one thing only, a project folder that is to be
  * fixed in the page: only its handles can write, but they hide files with certain names.
  */
-import { foldersFromDrop, foldersFromFiles, handlesFromDrop } from '@livesaver/web'
+import { editableFromDrop, foldersFromDrop, foldersFromFiles } from '@livesaver/web'
 import { computed, ref, useTemplateRef } from 'vue'
 import { pickFolderToEdit } from '../../engine/storage'
 import type { FolderListing } from '../../engine/types'
@@ -79,12 +79,12 @@ async function drop(event: DragEvent): Promise<void> {
   problem.value = ''
   reading.value = 0
   try {
-    // (Both read the drop before anything is waited for: it cannot be read later.)
-    const dropped = await (forEditing.value
-      ? handlesFromDrop(event.dataTransfer.items)
-      : foldersFromDrop(event.dataTransfer.items, (files) => {
-          reading.value = files
-        }))
+    // (The drop is read before anything is waited for: it cannot be read later.) A folder that
+    // is to be edited is listed too: a drop shows every file, its handle hides some.
+    const take = forEditing.value ? editableFromDrop : foldersFromDrop
+    const dropped = await take(event.dataTransfer.items, (files) => {
+      reading.value = files
+    })
     library.addSources(props.kind, dropped)
   } catch (error) {
     problem.value = `The folder could not be read: ${(error as Error).message || String(error)}`
@@ -95,9 +95,7 @@ async function drop(event: DragEvent): Promise<void> {
 
 const waiting = computed(() =>
   reading.value !== undefined
-    ? forEditing.value
-      ? 'taking the folder…'
-      : `listing… ${count(reading.value)} files`
+    ? `listing… ${count(reading.value)} files`
     : listing.value
       ? 'a large folder takes a few seconds to appear…'
       : 'or drop a folder here',

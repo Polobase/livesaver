@@ -3,7 +3,7 @@
 Browser host for livesaver: folders a page was given (folder upload, drag and drop, File System Access API) as a file system, gzip, hashing and worker-based set parsing; the scan that runs in a page; and a fix and an upgrade of plug-ins through folder handles, where a browser hands a page a folder to edit.
 
 - `WebFs`, `createWebHost`: the given folders as livesaver's Host ports. Read-only, unless folders are given for editing.
-- `foldersFromFiles`, `foldersFromDrop`, `folderFromHandle`, `handlesFromDrop`: a folder as the browser hands it over.
+- `foldersFromFiles`, `foldersFromDrop`, `folderFromHandle`, `editableFromDrop`: a folder as the browser hands it over (the last one to be edited: a handle, with what a handle hides taken from the drop).
 - `createWorkerParser`, `serveParser`: sets parsed on web workers.
 - `scanFolders`: the samples (as `livesaver doctor` reports them) and the plug-ins of every set.
 - `installedIn`: what is installed, from folders a page is shown (a plug-in folder, the folder of Live's plug-in database), as the inventory and the catalog the command line makes.

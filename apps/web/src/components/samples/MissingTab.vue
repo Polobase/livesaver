@@ -8,7 +8,7 @@ import { computed, ref } from 'vue'
 import type { FolderListing, Scan } from '../../engine/types'
 import { missingAsText, missingGroups } from '../../lib/detail'
 import { bytes, count, plural, splitPath } from '../../lib/format'
-import { STATUS_LABEL } from '../../lib/health'
+import { whyLabel } from '../../lib/health'
 import { type Filter, matcher } from '../../lib/search'
 import { adviceFor } from '../../lib/words'
 import { useEngineStore } from '../../stores/engine'
@@ -194,14 +194,14 @@ function added(folder: FolderListing): void {
               <tbody class="divide-y divide-default border-t border-default">
                 <tr
                   v-for="row in group.rows.slice(0, limit(keyOf(group)))"
-                  :key="`${row.status}:${row.path}`"
+                  :key="`${row.status}:${row.blind}:${row.path}`"
                   class="cursor-pointer hover:bg-elevated/50 focus-visible:outline-2 focus-visible:outline-(--ui-primary)"
                   tabindex="0"
                   @click="emit('open', row)"
                   @keydown.enter.space.prevent="emit('open', row)"
                 >
                   <td class="truncate py-1.5 pe-3 font-medium" :title="row.name">{{ row.name }}</td>
-                  <td class="truncate py-1.5 pe-3">{{ STATUS_LABEL[row.status] }}</td>
+                  <td class="truncate py-1.5 pe-3" :title="whyLabel(row)">{{ whyLabel(row) }}</td>
                   <td class="truncate py-1.5 pe-3 text-muted" :title="row.path">
                     {{ splitPath(row.path).folder || row.path }}
                   </td>

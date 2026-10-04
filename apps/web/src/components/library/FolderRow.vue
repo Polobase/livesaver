@@ -2,7 +2,7 @@
 /** One folder of the library: what it is, where it lies, and (for a sample folder) whose it is. */
 import { computed, ref } from 'vue'
 import type { KnownFolder, LocatedFolder } from '../../engine/types'
-import { count } from '../../lib/format'
+import { count, plural } from '../../lib/format'
 import { LIVE_CONTENT } from '../../lib/library'
 import { useEngineStore } from '../../stores/engine'
 import { type FolderKind, useLibraryStore } from '../../stores/library'
@@ -178,6 +178,12 @@ const canMark = computed(() => props.kind === 'search' && !isLive.value)
           Added to be read only. To fix in it, remove it and add it again with “Add folder”.
         </template>
       </div>
+      <!-- A folder that was dropped is read in full; one chosen with the dialog shows less. -->
+      <p v-if="access && folder.hidden" class="text-xs text-muted" data-testid="folder-hidden">
+        Dropped, so this page also sees its
+        {{ plural(folder.hidden, 'file with a name', 'files with names') }}
+        a browser hides in a folder it lets a page edit.
+      </p>
       <UInput
         v-if="editing"
         :model-value="folder.path"

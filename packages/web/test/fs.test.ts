@@ -6,12 +6,23 @@ import { createNodeHost } from '@livesaver/node'
 import { Probe } from '@livesaver/ops'
 import {
   copyFixtures,
+  droppedFolder,
+  memoryFolder,
   pickedFolder as picked,
   tempDir,
   uploadedFolder as uploaded,
   writeFile,
 } from '@livesaver/test-kit'
-import { type FolderSource, foldersFromFiles, WebFs, webCodec, webHash } from '../src/index.js'
+import {
+  editable,
+  type FolderSource,
+  folderFromHandle,
+  foldersFromFiles,
+  hiddenByHandle,
+  WebFs,
+  webCodec,
+  webHash,
+} from '../src/index.js'
 
 let tmp: { path: string; cleanup: () => void }
 let samples: string
@@ -131,6 +142,113 @@ describe('a listed folder', () => {
     expect(await fs.file('/samples/Lib1/Kick/1.wav')).toBeUndefined()
     expect(await fs.stat('/samples/Lib1/Kick/1.wav')).toBeUndefined()
     expect(fs.read('/samples/Lib1/Kick/1.wav', 0, 10)).rejects.toThrow('No such file')
+  })
+})
+
+describe('a folder behind a handle, which hides entries with some names', () => {
+  /** A project folder as Chromium hands it out, inside a library folder. */
+  function library() {
+    const root = join(tmp.path, 'Music')
+    writeFile(join(root, 'Projects', 'Song Project', 'Song.als'), 'set')
+    writeFile(join(root, 'Projects', 'Song Project', 'Samples', 'Kick.wav'), 'RIFF kick')
+    writeFile(join(root, 'Projects', 'Song Project', 'Samples', ' lead.wav'), 'RIFF lead')
+    writeFile(join(root, 'Projects', 'Song Project', 'Samples', 'Claps:Snares', 'a.wav'), 'RIFF a')
+    writeFile(join(root, 'Loops', 'Odd:Names', 'b.wav'), 'RIFF b')
+    const handle = memoryFolder(join(root, 'Projects'))
+    handle.hides = hiddenByHandle
+    return { root, handle, projects: folderFromHandle(handle) }
+  }
+  const SAMPLES = '/Music/Projects/Song Project/Samples'
+
+  test('what it hides is not there for the page, and such a place is said to be hidden', async () => {
+    const { projects } = library()
+    const fs = new WebFs([{ path: '/Music/Projects', source: projects }])
+    expect((await fs.listDir(SAMPLES))?.map((e) => e.name)).toEqual(['Kick.wav'])
+    expect(await fs.kind(`${SAMPLES}/ lead.wav`)).toBeUndefined()
+    expect(await fs.kind(`${SAMPLES}/Claps:Snares/a.wav`)).toBeUndefined()
+    // Neither seen nor to be made: by its own name, or by the name of a folder on the way.
+    for (const place of [`${SAMPLES}/ lead.wav`, `${SAMPLES}/Claps:Snares/a.wav`])
+      expect([place, fs.hides(place), fs.refuses(place)]).toEqual([place, true, true])
+    expect([fs.hides(`${SAMPLES}/Kick.wav`), fs.refuses(`${SAMPLES}/New.wav`)]).toEqual([
+      false,
+      false,
+    ])
+    // Outside the folders that were given, nothing is known and nothing claimed.
+    expect(fs.hides('/Elsewhere/ lead.wav')).toBe(false)
+  })
+
+  test('a folder that was given around it shows what the handle hides', async () => {
+    const { root, projects } = library()
+    for (const around of [uploaded(root), listed(root)]) {
+      const fs = new WebFs([
+        { path: '/Music', source: around },
+        { path: '/Music/Projects', source: projects },
+      ])
+      expect((await fs.listDir(SAMPLES))?.map((e) => e.name).sort()).toEqual([
+        ' lead.wav',
+        'Claps:Snares',
+        'Kick.wav',
+      ])
+      expect(await fs.kind(`${SAMPLES}/ lead.wav`)).toBe('file')
+      expect(new TextDecoder().decode(await fs.readFile(`${SAMPLES}/ lead.wav`))).toBe('RIFF lead')
+      // A folder with such a name, and what lies in it.
+      expect((await fs.listDir(`${SAMPLES}/Claps:Snares`))?.map((e) => e.name)).toEqual(['a.wav'])
+      expect((await fs.stat(`${SAMPLES}/Claps:Snares/a.wav`))?.size).toBe(6)
+      // What the handle shows is read through the handle: it is the file as it is now.
+      expect((await fs.stat(`${SAMPLES}/Kick.wav`))?.size).toBe(9)
+      // Seen, so not hidden; made it still cannot be.
+      expect([fs.hides(`${SAMPLES}/ lead.wav`), fs.refuses(`${SAMPLES}/ lead.wav`)]).toEqual([
+        false,
+        true,
+      ])
+      // The folder around is an upload: its own odd names were never hidden.
+      expect(await fs.kind('/Music/Loops/Odd:Names/b.wav')).toBe('file')
+      expect([
+        fs.hides('/Music/Loops/Odd:Names/b.wav'),
+        fs.refuses('/Music/Loops/x:y.wav'),
+      ]).toEqual([false, false])
+    }
+  })
+
+  test('the same folder, given once more as an upload or a drop, shows it too', async () => {
+    const { root, handle, projects } = library()
+    const again = join(root, 'Projects')
+    // In either order: the handle is what is read, the other one what it hides. Or as one
+    // folder: dropped to be edited, it brings what its handle hides.
+    for (const mounts of [
+      [projects, uploaded(again)],
+      [listed(again), projects],
+      [editable(droppedFolder(again, handle))],
+    ]) {
+      const fs = new WebFs(mounts.map((source) => ({ path: '/Music/Projects', source })))
+      expect((await fs.listDir(SAMPLES))?.map((e) => e.name).sort()).toEqual([
+        ' lead.wav',
+        'Claps:Snares',
+        'Kick.wav',
+      ])
+      expect(new TextDecoder().decode(await fs.readFile(`${SAMPLES}/ lead.wav`))).toBe('RIFF lead')
+      expect((await fs.stat(`${SAMPLES}/Claps:Snares/a.wav`))?.size).toBe(6)
+      expect([fs.hides(`${SAMPLES}/ lead.wav`), fs.refuses(`${SAMPLES}/ lead.wav`)]).toEqual([
+        false,
+        true,
+      ])
+      // Each entry is there once.
+      expect((await fs.listDir('/Music/Projects'))?.map((e) => e.name)).toEqual(['Song Project'])
+    }
+  })
+
+  test('only what the handle hides is taken from the folder around: a file that is gone stays gone', async () => {
+    const { root, handle, projects } = library()
+    const around = uploaded(root)
+    // Deleted since the folder around was handed over: the handle no longer has it.
+    const song = handle.entries.get('Song Project') as ReturnType<typeof memoryFolder>
+    ;(song.entries.get('Samples') as ReturnType<typeof memoryFolder>).entries.delete('Kick.wav')
+    const fs = new WebFs([
+      { path: '/Music', source: around },
+      { path: '/Music/Projects', source: projects },
+    ])
+    expect(await fs.kind(`${SAMPLES}/Kick.wav`)).toBeUndefined()
+    expect(await fs.kind(`${SAMPLES}/ lead.wav`)).toBe('file')
   })
 })
 

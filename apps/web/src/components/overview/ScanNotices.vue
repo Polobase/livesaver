@@ -6,28 +6,22 @@
 import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
 import { bytes, count, plural, when } from '../../lib/format'
-import { hiddenFromPage } from '../../lib/ready'
 import { TAKEN_OUT } from '../../lib/runs'
 import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
-import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
 
 const props = defineProps<{ scan: Scan }>()
 const engines = useEngineStore()
 const fix = useFixStore()
-const library = useLibraryStore()
 const scans = useScanStore()
 /**
- * Missing samples a browser may have hidden: a project folder that was chosen for editing shows
- * a page no file with certain names (see `hiddenFromPage`).
+ * Samples that may only look missing: in a project folder that was chosen for editing, a browser
+ * shows a page no file or folder with certain names. The scan left them alone (`unseen`).
  */
-const hidden = computed(() =>
-  engines.kind === 'browser' &&
-  library.projects.some((folder) => folder.access === 'edit' || folder.access === 'ask')
-    ? props.scan.samples.missing.filter((row) => hiddenFromPage(row.name))
-    : [],
-)
+const hidden = computed(() => props.scan.samples.missing.filter((row) => row.blind === 'unseen'))
+/** The end of a path the set stores: the name the browser hides may be the folder's. */
+const ending = (path: string) => path.split(/[\\/]/).slice(-2).join('/')
 
 const busy = computed(() => scans.running || fix.running || fix.undoing)
 const some = (items: readonly string[], limit = 5) =>
@@ -198,10 +192,11 @@ const liveAdvice = computed(() =>
       color="neutral"
       variant="outline"
       icon="i-lucide-eye-off"
-      :title="`${plural(hidden.length, 'missing sample has a name', 'missing samples have names')} your browser hides from a page`"
-      :description="`For example “${hidden[0]?.name}”. In a project folder that was chosen for editing, a browser shows a page no file with a “/” in its name (as Finder shows it) or with a space at its start or end. ${hidden.length === 1 ? 'This sample' : 'These samples'} may well be where the sets expect ${hidden.length === 1 ? 'it' : 'them'}: livesaver on your computer sees ${hidden.length === 1 ? 'it' : 'them'}.`"
+      :title="`${plural(hidden.length, 'sample')} may only look missing: your browser does not show ${hidden.length === 1 ? 'it' : 'them'} to this page`"
+      :description="`For example “${ending(hidden[0]?.path ?? '')}”. In a project folder that was chosen for editing, a browser shows a page no file or folder with a “/” in its name (as Finder shows it) or with a space at its start or end. ${hidden.length === 1 ? 'This sample' : 'These samples'} may well be where the sets expect ${hidden.length === 1 ? 'it' : 'them'}, so the page takes no other file for ${hidden.length === 1 ? 'it' : 'them'}. To let the page see every name, drop your project folder onto the sample folders as well, and scan again.`"
       role="note"
       data-testid="hidden-names"
+      :actions="[{ label: 'To the folders', color: 'neutral', variant: 'subtle', to: '/settings' }]"
     />
 
     <UAlert

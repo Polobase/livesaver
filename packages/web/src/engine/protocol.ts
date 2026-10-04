@@ -37,7 +37,13 @@ export interface ScanRequest {
  * it is.
  */
 export type WireSource =
-  | { readonly kind: 'handle'; readonly name: string; readonly handle: DirectoryHandleLike }
+  | {
+      readonly kind: 'handle'
+      readonly name: string
+      readonly handle: DirectoryHandleLike
+      /** The paths of the files the handle hides; the files stay with the page, like a listing's. */
+      readonly hidden?: { readonly paths: readonly string[] }
+    }
   | { readonly kind: 'listing'; readonly name: string; readonly paths: readonly string[] }
 
 export interface WireFolder extends Omit<FolderInput, 'source'> {

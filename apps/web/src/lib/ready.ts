@@ -3,15 +3,8 @@
  * edit the project folders, and that it knows where the folders lie whose places a fix writes
  * into the sets. (The engine checks both again: this is to say it before the button is pressed.)
  */
-import { hiddenByHandle } from '@livesaver/web'
 import type { KnownFolder, LocatedFolder, Scan, ScanRequest } from '../engine/types.js'
 import { LIVE_CONTENT } from './library.js'
-
-/**
- * A browser shows a page no file whose name it considers unsafe, in a folder that was chosen
- * for editing (see `hiddenByHandle`). A sample named like that counts as missing there.
- */
-export const hiddenFromPage = hiddenByHandle
 
 export interface PageReadiness {
   /** Project folders the page may not edit yet: its user can be asked. */

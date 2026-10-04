@@ -7,7 +7,7 @@ import { posix } from '@livesaver/core'
 import { type Action, isComplete, type SetResult } from './collect.js'
 import type { DoctorResult } from './doctor.js'
 import type { Environment } from './env.js'
-import { MISSING_STATES, type Status } from './match.js'
+import { type Blind, MISSING_STATES, type Status } from './match.js'
 import {
   FOUND_NAMES,
   foundSources,
@@ -111,6 +111,8 @@ export interface MissingRow {
    * same name and place, another fingerprint ('' = there is none, or the rule is on).
    */
   readonly libraryFile: string
+  /** It is left as it is because of what the host cannot do, a browser ('' = it is not). */
+  readonly blind: Blind | ''
 }
 
 export interface ChangeRow {
@@ -278,6 +280,7 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
         usedBy: [...g.sets].map(rel),
         candidates: g.choice.candidates.slice(0, 10),
         libraryFile: g.choice.libraryFile,
+        blind: g.choice.blind,
       }
     }),
     changes: r.results.flatMap((s) =>

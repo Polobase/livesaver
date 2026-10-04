@@ -423,6 +423,8 @@ describe('what can go wrong while a fix runs', () => {
       'The browser lets a page make no file or folder named “1.wav”.',
     ])
     expect(memoryFiles(folder).get(SET)?.writes).toBe(0)
+    // A copy that was not made is not counted as one.
+    expect([fixed?.files, fixed?.bytes]).toEqual([0, 0])
   })
 
   test('a run that fails after it wrote names itself, so that it can be undone', async () => {

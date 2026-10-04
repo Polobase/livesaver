@@ -224,8 +224,38 @@ up front) and the only way a page can write, but Chromium does not show everythi
 
 Uploads and drops show every file. In a real project folder (299 projects, 46,507 files) a
 handle hides 118 files: 36 samples, their analysis files, and Finder's icon files; no set and
-no folder. So a handle is acceptable there, with that said to the user; sample folders stay
-uploads and drops.
+no folder. Sample folders stay uploads and drops; a project folder that is to be fixed needs
+its handle, and the page makes up for what the handle hides:
+
+- **A sample the handle hides is not a missing sample.** The first real fix in a page showed
+  what happens otherwise: 41 samples that lay where their sets expect them counted as missing,
+  were "found" elsewhere, and were to be copied to the names the browser refuses. The fix
+  failed for all 48 sets it touched, and said it had copied the 23 files it had planned to
+  (it had copied none: a copy now counts once it is made). So the file system says
+  where it sees nothing and where it can make nothing (`FsRead.hides`, `FsRead.refuses`), and
+  a set is planned by that (`processSet`, `Choice.blind`):
+  - `unseen`: a place where Live would look for the file is hidden. The file may be there:
+    nothing is looked for in its place, and the reference is left alone.
+  - `unmade`: the file was found, and would be copied to a name the browser does not make.
+    Another place in the project is taken if there is one (`Project.places`); otherwise the
+    reference is left alone, with the file that was found as its candidate.
+  - `locked`: the set itself has such a name, or lies in a folder with one. It is read (through
+    a listing, see below) and checked, and nothing is done for it.
+
+  Each of the three is listed with the missing samples under a source of its own, with what to
+  do, and no set is planned to change for it: a fix then writes the sets it can, and fails for
+  none.
+- **A listing of the same folder shows what the handle hides** (`WebFs`: the handle is what is
+  read and written, the listing what it leaves out). The page gets one in three ways:
+  - The project folder is **dropped** rather than chosen in the dialog: a drop lists every
+    file and comes with the handle (`editableFromDrop`; the source keeps the files the handle
+    hides, `hidden`). The folder is then read in full from the start.
+  - The same folder is given once more, as an upload or a drop, among the sample folders
+    (`locate` takes it for the project folder: one place, read once).
+  - A folder that holds the project folder is among the sample folders (a library folder).
+
+  A place that a listing shows is not hidden, and still refused: a file there is seen, and
+  none can be made.
 
 **Files are fetched lazily.** For an uploaded folder even reading a file's size costs a round
 trip to the browser (about 60 µs), and sending a `File` object to a worker about 30 µs: touching
@@ -308,7 +338,7 @@ What a page cannot do, and says before the switch goes on:
 | date of a rewritten set | that of the fix; an undo puts the old one back | that of the fix; an undo cannot put the old one back |
 | what an undo takes out | the Trash | a hidden folder in the project folder |
 | free space | checked | unknown |
-| names with `:`, or a space at an end | seen and written | hidden from the page, and a file cannot be made with such a name: the set is left alone, with the reason |
+| names with `:`, or a space at an end | seen and written | seen if the folder was dropped (or is listed by a folder around it), otherwise left alone as "not shown by the browser"; never made: a copy goes elsewhere in the project, or the reference is left with the reason |
 | what an undo needs | livesaver's state folder | the browser's storage for the site: cleared with the site's data |
 | plug-ins | what is installed is looked up; upgrade, with undo | what is installed is what the page was shown; upgrade, with undo, once that includes Live's plug-in database |
 
@@ -487,8 +517,17 @@ there.
     that they cannot. No test browser lets a page write to a folder of the disk without a
     person saying yes (the headless one refuses, the full one waits for its prompt), and the
     folder dialog cannot be driven: the project folder that is fixed in this test lies in the
-    browser's private file system, behind the same handles. **Writing to a folder of the disk
-    through a browser's permission is not covered by a test**; it is tried by hand.
+    browser's private file system, behind the same handles.
+  - Fixing in a folder of the disk (`disk.e2e.ts`, Chromium as it is installed for people):
+    "allow on every visit" is a setting of the browser for a site, so a profile is given that
+    setting before the browser starts with it (the guards of the File System Access API in
+    its `Preferences`), and the page is let in as it is for such a user. The folder is a
+    temporary one, with the browser's real rules for names: dropped to be edited, it is read
+    in full, the fix writes the set, its copy and its backup to the disk, and the undo puts
+    them back; chosen "in the dialog" (the test answers the dialog with the handle of a drop),
+    the sample the handle hides is left alone and said to be, the fix fails for no set, and
+    the folder dropped as well shows the sample. **The prompt itself, and the folder dialog,
+    are not covered by a test.**
   - A library of real size (299 projects, 876 sets, 9,305 planned changes, 2,243 missing
     samples, 199 plug-ins; made up from a small real scan): a table builds fewer than 80 rows,
     scrolls to its end without a frame of half a second, and is sorted and searched at once.

@@ -63,3 +63,27 @@ export function uploadedFolder(dir: string): {
   walk(dir, '')
   return { kind: 'files', name: basename(dir), files }
 }
+
+/**
+ * A directory as a drop delivers it: its files by their paths, each fetched when it is read.
+ * `kept`: the handle a browser also hands out for a dropped folder (Chromium).
+ */
+export function droppedFolder<H = never>(
+  dir: string,
+  kept?: H,
+): {
+  kind: 'listing'
+  name: string
+  paths: string[]
+  open: (index: number) => Promise<File | undefined>
+  kept?: H
+} {
+  const { name, files } = uploadedFolder(dir)
+  return {
+    kind: 'listing',
+    name,
+    paths: files.map((file) => file.path),
+    open: async (index) => files[index]?.file,
+    ...(kept ? { kept } : {}),
+  }
+}

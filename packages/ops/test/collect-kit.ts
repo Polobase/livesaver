@@ -2,7 +2,7 @@
 import { afterEach, beforeEach } from 'bun:test'
 import { statSync } from 'node:fs'
 import { join } from 'node:path'
-import { EMPTY_REMAP, fileRefs } from '@livesaver/core'
+import { EMPTY_REMAP, fileRefs, type Host } from '@livesaver/core'
 import { createNodeHost } from '@livesaver/node'
 import { docFromText, readSet, tempDir } from '@livesaver/test-kit'
 import {
@@ -36,6 +36,8 @@ export interface RunOptions {
   apply?: boolean
   packLimit?: number
   matchLibraryPath?: boolean
+  /** Another host than Node's as it is (one that sees or makes less). */
+  host?: Host
 }
 
 /** Call at the top of a test file: its tests get a temporary folder each, and runs in it. */
@@ -51,7 +53,7 @@ export function useCollect() {
   afterEach(() => cleanup())
 
   async function run(targets: string[], search: string[], options: RunOptions = {}): Promise<Run> {
-    const host = createNodeHost({ write: true })
+    const host = options.host ?? createNodeHost({ write: true })
     const probe = new Probe(host.fs, host.hash)
     const context = { id: `test-${++runs}`, dir: join(tmp.path, `run-${runs}`) }
     const result = await doctor(host, {

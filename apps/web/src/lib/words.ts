@@ -45,6 +45,19 @@ const ADVICE: Readonly<Record<string, Omit<Advice, 'accept'>>> = {
     text: 'Find this folder or drive and add it as a sample folder.',
     addFolder: true,
   },
+  // What a browser kept the page from: no place the samples came from (see `Blind`).
+  unseen: {
+    text: 'They may well be where your sets expect them. In a project folder that was chosen for editing, a browser shows a page no file or folder with a “/” in its name (as Finder shows it) or with a space at its start or end. Drop your project folder onto the sample folders as well: a dropped folder shows every name.',
+    addFolder: true,
+  },
+  unmade: {
+    text: 'They were found, and would be copied into their projects. A browser makes no file with a “/” in its name (as Finder shows it) or with a space at its start or end. livesaver on your computer copies them in.',
+    addFolder: false,
+  },
+  locked: {
+    text: 'They were found, but this page cannot rewrite their sets: the set, or a folder it lies in, has a name the browser hides. livesaver on your computer fixes them.',
+    addFolder: false,
+  },
 }
 
 /**

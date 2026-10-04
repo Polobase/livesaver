@@ -86,7 +86,7 @@ Scan again, and **Plug-ins** says which plug-ins of your sets are installed, mis
 Chrome and Edge can let a page edit a folder you choose. With that, the page fixes on its own: the same fix as livesaver's, with a backup of every set in its project and an undo. It is an experiment, and off until you switch it on:
 
 1. In the **Settings**, switch on **Fix in this browser**. The page lists what it cannot do; read it.
-2. Add your project folder with **Add folder**. Your browser asks whether the page may edit it.
+2. Drop your project folder on the page, and press **Allow editing**: your browser asks whether the page may edit it. (**Add folder** works too, but a dropped folder is read in full; see below.)
 3. Scan, then **Review and fix**. The review shows where it takes your project folder to lie, and asks you to confirm that Ableton Live is closed.
 
 **Plug-ins › Upgrade to VST3** works the same way, once the page was [shown Live's plug-in database](#showing-it-what-is-installed): from it the page knows which VST3 plug-ins Live has.
@@ -98,7 +98,10 @@ What a page cannot do that livesaver on your Mac can:
 - **It cannot see whether Live is running.** Quit Live before every fix and every undo: a set that is open in Live must not be rewritten under it. (A set that was saved between the scan and the fix is noticed, and left alone.)
 - **A rewritten set loses its Finder tags and its Finder comment.** To macOS, the set a browser writes is a new file.
 - **The undo is kept by the browser, for the site.** It is gone if you clear the site's data, and another browser does not have it. The backup of every set in its project's Backup folder stays, as after any fix.
-- **The browser hides files with some names** in a folder it lets a page edit: a name with a “/” as Finder shows it, or with a space at its start or end. Such samples count as missing in the page, and a fix cannot copy a file to such a name; the set is then left as it is, and the page says so.
+- **The browser hides files with some names** in a folder it lets a page edit: a name with a “/” as Finder shows it, or with a space at its start or end.
+  - A folder you **dropped** is read in full all the same: a drop shows the page every file.
+  - A folder you chose with **Add folder** is not. A sample the page cannot see may well be where its set expects it, so the page takes no other file for it and leaves the set alone; it lists the sample under “Files the browser does not show”. Drop the project folder onto the sample folders as well, and the page sees it.
+  - A file with such a name cannot be made either. A sample that was found and would be copied to such a name is left where it is, listed under “Names the browser does not make”; livesaver on your Mac copies it in.
 - **A page has no Trash.** What an undo takes out of a project goes to a hidden folder, `.livesaver-trash`, in your project folder. Delete it when you no longer need it.
 - **It does not see how much room is left** on your disk. The review says how much the copies need.
 - **It needs to know where your folders lie**, because a fix writes that into the sets. It takes what the sets say: for a project folder, and for the folders with Ableton's packs and Live's own content. The review shows these places; type the path (**Set path**) if one is wrong because you moved the folder since, or if your sets say nothing about it.

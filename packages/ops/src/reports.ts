@@ -4,7 +4,7 @@
  */
 import { type CsvValue, compareCodePoints, formatCsv, posix } from '@livesaver/core'
 import type { Action, SetResult } from './collect.js'
-import { MISSING_STATES, type Status } from './match.js'
+import { MISSING_STATES, methodText, type Status } from './match.js'
 import type { Probe } from './probe.js'
 import {
   hintOf,
@@ -89,6 +89,9 @@ const TITLES: Record<LibraryKind, string> = {
   'project-samples': "A project's own samples",
   'user-library': 'Old Ableton User Library',
   folder: 'Sample folders and libraries',
+  unseen: 'Not shown by the browser',
+  unmade: 'Found, not copied by the browser',
+  locked: 'Found, in sets the browser cannot rewrite',
 }
 
 const GENERIC_WORDS = new Set(
@@ -281,7 +284,8 @@ export async function buildReports(
   ]
   for (const g of groups) {
     samples.push([
-      STATUS_TEXT[g.status],
+      // Left because of the host (a browser): why, since the file need not be missing.
+      g.choice.blind ? methodText(g.choice) : STATUS_TEXT[g.status],
       g.kind === 'device' ? 'Max device' : 'Sample',
       g.name,
       g.path,

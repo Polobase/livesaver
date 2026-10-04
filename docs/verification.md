@@ -26,7 +26,10 @@ writes runs on temporary copies.
   (Chromium) is compared with `livesaver collect --apply` on the same projects, and an upgrade
   of plug-ins in the page with the set livesaver writes; the folder lies in the browser's
   private file system, since no test browser lets a page write to the disk without a person
-  (see [web.md](web.md#how-it-is-tested)). Shown a plug-in folder and Live's database folder,
+  (see [web.md](web.md#how-it-is-tested)). One test does write to a folder of the disk, in
+  Chromium with a profile that allows the site to edit files: with the names a browser hides
+  in such a folder, the fix writes the sets it can and fails for none. Shown a plug-in folder
+  and Live's database folder,
   the page says of the plug-ins what livesaver says. A scan of the size of a real
   library (9,305 planned changes) must stay quick in its tables. On a real library its report
   files are byte-identical to the command line's (see [web.md](web.md)).

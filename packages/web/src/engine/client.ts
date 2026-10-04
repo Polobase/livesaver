@@ -33,7 +33,13 @@ export interface EngineWorker {
 /** A folder as it travels to the engine: an upload as the paths of its files, without the files. */
 export function wireFolder(folder: FolderInput): WireFolder {
   const { source } = folder
-  if (source.kind === 'handle') return { ...folder, source }
+  if (source.kind === 'handle') {
+    const { kind, name, handle, hidden } = source
+    return {
+      ...folder,
+      source: { kind, name, handle, ...(hidden ? { hidden: { paths: hidden.paths } } : {}) },
+    }
+  }
   const paths = source.kind === 'files' ? source.files.map((f) => f.path) : source.paths
   return { ...folder, source: { kind: 'listing', name: source.name, paths } }
 }
@@ -83,8 +89,14 @@ function runInWorker<T>(
         const source = folders.find((f) => f.id === data.folder)?.source
         const reply = (file: File | undefined) =>
           worker.postMessage({ type: 'file', request: data.request, file })
-        if (source?.kind === 'listing')
-          void source.open(data.index).then(reply, () => reply(undefined))
+        // (Of a folder behind a handle: one of the files the handle hides.)
+        const listed =
+          source?.kind === 'listing'
+            ? source
+            : source?.kind === 'handle'
+              ? source.hidden
+              : undefined
+        if (listed) void listed.open(data.index).then(reply, () => reply(undefined))
         else reply(source?.kind === 'files' ? source.files[data.index]?.file : undefined)
         return
       }

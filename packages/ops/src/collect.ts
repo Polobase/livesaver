@@ -233,11 +233,8 @@ export class Project {
       this.need(known, certain)
       return known
     }
+    const options = this.places(source, wanted, folder)
     const name = nfc(posix.basename(source))
-    const [stem, ext] = posix.splitext(name)
-    const dir = posix.join(this.root, folder)
-    const options = [...(wanted ? [wanted] : []), posix.join(dir, name)]
-    for (let i = 2; i < 1000; i++) options.push(posix.join(dir, `${stem}-${i}${ext}`))
     let chosen: string | undefined
     for (const dst of options) {
       const claimedBy = this.claimed.get(norm(dst))
@@ -257,7 +254,13 @@ export class Project {
         continue
       }
       this.claimed.set(norm(dst), source)
-      await this.copy(source, dst)
+      try {
+        await this.copy(source, dst)
+      } catch (error) {
+        // Not made: the place is free again, and the next set that needs the file tries anew.
+        this.claimed.delete(norm(dst))
+        throw error
+      }
       chosen = dst
       break
     }
@@ -265,6 +268,25 @@ export class Project {
     this.bySource.set(key, chosen)
     this.need(chosen, certain)
     return chosen
+  }
+
+  /**
+   * Where `source` may go in the project, in the order they are tried: its expected place, its
+   * own name in `folder`, then that name numbered. A place where the host can make no file (a
+   * browser refuses some names) is none.
+   */
+  private places(source: string, wanted: string, folder: string): string[] {
+    const name = nfc(posix.basename(source))
+    const [stem, ext] = posix.splitext(name)
+    const dir = posix.join(this.root, folder)
+    const options = [...(wanted ? [wanted] : []), posix.join(dir, name)]
+    for (let i = 2; i < 1000; i++) options.push(posix.join(dir, `${stem}-${i}${ext}`))
+    return options.filter((dst) => !this.probe.refuses(dst))
+  }
+
+  /** Whether `source` can be put into the project at all (see `places`). */
+  canPlace(source: string, wanted = '', folder = IMPORTED_DIR): boolean {
+    return this.bySource.has(norm(source)) || this.places(source, wanted, folder).length > 0
   }
 
   private need(dst: string, certain: boolean): void {
@@ -278,7 +300,15 @@ export class Project {
     this.copiedFiles++
     this.copiedBytes += bytes
     if (!this.writer.apply) return
-    await this.writer.copy(source, dst)
+    try {
+      await this.writer.copy(source, dst)
+    } catch (error) {
+      // A copy that was not made is none: a run must not say it copied what the host refused.
+      this.copies.delete(norm(dst))
+      this.copiedFiles--
+      this.copiedBytes -= bytes
+      throw error
+    }
     this.probe.forget(dst)
     this.probe.forget(`${dst}.asd`)
   }

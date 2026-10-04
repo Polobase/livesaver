@@ -4,7 +4,12 @@
  * should be the folder's real place on disk (see `locateFolder`).
  */
 import { casefold, type DirEntry, type FileStat, type FsRead, nfc, posix } from '@livesaver/core'
-import type { DirectoryHandleLike, FileHandleLike, FolderSource } from './source.js'
+import {
+  type DirectoryHandleLike,
+  type FileHandleLike,
+  type FolderSource,
+  hiddenByHandle,
+} from './source.js'
 
 export interface Mount {
   /** Absolute POSIX path under which the folder appears. */
@@ -125,19 +130,41 @@ export function statOf(file: File): FileStat {
 export class WebFs implements FsRead {
   readonly usage: FsUsage = { opened: 0, reads: 0, bytes: 0 }
   private readonly mounts = new Map<string, DirNode>()
+  /**
+   * A folder behind a handle that was also listed in full: it was dropped to be edited, or was
+   * given a second time as an upload or a drop. The listing shows what the handle hides (see
+   * `find`).
+   */
+  private readonly twins = new Map<string, DirNode>()
   /** Folders that only exist because a mount lies below them (`/Users` for `/Users/me/Music`). */
   private readonly above = new Map<string, Map<string, string>>()
 
   constructor(mounts: readonly Mount[]) {
     for (const { path, source } of mounts) {
       const parts = posix.splitPath(posix.normpath(path))
-      this.mounts.set(parts.map(nameKey).join('/'), rootOf(source))
+      const key = parts.map(nameKey).join('/')
+      const root = rootOf(source)
+      const first = this.mounts.get(key)
+      if (!first) this.mounts.set(key, root)
+      else if (first.handle && !root.handle) this.twins.set(key, root)
+      else if (!first.handle && root.handle) {
+        this.mounts.set(key, root)
+        this.twins.set(key, first)
+      }
+      // A folder that was dropped to be edited brings what its handle hides.
+      if (source.kind === 'handle' && source.hidden && !this.twins.has(key)) {
+        const { paths, open } = source.hidden
+        this.twins.set(
+          key,
+          treeOf(paths, (i) => ({ kind: 'file', open: () => open(i) })),
+        )
+      }
       for (let i = 0; i < parts.length; i++) {
-        const key = parts.slice(0, i).map(nameKey).join('/')
-        let names = this.above.get(key)
+        const parent = parts.slice(0, i).map(nameKey).join('/')
+        let names = this.above.get(parent)
         if (!names) {
           names = new Map()
-          this.above.set(key, names)
+          this.above.set(parent, names)
         }
         const name = parts[i] as string
         if (!names.has(nameKey(name))) names.set(nameKey(name), name)
@@ -168,31 +195,94 @@ export class WebFs implements FsRead {
     await dir.loading
   }
 
-  private async resolve(path: string): Promise<Node | undefined> {
+  /** The entry called `name` in a folder, by its exact name or as macOS compares names. */
+  private async childOf(dir: Node | undefined, name: string): Promise<Node | undefined> {
+    if (dir?.kind !== 'dir') return undefined
+    try {
+      await this.load(dir)
+    } catch {
+      return undefined
+    }
+    const known = dir.children?.has(name) ? name : dir.keys?.get(nameKey(name))
+    return known === undefined ? undefined : dir.children?.get(known)
+  }
+
+  /**
+   * The node at `path`, and what lies at the same place in another folder that was given: the
+   * same folder once more, or one around it (a library folder that holds the project folder,
+   * say). A folder behind a handle shows no entry with certain names (`hiddenByHandle`); an
+   * upload or a drop shows them all: what the handle hides is taken from there.
+   */
+  private async find(path: string): Promise<{ node: Node; under: Node | undefined } | undefined> {
     let node: Node = this.mounts.get('') ?? emptyDir()
+    let under: Node | undefined
     let key = ''
     for (const part of posix.splitPath(posix.normpath(path))) {
       if (node.kind !== 'dir') return undefined
       const parent: string = key
       key = key ? `${key}/${nameKey(part)}` : nameKey(part)
-      let next: Node | undefined = this.mounts.get(key)
-      if (!next) {
-        try {
-          await this.load(node)
-        } catch {
-          return undefined
+      const mounted: Node | undefined = this.mounts.get(key)
+      const below: Node | undefined = await this.childOf(under, part)
+      let next: Node | undefined
+      if (mounted) {
+        // What the other folder has at this place lies under the mounted folder from here on.
+        under = this.twins.get(key) ?? (await this.childOf(node, part)) ?? below
+        next = mounted
+      } else {
+        next = await this.childOf(node, part)
+        under = below
+        if (!next && below && hiddenByHandle(part)) {
+          next = below
+          under = undefined
         }
-        const dir: DirNode = node
-        const name: string | undefined = dir.children?.has(part)
-          ? part
-          : dir.keys?.get(nameKey(part))
-        next = name === undefined ? undefined : dir.children?.get(name)
       }
       if (!next && this.above.get(parent)?.has(nameKey(part))) next = emptyDir()
       if (!next) return undefined
       node = next
     }
-    return node
+    return { node, under }
+  }
+
+  private async resolve(path: string): Promise<Node | undefined> {
+    return (await this.find(path))?.node
+  }
+
+  /**
+   * Where `path` lies among the folders that were given: behind a handle (the innermost folder
+   * it lies in is one), below a name a handle does not show, and in a folder that shows every
+   * name (the same folder, or one around it, given as an upload or a drop).
+   */
+  private placeOf(path: string): { handle: boolean; hidden: boolean; covered: boolean } {
+    const parts = posix.splitPath(posix.normpath(path))
+    let key = ''
+    let handle = false
+    let covered = false
+    let below = 0
+    for (const [i, part] of parts.entries()) {
+      key = key ? `${key}/${nameKey(part)}` : nameKey(part)
+      const mounted = this.mounts.get(key)
+      if (!mounted) continue
+      // The folder around was no handle, or this one was also given as an upload or a drop.
+      if ((handle === false && below > 0) || this.twins.has(key)) covered = true
+      handle = mounted.handle !== undefined
+      below = i + 1
+    }
+    return { handle, hidden: parts.slice(below).some(hiddenByHandle), covered }
+  }
+
+  /**
+   * In a folder behind a handle, a browser shows no entry with certain names (see
+   * `hiddenByHandle`): what lies there is hidden, unless a folder given around it shows it.
+   */
+  hides(path: string): boolean {
+    const at = this.placeOf(path)
+    return at.handle && at.hidden && !at.covered
+  }
+
+  /** A browser makes no file or folder with such a name in a folder behind a handle either. */
+  refuses(path: string): boolean {
+    const at = this.placeOf(path)
+    return at.handle && at.hidden
   }
 
   /**
@@ -279,7 +369,8 @@ export class WebFs implements FsRead {
   }
 
   async listDir(path: string): Promise<DirEntry[] | undefined> {
-    const node = await this.resolve(path)
+    const found = await this.find(path)
+    const node = found?.node
     if (node?.kind !== 'dir') return undefined
     try {
       await this.load(node)
@@ -291,6 +382,16 @@ export class WebFs implements FsRead {
     for (const [name, child] of node.children ?? []) {
       seen.add(nameKey(name))
       entries.push({ name, isDirectory: child.kind === 'dir', isSymlink: false })
+    }
+    // What the handle of this folder hides, the folder that was given around it shows.
+    const under = found?.under
+    if (under?.kind === 'dir') {
+      await this.load(under).catch(() => {})
+      for (const [name, child] of under.children ?? []) {
+        if (!hiddenByHandle(name) || seen.has(nameKey(name))) continue
+        seen.add(nameKey(name))
+        entries.push({ name, isDirectory: child.kind === 'dir', isSymlink: false })
+      }
     }
     for (const [key, name] of this.above.get(pathKey(path)) ?? []) {
       if (!seen.has(key)) entries.push({ name, isDirectory: true, isSymlink: false })

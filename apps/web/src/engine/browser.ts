@@ -136,8 +136,10 @@ export class BrowserEngine implements Engine {
     this.sources.set(id, source)
     // A folder behind a handle is read through it now, so reading it through it next time
     // loses nothing. A dropped folder is read through its entries, which show every file:
-    // its handle may show fewer.
-    if (source.kind === 'handle') this.keepable.set(id, { handle: source.handle, lost: 0 })
+    // its handle may show fewer. So may that of a folder that was dropped to be edited: it is
+    // read in full now, by what the drop listed.
+    const seen = source.kind === 'handle' ? lostBehindHandle(source.hidden?.paths ?? []) : 0
+    if (source.kind === 'handle') this.keepable.set(id, { handle: source.handle, lost: seen })
     else if (source.kind === 'listing' && source.kept)
       this.keepable.set(id, { handle: source.kept, lost: lostBehindHandle(source.paths) })
     const files =
@@ -154,6 +156,7 @@ export class BrowserEngine implements Engine {
       holds: kind === 'installed' ? installedHoldsOf(source) : holdsNames(holdsOf(source)),
       exists: true,
       ...(files === undefined ? {} : { files }),
+      ...(seen ? { hidden: seen } : {}),
       access: this.handle(id) ? 'ask' : 'read',
     }
   }

@@ -82,9 +82,20 @@ export class MemoryDirectory {
   permission: 'granted' | 'prompt' = 'granted'
   /** What the user of the browser answers when asked. */
   answer: 'granted' | 'denied' = 'granted'
+  /**
+   * Names the browser neither shows nor makes in this folder and below it, as a test sets it
+   * (Chromium has such names in a folder of the disk: a `:`, a space at an end). What lies
+   * under such a name is there all the same: it is only not handed out.
+   */
+  hides: ((name: string) => boolean) | undefined
 
   constructor(name: string) {
     this.name = name
+  }
+
+  /** The browser's refusal of a name it considers unsafe. */
+  private allowed(name: string): void {
+    if (this.hides?.(name)) throw new TypeError('Name is not allowed.')
   }
 
   async queryPermission(): Promise<'granted' | 'prompt'> {
@@ -97,23 +108,34 @@ export class MemoryDirectory {
   }
 
   async *values(): AsyncIterable<MemoryDirectory | MemoryFile> {
-    yield* [...this.entries.values()]
+    for (const entry of [...this.entries.values()]) {
+      if (this.hides?.(entry.name)) continue
+      // (The rule holds below as well.)
+      if (entry instanceof MemoryDirectory) entry.hides ??= this.hides
+      yield entry
+    }
   }
 
   async getDirectoryHandle(
     name: string,
     options: { create?: boolean } = {},
   ): Promise<MemoryDirectory> {
+    this.allowed(name)
     const found = this.entries.get(name)
-    if (found instanceof MemoryDirectory) return found
+    if (found instanceof MemoryDirectory) {
+      found.hides ??= this.hides
+      return found
+    }
     if (found) throw fail('TypeMismatchError', `${name} is a file`)
     if (!options.create) throw fail('NotFoundError', `${name} is not there`)
     const made = new MemoryDirectory(name)
+    made.hides = this.hides
     this.entries.set(name, made)
     return made
   }
 
   async getFileHandle(name: string, options: { create?: boolean } = {}): Promise<MemoryFile> {
+    this.allowed(name)
     const found = this.entries.get(name)
     if (found instanceof MemoryFile) return found
     if (found) throw fail('TypeMismatchError', `${name} is a folder`)

@@ -85,12 +85,15 @@ export {
 } from './parser.js'
 export {
   type DirectoryHandleLike,
+  editable,
+  editableFromDrop,
   type FileHandleLike,
   type FolderFile,
   type FolderSource,
   folderFromHandle,
   foldersFromDrop,
   foldersFromFiles,
+  type HiddenFiles,
   handlesFromDrop,
   hiddenByHandle,
   lostBehindHandle,

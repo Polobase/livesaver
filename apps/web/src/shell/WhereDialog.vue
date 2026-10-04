@@ -157,7 +157,7 @@ function connect(): void {
               <template v-if="ways.edit.state === 'works'">
                 {{
                   writing.on
-                    ? 'It is switched on: add your project folder with “Add folder”, scan, then review and fix.'
+                    ? 'It is switched on: drop your project folder on the page (or add it with “Add folder”), scan, then review and fix.'
                     : 'It is off until you switch it on, after reading what a page cannot do.'
                 }}
               </template>

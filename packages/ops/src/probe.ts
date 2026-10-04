@@ -40,6 +40,16 @@ export class Probe {
     this.hash = hash
   }
 
+  /** A place where the host shows nothing, whatever lies there (see `FsRead.hides`). */
+  hides(path: string): boolean {
+    return this.fs.hides?.(path) ?? false
+  }
+
+  /** A place where the host can make nothing (see `FsRead.refuses`). */
+  refuses(path: string): boolean {
+    return this.fs.refuses?.(path) ?? false
+  }
+
   stat(path: string): Promise<FileStat | undefined> {
     let s = this.stats.get(path)
     if (!s) {

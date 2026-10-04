@@ -59,14 +59,13 @@ export type RefLocation = Pick<
   'relPath' | 'relType' | 'packId' | 'packName' | 'path' | 'hintPath'
 >
 
-/** The existing file a reference points to, found the way Live would find it. */
-export async function resolveExisting(
+/** Where the file of a reference is looked for, in the order Live would look. */
+export function expectedPlaces(
   ref: RefLocation,
   setDir: string,
   projectRoot: string,
   env: Environment,
-  probe: Probe,
-): Promise<string | undefined> {
+): string[] {
   const tries: string[] = []
   const rel = ref.relPath
   if (rel) {
@@ -104,8 +103,19 @@ export async function resolveExisting(
     }
   }
   if (rel) tries.push(env.remapped(ref.relType, ref.packId, rel))
-  for (const path of tries) {
-    if (path && (await probe.isFile(path))) return posix.normpath(path)
+  return tries.filter((path) => path)
+}
+
+/** The existing file a reference points to, found the way Live would find it. */
+export async function resolveExisting(
+  ref: RefLocation,
+  setDir: string,
+  projectRoot: string,
+  env: Environment,
+  probe: Probe,
+): Promise<string | undefined> {
+  for (const path of expectedPlaces(ref, setDir, projectRoot, env)) {
+    if (await probe.isFile(path)) return posix.normpath(path)
   }
   return undefined
 }
@@ -120,6 +130,14 @@ export function classify(path: string, projectRoot: string, env: Environment): L
 }
 
 export type Check = 'vendor-update' | 'fingerprint' | 'size-only' | 'library-path' | 'none'
+
+/**
+ * Why a host leaves a reference as it is, though it need not be missing (a browser, for a folder
+ * it hands a page): `unseen`, it shows no file at a place the set names, so the file may well be
+ * there; `unmade`, a file was found, and the host can make no file of that name in the project;
+ * `locked`, a file was found, and the host cannot rewrite the set.
+ */
+export type Blind = 'unseen' | 'unmade' | 'locked'
 
 export interface Choice {
   readonly status: Status
@@ -141,6 +159,8 @@ export interface Choice {
    * who has the library installed in another version than the set remembers.
    */
   readonly libraryFile: string
+  /** Of a reference that is left as it is because of what the host cannot do ('' = it is not). */
+  readonly blind: Blind | ''
 }
 
 function choice(status: Status, extra: Partial<Choice> = {}): Choice {
@@ -154,8 +174,20 @@ function choice(status: Status, extra: Partial<Choice> = {}): Choice {
     libraryPath: false,
     candidates: [],
     libraryFile: '',
+    blind: '',
     ...extra,
   }
+}
+
+/** A reference that stays unresolved because of the host (see `Choice.blind`). */
+export function leftBlind(blind: Blind, candidates: readonly string[] = []): Choice {
+  return choice('not-found', { blind, candidates })
+}
+
+const BLIND_TEXT: Readonly<Record<Blind, string>> = {
+  unseen: 'cannot be seen here: the file may be where the set expects it',
+  unmade: 'found, but no file of this name can be made here',
+  locked: 'found, but the set cannot be rewritten here',
 }
 
 export function checkOf(c: Choice): Check {
@@ -168,6 +200,7 @@ export function checkOf(c: Choice): Check {
 
 /** How a file was found, e.g. "fingerprint ok, path end 3 level(s)" (reports). */
 export function methodText(c: Choice): string {
+  if (c.blind) return BLIND_TEXT[c.blind]
   const text = {
     'vendor-update': 'fingerprint ok (vendor update, file slightly larger)',
     fingerprint: 'fingerprint ok',

@@ -34,7 +34,16 @@ import {
 } from './collect.js'
 import { isInside } from './env.js'
 import { mapLimited } from './file-index.js'
-import { checkOf, classify, methodText, resolveExisting, type Status } from './match.js'
+import {
+  type Choice,
+  checkOf,
+  classify,
+  expectedPlaces,
+  leftBlind,
+  methodText,
+  resolveExisting,
+  type Status,
+} from './match.js'
 
 /** References whose files are read at the same time before a set's decisions are made. */
 const READ_AHEAD = 16
@@ -93,6 +102,14 @@ export async function processSet(
   }
   const edits: Edit[] = []
   const stale: [FileRef[], string][] = []
+  /**
+   * The host shows nothing at a place where the file is looked for (a browser hides some
+   * names): the file may well be there, and the page cannot tell.
+   */
+  const unseen = (ref: FileRef) =>
+    expectedPlaces(ref, setDir, root, env).some((place) => probe.hides(place))
+  /** The host cannot rewrite the set itself: it is checked, and nothing is done for it. */
+  const locked = probe.refuses(setPath)
   const decide = (ref: FileRef, status: Status, extra: Partial<Decision> = {}) =>
     result.decisions.push({
       key: ref.key,
@@ -115,9 +132,16 @@ export async function processSet(
     const ref = same[0] as FileRef
     if (!ref.name) return
     try {
-      if (!(await resolveExisting(ref, setDir, root, env, probe))) await project.choose(ref)
+      if (!(await resolveExisting(ref, setDir, root, env, probe)) && !unseen(ref))
+        await project.choose(ref)
     } catch {}
   })
+  /** A reference that is not resolved, and stays so: counted as missing, with the reason. */
+  const leave = (ref: FileRef, choice: Choice) => {
+    result.counts[choice.status]++
+    result.missing.push({ ref, choice })
+    decide(ref, choice.status, { method: methodText(choice) })
+  }
   try {
     for (const same of groups.values()) {
       const ref = same[0] as FileRef
@@ -148,7 +172,15 @@ export async function processSet(
           decide(ref, 'kept', { destination: existing })
           continue
         }
-        dst = await project.place(existing, '', await importDir(ref, existing, probe))
+        const folder = await importDir(ref, existing, probe)
+        if (locked || !project.canPlace(existing, '', folder)) {
+          // The host can make no file of this name: the file stays where the set has it.
+          result.counts.ok++
+          result.files.push(existing)
+          decide(ref, 'ok', { destination: existing })
+          continue
+        }
+        dst = await project.place(existing, '', folder)
         source = existing
         status = 'external'
         action = 'collected'
@@ -160,11 +192,18 @@ export async function processSet(
           certain: true,
         }
       } else {
+        // Where the host shows nothing, the file may be: nothing is looked for in its place.
+        if (unseen(ref)) {
+          leave(ref, leftBlind('unseen'))
+          continue
+        }
         const choice = await project.choose(ref)
         if (choice.status !== 'found') {
-          result.counts[choice.status]++
-          result.missing.push({ ref, choice })
-          decide(ref, choice.status, { method: methodText(choice) })
+          leave(ref, choice)
+          continue
+        }
+        if (locked) {
+          leave(ref, leftBlind('locked', [choice.path]))
           continue
         }
         let method = methodText(choice)
@@ -180,6 +219,10 @@ export async function processSet(
         } else {
           const wanted = wantedLocation(ref, root)
           const folder = await importDir(ref, choice.path, probe)
+          if (!project.canPlace(choice.path, wanted, folder)) {
+            leave(ref, leftBlind('unmade', [choice.path]))
+            continue
+          }
           dst = await project.place(choice.path, wanted, folder, choice.verified)
           source = choice.path
         }

@@ -42,6 +42,17 @@ export interface FsRead {
   readFile(path: string): Promise<Uint8Array>
   /** Entries of a directory; `undefined` if it cannot be read (reported, never silently skipped). */
   listDir(path: string): Promise<DirEntry[] | undefined>
+  /**
+   * Whether `path` is a place where this host shows nothing, whatever lies there: a browser
+   * shows a page no entry with certain names in a folder behind a handle. A file that is not
+   * found at such a place may well be there. Left out where a host sees everything.
+   */
+  hides?(path: string): boolean
+  /**
+   * Whether nothing can be made at `path`: a browser makes no file or folder with those names
+   * either. Left out where a host can make whatever its file system takes.
+   */
+  refuses?(path: string): boolean
 }
 
 /** gzip for Live documents. */

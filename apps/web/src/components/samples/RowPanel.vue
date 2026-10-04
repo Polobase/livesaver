@@ -3,7 +3,7 @@
 import type { ChangeRow, MissingRow } from '@livesaver/ops'
 import { computed } from 'vue'
 import { bytes, count } from '../../lib/format'
-import { ACTION_LABEL, ACTION_WHY, STATUS_LABEL, STATUS_WHY } from '../../lib/health'
+import { ACTION_LABEL, ACTION_WHY, whyLabel, whyText } from '../../lib/health'
 import RevealLink from '../common/RevealLink.vue'
 import ScrollRegion from '../common/ScrollRegion.vue'
 
@@ -29,9 +29,11 @@ const subtitle = computed(() =>
   props.change
     ? (ACTION_LABEL[props.change.action] ?? props.change.action)
     : props.missing
-      ? STATUS_LABEL[props.missing.status]
+      ? whyLabel(props.missing)
       : '',
 )
+/** The file was found, and the browser kept the page from using it. */
+const found = computed(() => props.missing?.blind === 'unmade' || props.missing?.blind === 'locked')
 </script>
 
 <template>
@@ -81,13 +83,14 @@ const subtitle = computed(() =>
     </template>
     <template v-else-if="missing" #body>
       <ScrollRegion :label="title" class="space-y-5 p-4 text-sm sm:p-6">
-        <p class="text-muted">{{ STATUS_WHY[missing.status as keyof typeof STATUS_WHY] }}</p>
+        <p class="text-muted" data-testid="missing-why">{{ whyText(missing) }}</p>
         <dl class="space-y-3">
           <div>
             <dt class="text-muted">{{ missing.device ? 'Max device' : 'Sample' }}</dt>
             <dd class="break-all text-highlighted">{{ missing.path }}</dd>
           </div>
-          <div>
+          <!-- (What the browser kept the page from came from nowhere: it need not be missing.) -->
+          <div v-if="!missing.blind">
             <dt class="text-muted">Came from</dt>
             <dd>{{ missing.sourceName }} ({{ missing.sourceKind }})</dd>
           </div>
@@ -119,7 +122,13 @@ const subtitle = computed(() =>
             </dd>
           </div>
           <div v-if="others.length">
-            <dt class="text-muted">Files of this name that were found, and are not it</dt>
+            <dt class="text-muted">
+              {{
+                found
+                  ? 'The file that was found'
+                  : 'Files of this name that were found, and are not it'
+              }}
+            </dt>
             <dd>
               <ul>
                 <li v-for="file in others" :key="file" class="break-all">

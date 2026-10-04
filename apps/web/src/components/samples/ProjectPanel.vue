@@ -11,9 +11,9 @@ import {
   ACTION_LABEL,
   missingOf,
   projectHealth,
-  STATUS_LABEL,
-  STATUS_WHY,
   setHealth,
+  whyLabel,
+  whyText,
 } from '../../lib/health'
 import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
@@ -197,19 +197,19 @@ function fixIt(): void {
           <ul class="mt-2 divide-y divide-default rounded-lg border border-default text-sm">
             <li
               v-for="row in detail.missing.slice(0, LISTED)"
-              :key="`${row.status}:${row.path}`"
+              :key="`${row.status}:${row.blind}:${row.path}`"
               class="space-y-1 px-3 py-2"
             >
               <div class="flex items-baseline justify-between gap-3">
                 <span class="min-w-0 truncate font-medium text-highlighted" :title="row.name">
                   {{ row.name }}
                 </span>
-                <span class="shrink-0 text-muted">{{ STATUS_LABEL[row.status] }}</span>
+                <span class="shrink-0 text-muted">{{ whyLabel(row) }}</span>
               </div>
               <PathText :path="row.path" plain class="text-muted" />
               <p class="text-muted">
-                {{ STATUS_WHY[row.status as keyof typeof STATUS_WHY] }} Came from:
-                {{ row.sourceName }}.
+                {{ whyText(row) }}
+                <template v-if="!row.blind">Came from: {{ row.sourceName }}.</template>
               </p>
             </li>
           </ul>
