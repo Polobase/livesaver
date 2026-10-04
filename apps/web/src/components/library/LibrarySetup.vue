@@ -120,8 +120,11 @@ const keepsDrops = keepsDroppedFolders()
                 <code class="text-xs">Contents/App-Resources/Core Library</code>).
               </template>
               <template v-else>
-                Live's own content: drag the Ableton Live app here from your Applications folder
-                (the folder dialog cannot open an app).
+                Live's own content: drag the Ableton Live app here from your Applications folder.
+                The folder dialog cannot open an app; there, press
+                <UKbd value="meta" /> <UKbd value="shift" /> <UKbd value="G" /> and type the path of
+                its <code class="text-xs">Contents</code> folder:
+                <code class="text-xs">/Applications/Ableton Live 12 Suite.app/Contents</code>.
               </template>
             </li>
           </ul>

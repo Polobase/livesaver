@@ -42,7 +42,7 @@ Choose a folder with **Add folder**, or drop it on the page. Your browser may as
 Worth adding as sample folders:
 
 - **`Music/Ableton`** in your home folder: your User Library and the Factory Packs.
-- **The Ableton Live app**, dropped on the page from your Applications folder. To a drop, an app is a folder; it holds the Core Library, and Live's own list of content that moved between versions.
+- **The Ableton Live app**, dropped on the page from your Applications folder. To a drop, an app is a folder; it holds the Core Library, and Live's own list of content that moved between versions. The folder dialog cannot open an app: there, press ⌘⇧G and type the path of its `Contents` folder, `/Applications/Ableton Live 12 Suite.app/Contents`.
 - **`/Users/Shared`**, if you have libraries from Native Instruments.
 
 Until Live's own content is there, the page says that samples of the Core Library cannot be found.
