@@ -169,6 +169,8 @@ async function shots(scheme: 'light' | 'dark'): Promise<void> {
   // The app on its own, before anything is changed: it reads the same library, handed over.
   const own = await context.newPage()
   await own.goto(alone.url)
+  // (The page takes no folder before it knows the folders of the last visit.)
+  await own.locator('[data-testid="projects-input"]:not([disabled])').waitFor({ state: 'attached' })
   await own.getByTestId('projects-input').setInputFiles(demo.projects)
   await own.getByTestId('search-input').setInputFiles(demo.samples)
   await own.getByTestId('scan-library').click()

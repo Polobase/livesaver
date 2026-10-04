@@ -88,6 +88,8 @@ export async function commandKey(page: Page): Promise<'Meta' | 'Control'> {
  * again, unless a row for it has appeared in the meantime.
  */
 export async function giveFolder(page: Page, input: string, folder: string): Promise<void> {
+  // (The page takes no folder before it knows the folders of the last visit.)
+  await page.locator(`[data-testid="${input}"]:not([disabled])`).waitFor({ state: 'attached' })
   // The folders the page has: a folder of an earlier visit that is added again takes the row
   // that waited for it, so the rows that wait are not counted.
   const there = async () =>
@@ -133,6 +135,8 @@ export async function shown(page: Page, target: Locator, timeout: number): Promi
  * lets a test do that (through its debugging protocol).
  */
 export async function dropFolder(page: Page, target: Locator, folder: string): Promise<void> {
+  // (The page takes no folder before it knows the folders of the last visit.)
+  await page.locator('input[type="file"]:not([disabled])').first().waitFor({ state: 'attached' })
   await target.scrollIntoViewIfNeeded()
   const box = await target.boundingBox()
   if (!box) throw new Error('nothing to drop on')

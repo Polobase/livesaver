@@ -40,6 +40,13 @@ const add = (folder: FolderListing) => {
   if (props.kind !== 'installed') library.addPath(props.kind, folder)
 }
 
+/**
+ * Nothing is added before the engine has said what the page starts with: the folders of the
+ * last visit are put in place then, over whatever the lists hold. (A browser may take a moment
+ * to hand them back; a folder added in that moment was lost, and written over the others.)
+ */
+const locked = computed(() => props.disabled || !engines.start)
+
 // --- in a browser: handed over
 const input = useTemplateRef<HTMLInputElement>('input')
 const dragging = ref(false)
@@ -50,6 +57,7 @@ const listing = ref(false)
 const problem = ref('')
 
 async function pick(): Promise<void> {
+  if (locked.value) return
   problem.value = ''
   if (forEditing.value) {
     try {
@@ -69,13 +77,13 @@ async function pick(): Promise<void> {
 function picked(event: Event): void {
   const target = event.target as HTMLInputElement
   listing.value = false
-  library.addSources(props.kind, foldersFromFiles(target.files ?? []))
+  if (!locked.value) library.addSources(props.kind, foldersFromFiles(target.files ?? []))
   target.value = ''
 }
 
 async function drop(event: DragEvent): Promise<void> {
   dragging.value = false
-  if (props.disabled || engines.capabilities.paths || !event.dataTransfer) return
+  if (locked.value || engines.capabilities.paths || !event.dataTransfer) return
   problem.value = ''
   reading.value = 0
   try {
@@ -105,11 +113,13 @@ const dropHint = computed(() =>
       : 'or drop a folder here',
 )
 const waiting = computed(() =>
-  reading.value !== undefined
-    ? `listing… ${count(reading.value)} files`
-    : listing.value
-      ? 'a large folder takes a few seconds to appear…'
-      : dropHint.value,
+  !engines.start
+    ? 'one moment…'
+    : reading.value !== undefined
+      ? `listing… ${count(reading.value)} files`
+      : listing.value
+        ? 'a large folder takes a few seconds to appear…'
+        : dropHint.value,
 )
 </script>
 
@@ -160,7 +170,7 @@ const waiting = computed(() =>
           color="neutral"
           variant="subtle"
           label="Add folder"
-          :disabled="disabled"
+          :disabled="locked"
           @click="pick"
         />
         <span class="text-sm text-muted" data-testid="folder-waiting">{{ waiting }}</span>
@@ -170,6 +180,7 @@ const waiting = computed(() =>
           multiple
           hidden
           webkitdirectory
+          :disabled="locked"
           :data-testid="`${kind}-input`"
           @change="picked"
           @cancel="listing = false"

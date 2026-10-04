@@ -279,6 +279,14 @@ A browser hands a page the files of a folder for one visit. What a page can keep
   a scan that was made without them it says so on every page, and beside the samples that
   were not found (`absent` and `waiting` in the library store). (It was not said at first,
   and a library scanned after a reload looked as if its sample folders held nothing.)
+- **The lists open when the page knows what it starts with.** Reading the folders of the last
+  visit back takes a browser a moment (its database is asked for the handles). A folder that
+  was added in that moment was put in place, then replaced by the folders that came back, and
+  the list that was noted for the next visit held it alone: the others were gone for good. It
+  showed on a slow machine in Firefox, whose database was asked although it can hold no
+  handle. So nothing is added, and nothing noted, before the engine has said what the page
+  starts with (the lists say "one moment…"), and a browser that hands a page no handle is not
+  asked for any.
 - **A folder's handle**, in the browser's database, where the browser handed one out: for a
   folder chosen for editing, and for a dropped folder, whose drop offers a handle beside its
   entries in Chromium (`kept` on a listing). A handle is read again on the next visit once the

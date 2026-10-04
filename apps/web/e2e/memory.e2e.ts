@@ -394,3 +394,68 @@ describe('in a private window no handle is kept (Chromium)', () => {
     60_000 * PATIENCE,
   )
 })
+
+describe('a folder that arrives before the folders of the last visit are back (Chromium)', () => {
+  let browser: Browser
+  let page: Page
+  let tmp: { path: string; cleanup: () => void }
+  let projects: string
+  let samples: string
+
+  beforeAll(async () => {
+    tmp = tempDir()
+    ;({ projects, samples } = copyFixtures(tmp.path))
+    browser = await chromium.launch()
+    ;({ page } = await watch(browser, site.url))
+    // A browser that takes its time to say what it kept for the page, as a busy one does: the
+    // page asks how much room it has before it asks for its folders.
+    await page.addInitScript(() => {
+      const estimate = navigator.storage.estimate.bind(navigator.storage)
+      navigator.storage.estimate = () =>
+        new Promise((resolve) => setTimeout(() => resolve(estimate()), 1500))
+    })
+    await page.goto(site.url)
+    await page.getByTestId('search-folders').waitFor()
+  }, 60_000 * PATIENCE)
+  afterAll(async () => {
+    await browser?.close()
+    tmp?.cleanup()
+  })
+
+  test(
+    'is not taken: the lists open when the page knows what it starts with, and nothing is lost',
+    async () => {
+      // Until then the lists are closed, and say so. A folder pushed at the page all the same
+      // (the upload answers a dialog that was opened before) is not taken.
+      const early = page.getByTestId('projects-input')
+      expect(await early.isDisabled()).toBe(true)
+      expect(await textOf(page.getByTestId('folder-waiting').first())).toBe('one moment…')
+      await early.setInputFiles(projects)
+      expect(await page.getByTestId('folder-row').count()).toBe(0)
+
+      // Open, they take it.
+      await giveFolder(page, 'projects-input', projects)
+      await giveFolder(page, 'search-input', samples)
+      expect([await names(page, 'projects-folders'), await names(page, 'search-folders')]).toEqual([
+        ['projects'],
+        ['samples'],
+      ])
+
+      // After a reload the browser is slow again. A folder that arrives meanwhile was once put
+      // in place of the two of the last visit, which were gone for good: now it is not taken.
+      await reload(page)
+      await page.getByTestId('search-input').setInputFiles(join(samples, 'Lib1'))
+      await page.getByTestId('absent').waitFor()
+      const lists = async () => [
+        await names(page, 'projects-folders'),
+        await names(page, 'search-folders'),
+      ]
+      expect(await lists()).toEqual([['projects'], ['samples']])
+      // (What the browser keeps is what it kept: the next visit starts with the same two.)
+      await reload(page)
+      await page.getByTestId('absent').waitFor()
+      expect(await lists()).toEqual([['projects'], ['samples']])
+    },
+    60_000 * PATIENCE,
+  )
+})

@@ -199,6 +199,6 @@ const absent = computed(() =>
         every file.
       </template>
     </p>
-    <ScanOptions :disabled="scans.running" />
+    <ScanOptions :disabled="scans.running || !engines.start" />
   </div>
 </template>

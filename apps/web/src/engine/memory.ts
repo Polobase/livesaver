@@ -5,6 +5,7 @@
  * handle is read again after a reload, once the browser's user allows it.
  */
 import type { DirectoryHandleLike } from '@livesaver/web'
+import { canWriteHere, keepsDroppedFolders } from './storage.js'
 import type { ScanOptions } from './types.js'
 
 export type FolderKind = 'projects' | 'search' | 'installed'
@@ -133,6 +134,9 @@ let handed: Promise<boolean> | undefined
 function handsHandlesBack(): Promise<boolean> {
   handed ??= (async () => {
     if (typeof indexedDB === 'undefined' || tab()?.getItem(SILENT)) return false
+    // A browser that hands a page no handle has kept none (Firefox, Safari): its database is
+    // not asked, and the page is not kept waiting for it.
+    if (!keepsDroppedFolders() && !canWriteHere()) return false
     if ('brave' in globalThis.navigator) return true
     try {
       const { quota = 0, usage = 0 } = await globalThis.navigator.storage.estimate()

@@ -225,6 +225,33 @@ describe('the folders of a page after a reload', () => {
     expect(rows((await page()).library.projects)).toEqual([['projects', '', false, 'there']])
   })
 
+  test('what happens before the folders of the last visit are back is not noted over them', async () => {
+    const first = await page()
+    first.library.addSources('search', [uploadedFolder(samples)])
+    first.library.options = { packLimitMB: 20, matchLibraryPath: true }
+    await settled()
+    expect(kept.map((folder) => folder.name)).toEqual(['samples'])
+
+    // The next page, before its engine has said what it starts with: a browser may take a
+    // moment to hand the folders back. (The screens take no folder then; should one arrive
+    // all the same, it must not be written over what the browser keeps.)
+    setActivePinia(createPinia())
+    const engines = useEngineStore()
+    engines.use(new BrowserEngine({ spawn: () => localEngineWorker({ cores: 4 }), memory }))
+    const library = useLibraryStore()
+    library.addSources('projects', [uploadedFolder(projects)])
+    library.options = { packLimitMB: 50, matchLibraryPath: false }
+    await settled()
+    expect(kept.map((folder) => folder.name)).toEqual(['samples'])
+    expect(memory.options()).toEqual({ packLimitMB: 20, matchLibraryPath: true })
+
+    // The folders of the last visit take their place, with how a scan matches.
+    await engines.load()
+    if (engines.start) library.init(engines.start)
+    expect(rows(library.search)).toEqual([['samples', '', false, 'folder']])
+    expect(library.options).toEqual({ packLimitMB: 20, matchLibraryPath: true })
+  })
+
   test('a page without a database for it remembers nothing, and works as before', async () => {
     setActivePinia(createPinia())
     const engines = useEngineStore()

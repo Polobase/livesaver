@@ -36,8 +36,14 @@ export const useLibraryStore = defineStore('library', () => {
 
   const list = (kind: FolderKind) =>
     kind === 'projects' ? projects : kind === 'search' ? search : installed
+  /**
+   * The lists are what the engine started with, and what was done since. Before that nothing
+   * is noted for the next visit: it would be written over the folders of the last one.
+   */
+  let filled = false
 
   function init(start: Start): void {
+    filled = true
     projects.value = start.projects.map((folder) => ({ holds: [], exists: true, ...folder }))
     search.value = [...start.search]
     installed.value = [...(start.installed ?? [])]
@@ -53,7 +59,7 @@ export const useLibraryStore = defineStore('library', () => {
    * was typed and ticked, and of each folder what the browser lets a page keep.
    */
   function remember(): void {
-    if (engines.kind !== 'browser') return
+    if (!filled || engines.kind !== 'browser') return
     void (engines.engine() as BrowserEngine).keep({
       projects: projects.value,
       search: search.value,
@@ -170,7 +176,7 @@ export const useLibraryStore = defineStore('library', () => {
   watch(
     options,
     (now) => {
-      if (engines.kind === 'browser') (engines.engine() as BrowserEngine).keepOptions(now)
+      if (filled && engines.kind === 'browser') (engines.engine() as BrowserEngine).keepOptions(now)
     },
     { deep: true },
   )
