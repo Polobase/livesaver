@@ -18,6 +18,21 @@ The app also runs on its own, as a page in your browser. It reads the folders yo
 
 What the page cannot do is said where you would look for it, with how to get it.
 
+## Two ways to fix from the page
+
+A page fixes either through livesaver on your Mac, or on its own. What each way needs depends on your browser:
+
+| Browser | [Connected to livesaver](#connect-the-page-to-livesaver) | [On its own](#fixing-in-the-page) |
+|---|---|---|
+| Chrome, Edge | yes; the browser asks once | yes, once you switch it on in the Settings |
+| Brave | once you allow the site in Brave's settings | once you switch on a flag of Brave, then in the Settings |
+| Firefox | yes; the browser asks once | no |
+| Safari | no | no |
+
+In every browser, `livesaver web` opens the app from your own computer, with livesaver behind it. That needs no permission of any browser.
+
+On the overview, **How this page can fix** says the same for the browser you are in, with the commands and the addresses of your browser's settings to copy.
+
 ## Giving it folders
 
 Choose a folder with **Add folder**, or drop it on the page. Your browser may ask whether to “upload” the folder: that is its word for letting a page read it. Nothing is uploaded; the files stay where they are and are read there.
@@ -55,7 +70,9 @@ What a page cannot do that livesaver on your Mac can:
 - **It needs to know where your folders lie**, because a fix writes that into the sets. For a project folder it takes what the sets say; type the path (**Set path**) if you moved the folder since. For a folder with Ableton's packs or Live's own content you type it.
 - **It cannot upgrade plug-ins**: a page does not see what is installed.
 
-Safari and Firefox do not let a page edit a folder, and Brave does not unless you switch that on in its settings: there the page only reads, and says so.
+Safari and Firefox do not let a page edit a folder: there the page only reads, and says so.
+
+Brave lets a page edit a folder only once you switch that on in Brave itself: open `brave://flags/#file-system-access-api`, choose **Enabled**, and restart Brave. The switch then appears in the page's Settings.
 
 ### Why it is off
 
@@ -71,8 +88,15 @@ livesaver web --pair
 
 opens the app on the site, connected to the livesaver that runs in your terminal. The page then reads and writes through it, on your computer; nothing of your files goes to the site.
 
-- Chrome, Edge, Firefox and Brave ask whether the page may reach your computer. Allow it.
-- Safari does not let a page of a site reach your computer. Use `livesaver web` without `--pair` there: it opens the same app from your own computer, which works in every browser.
+A browser decides whether a page of a site may reach your computer, and each does it differently:
+
+- **Chrome, Edge and Firefox** ask whether the page may reach your computer. Allow it.
+- **Brave** keeps the page from it, and does not ask. Allow it once: open `brave://settings/content/localhostAccess`, add `https://polobase.github.io` to the sites that are allowed, and reload the page.
+- **Safari** does not let a page of a site reach your computer. Use `livesaver web` without `--pair` there.
+
+A browser that keeps the page back says nothing, so the page says it: livesaver does not answer, what your browser needs, and **Open the app from this computer**. That opens the same app at livesaver's own address, which works in every browser.
+
+To connect a tab that is already open, in another browser than the one `livesaver web --pair` opened, paste the link it printed into **Where the app runs**.
 
 The connection lasts as long as the tab and the `livesaver web` in your terminal. **Where the app runs**, at the bottom of the sidebar, says how the page is connected, and disconnects it.
 

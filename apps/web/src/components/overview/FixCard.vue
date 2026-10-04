@@ -5,6 +5,7 @@ import type { Scan } from '../../engine/types'
 import { bytes, count, plural } from '../../lib/format'
 import { GET_LIVESAVER } from '../../lib/links'
 import { planOf } from '../../lib/plan'
+import { whereOpen } from '../../shell/where'
 import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
 import { useScanStore } from '../../stores/scan'
@@ -73,7 +74,19 @@ const counts = computed(() => props.scan.samples.counts)
             This page only reads. To fix, run <code class="text-xs">livesaver web</code> on your
             computer: it opens this app with livesaver behind it, which can write, back up and undo.
           </p>
-          <UButton v-bind="GET_LIVESAVER" size="sm" color="neutral" variant="subtle" />
+          <div class="flex flex-wrap gap-2">
+            <!-- Which ways there are depends on the browser: the dialog says them for this one. -->
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-circle-help"
+              label="How this page can fix"
+              data-testid="how-to-fix"
+              @click="whereOpen = true"
+            />
+            <UButton v-bind="GET_LIVESAVER" size="sm" color="neutral" variant="ghost" />
+          </div>
           <p v-if="writing.possible" class="text-sm text-muted" data-testid="can-write-here">
             Your browser can also let this page fix on its own, as an experiment with limits.
             <RouterLink to="/settings" class="underline underline-offset-2"

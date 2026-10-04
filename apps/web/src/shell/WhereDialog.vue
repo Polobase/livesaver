@@ -1,21 +1,33 @@
 <script setup lang="ts">
 /**
  * Where the app runs, which decides what it can do: served by livesaver on this computer,
- * connected to it from a page of another site, or on its own in the browser. And how to get
- * from the last to the first.
+ * connected to it from a page of another site, or on its own in the browser. And how a page on
+ * its own gets to fix: the two ways there are, each said for the browser at hand.
  */
-import { computed } from 'vue'
-import { disconnect } from '../engine/create'
+import { computed, ref } from 'vue'
+import CopyText from '../components/common/CopyText.vue'
+import { connectWith, disconnect } from '../engine/create'
 import { GET_LIVESAVER } from '../lib/links'
+import { browserFacts, waysOf } from '../lib/ways'
 import { useEngineStore } from '../stores/engine'
+import { useWritingStore } from '../stores/writing'
 
 const open = defineModel<boolean>('open', { required: true })
 const engines = useEngineStore()
+const writing = useWritingStore()
 
 const state = computed(() =>
   engines.kind === 'browser' ? 'alone' : engines.paired ? 'paired' : 'served',
 )
 const site = computed(() => window.location.origin)
+const ways = computed(() => waysOf(browserFacts()))
+
+/** The link that `livesaver web --pair` printed, for a tab that it did not open itself. */
+const link = ref('')
+const refused = ref(false)
+function connect(): void {
+  refused.value = !connectWith(link.value)
+}
 </script>
 
 <template>
@@ -29,7 +41,7 @@ const site = computed(() => window.location.origin)
           ? 'In this page, connected to livesaver on this computer.'
           : 'On this computer, served by livesaver.'
     "
-    :ui="{ content: 'sm:max-w-lg' }"
+    :ui="{ content: 'sm:max-w-xl' }"
   >
     <template #body>
       <div class="space-y-4 text-sm" data-testid="where-dialog">
@@ -41,28 +53,132 @@ const site = computed(() => window.location.origin)
           </p>
           <p v-else>
             The page reads the folders you give it and changes nothing. It scans samples and
-            plug-ins, and shows everything a scan finds.
+            plug-ins, and shows everything a scan finds. To fix from here, there are two ways.
           </p>
-          <p v-if="engines.capabilities.fix">
-            Without the limits of a page, and to upgrade plug-ins and see which are installed, the
-            app needs livesaver on your computer:
-          </p>
-          <p v-else>
-            To fix, to undo, and to see which plug-ins are installed, the app needs livesaver on
-            your computer:
-          </p>
-          <ol class="list-decimal space-y-2 ps-5">
-            <li>
-              Run <code class="text-xs">livesaver web</code> in a terminal. It opens this app with
-              livesaver behind it, in any browser.
-            </li>
-            <li>
-              Or run <code class="text-xs">livesaver web --pair</code> to connect this page to it.
-              Chrome, Edge and Firefox ask whether the page may reach your computer; Safari does not
-              allow it.
-            </li>
-          </ol>
-          <UButton v-bind="GET_LIVESAVER" color="neutral" variant="subtle" />
+
+          <section
+            class="space-y-3 rounded-lg border border-default p-3"
+            aria-labelledby="way-connect-title"
+            data-testid="way-connect"
+          >
+            <div>
+              <h3
+                id="way-connect-title"
+                class="flex items-center gap-2 font-medium text-highlighted"
+              >
+                <UIcon name="i-lucide-monitor" class="size-4 shrink-0" />
+                With livesaver on your computer
+              </h3>
+              <p class="text-muted">
+                Everything: fix, undo, history, the plug-ins that are installed, upgrades.
+              </p>
+            </div>
+            <!-- Two ways that stand side by side, not steps: hence no numbers. -->
+            <p>
+              Run <CopyText text="livesaver web" what="the command" /> in a terminal. It opens this
+              app from your own computer, with livesaver behind it: in every browser, with nothing
+              to allow.
+            </p>
+            <p v-if="ways.connect.state === 'no'" data-testid="connect-way">
+              {{ ways.connect.text }}
+            </p>
+            <p v-else data-testid="connect-way">
+              Or connect this page:
+              <CopyText text="livesaver web --pair" what="the command" />
+              opens it connected.
+              {{ ways.connect.text }}
+              <template v-if="ways.connect.address">
+                <span class="mt-1 block">
+                  The setting:
+                  <CopyText :text="ways.connect.address" what="the address of the setting" />
+                </span>
+                <span class="mt-1 block">
+                  This site: <CopyText :text="site" what="the address of this site" />
+                </span>
+              </template>
+            </p>
+            <form
+              v-if="ways.connect.state !== 'no'"
+              class="flex items-start gap-2"
+              @submit.prevent="connect"
+            >
+              <UFormField
+                class="min-w-0 flex-1"
+                size="sm"
+                label="Already running? Paste the link that “livesaver web --pair” printed"
+                :error="
+                  refused
+                    ? 'This is not that link: it has “#/connect?at=” in it. Copy it whole from the terminal.'
+                    : undefined
+                "
+              >
+                <UInput
+                  v-model="link"
+                  class="w-full"
+                  placeholder="https://…/#/connect?at=…"
+                  autocomplete="off"
+                  spellcheck="false"
+                  data-testid="pairing-link"
+                  @update:model-value="refused = false"
+                />
+              </UFormField>
+              <!-- (The label of the field takes a line: the button stands beside the field.) -->
+              <UButton
+                type="submit"
+                size="sm"
+                class="mt-6"
+                color="neutral"
+                variant="subtle"
+                icon="i-lucide-link"
+                label="Connect"
+                :disabled="!link.trim()"
+                data-testid="pairing-connect"
+              />
+            </form>
+            <UButton v-bind="GET_LIVESAVER" size="sm" color="neutral" variant="subtle" />
+          </section>
+
+          <section
+            class="space-y-3 rounded-lg border border-default p-3"
+            aria-labelledby="way-edit-title"
+            data-testid="way-edit"
+          >
+            <div>
+              <h3 id="way-edit-title" class="flex items-center gap-2 font-medium text-highlighted">
+                <UIcon name="i-lucide-globe" class="size-4 shrink-0" />
+                On its own, in this browser
+              </h3>
+              <p class="text-muted">
+                An experiment, with limits that livesaver on your computer does not have.
+              </p>
+            </div>
+            <p data-testid="edit-way">
+              {{ ways.edit.text }}
+              <template v-if="ways.edit.state === 'works'">
+                {{
+                  writing.on
+                    ? 'It is switched on: add your project folder with “Add folder”, scan, then review and fix.'
+                    : 'It is off until you switch it on, after reading what a page cannot do.'
+                }}
+              </template>
+              <template v-else-if="ways.edit.address">
+                Then switch it on in the Settings of this page.
+                <span class="mt-1 block">
+                  The flag: <CopyText :text="ways.edit.address" what="the address of the flag" />
+                </span>
+              </template>
+            </p>
+            <UButton
+              v-if="ways.edit.state === 'works' && !writing.on"
+              to="/settings"
+              size="sm"
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-settings"
+              label="Switch it on in the Settings"
+              @click="open = false"
+            />
+          </section>
         </template>
 
         <template v-else-if="state === 'paired'">

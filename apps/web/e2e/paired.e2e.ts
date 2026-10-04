@@ -150,7 +150,18 @@ for (const [name, type] of ENGINES) {
         const alert = page.getByTestId('engine-problem')
         await alert.waitFor()
         expect(await textOf(alert)).toContain('livesaver on this computer does not answer.')
-        expect(await textOf(alert)).toContain('start it again with “livesaver web --pair”')
+        // Safari lets no page of a site through: there, connecting anew would end here again.
+        expect(await textOf(alert)).toContain(
+          name === 'WebKit'
+            ? 'start it again with “livesaver web”: it opens the app from this computer'
+            : 'start it again with “livesaver web --pair”',
+        )
+        // livesaver's own address serves the app to any browser: it is one link away.
+        expect(
+          await alert
+            .getByRole('link', { name: 'Open the app from this computer' })
+            .getAttribute('href'),
+        ).toBe(closed.url)
         await alert.getByRole('button', { name: 'Use this page on its own' }).click()
         await page.getByTestId('where').getByText('In this browser').waitFor()
         expect(await page.getByTestId('engine-problem').count()).toBe(0)
@@ -177,7 +188,11 @@ for (const [name, type] of ENGINES) {
         const notice = page.getByTestId('connecting')
         await notice.waitFor()
         expect(await textOf(notice)).toContain('Connecting to livesaver on this computer')
-        expect(await textOf(notice)).toContain('Your browser may ask whether this page may reach')
+        expect(await textOf(notice)).toContain(
+          name === 'WebKit'
+            ? 'Safari does not let a page of a site reach your computer.'
+            : 'Your browser may ask whether this page may reach your computer: allow it.',
+        )
         expect(await barriers(page)).toEqual([])
         // Allowed: the page is connected (it shows the scan livesaver kept), and the notice is gone.
         release()

@@ -10,8 +10,10 @@ import { pairingLink, startWeb, WEB_API, type WebServer } from 'livesaver'
 import { API, ComputerEngine } from '../src/engine/computer.js'
 import {
   clearPairing,
+  keepPairing,
   type PairingStore,
   pairingIn,
+  pairingOf,
   readPairing,
   takePairing,
 } from '../src/engine/pairing.js'
@@ -105,6 +107,35 @@ describe('a pairing in the address of the page', () => {
       takePairing({ hash: '#/history', pathname: '/', search: '' }, history, store),
     ).toBeUndefined()
     expect(replaced).toHaveLength(2)
+  })
+
+  test('is read from a link that was pasted, for a tab that is already open', () => {
+    const link = pairingLink(
+      'https://polobase.github.io/livesaver/app/',
+      'http://127.0.0.1:5483/',
+      TOKEN,
+    )
+    const pairing = { at: 'http://127.0.0.1:5483', token: TOKEN }
+    expect(pairingOf(link)).toEqual(pairing)
+    // As it comes out of a terminal: with the words before it, and a line end after it.
+    expect(pairingOf(`Connected to it, the app at https://polobase.github.io: ${link}\n`)).toEqual(
+      pairing,
+    )
+    expect(pairingOf(new URL(link).hash)).toEqual(pairing)
+    // The address of the app alone, or of livesaver, is no pairing; nor is a link elsewhere.
+    for (const other of [
+      'https://polobase.github.io/livesaver/app/',
+      'http://127.0.0.1:5483/',
+      `https://polobase.github.io/livesaver/app/#/connect?at=https%3A%2F%2Fevil.example&token=${TOKEN}`,
+      'livesaver web --pair',
+      '',
+    ])
+      expect([other, pairingOf(other)]).toEqual([other, undefined])
+
+    // Kept, it is what the tab starts with from then on.
+    const store = tabStore()
+    keepPairing(store, pairing)
+    expect(readPairing(store)).toEqual(pairing)
   })
 
   test('what the tab kept is checked again when it is read', () => {

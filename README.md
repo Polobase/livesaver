@@ -124,7 +124,8 @@ settings: nothing leaves the computer, and only the page that livesaver served c
 anything.
 
 `livesaver web --pair` opens the app on livesaver's site instead, connected to the livesaver of
-your computer (where the browser allows a site to reach it; Safari does not).
+your computer, where the browser allows a site to reach it: Chrome, Edge and Firefox ask, Brave
+wants the site allowed in its settings, Safari does not. The page says what its browser needs.
 
 The same app also runs without livesaver behind it, on its own in a browser (Chrome, Safari,
 Firefox). Then you choose or drop the folders and it scans them by itself, read-only. (In Chrome

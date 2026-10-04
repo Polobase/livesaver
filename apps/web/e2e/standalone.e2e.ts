@@ -398,12 +398,15 @@ for (const [name, type] of ENGINES) {
         await goTo('Overview')
         expect(await page.getByTestId('recent-runs').count()).toBe(0)
 
-        // Where the app runs says what that means, and how to get livesaver behind it.
+        // Where the app runs says what that means, and how to get livesaver behind it (what
+        // it says of this browser is in `ways.e2e.ts`).
         await page.getByTestId('where').click()
         const where = page.getByRole('dialog')
         await where.getByTestId('where-dialog').waitFor()
         expect(await textOf(where)).toContain('In this browser, on its own.')
-        expect(await textOf(where)).toContain('livesaver web --pair')
+        expect(await textOf(where.getByTestId('way-connect'))).toContain(
+          'It opens this app from your own computer, with livesaver behind it',
+        )
         expect(
           await where.getByRole('link', { name: 'How to get livesaver' }).getAttribute('href'),
         ).toContain('/docs/guide/getting-started/')

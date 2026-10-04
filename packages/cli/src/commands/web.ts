@@ -27,6 +27,19 @@ export function pairingLink(app: string, at: string, token: string): string {
   return `${page}#/connect?at=${encodeURIComponent(at.replace(/\/$/, ''))}&token=${token}`
 }
 
+/**
+ * What to do when the page that `--pair` opened cannot reach this livesaver: some browsers keep
+ * a page of a site from asking this computer for anything, and say nothing. The app at
+ * livesaver's own address is the same one, and no browser keeps anyone from it.
+ */
+export function pairingHint(own: string): string[] {
+  return [
+    'If the page says that livesaver does not answer, the browser keeps it from reaching this computer:',
+    '  Brave does until the site is allowed under brave://settings/content/localhostAccess, Safari always does.',
+    `  The app at ${own} is the same one, and works in every browser.`,
+  ]
+}
+
 /** `livesaver web`: the web app on this computer, until it is stopped. */
 export async function runWeb(flags: WebFlags, version: string): Promise<number> {
   const port = Number(flags.port ?? DEFAULT_PORT)
@@ -59,7 +72,11 @@ export async function runWeb(flags: WebFlags, version: string): Promise<number> 
   // The app elsewhere, connected to this livesaver: only that site's pages are let in, and
   // only with the token of this link.
   const link = app === undefined ? undefined : pairingLink(app, server.url, server.token)
-  if (link) console.log(`Connected to it, the app at ${site}: ${link}`)
+  if (link) {
+    console.log(`Connected to it, the app at ${site}: ${link}`)
+    // A browser that keeps a page of a site from reaching this computer says nothing of it.
+    for (const line of pairingHint(server.url)) console.log(pc.dim(line))
+  }
   console.log(pc.dim('It runs until you stop it with Ctrl-C.'))
   if (flags.open !== false && process.platform === 'darwin')
     spawn('open', [link ?? server.url], { stdio: 'ignore', detached: true }).unref()

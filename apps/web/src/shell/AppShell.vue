@@ -18,6 +18,7 @@ import { PLACES, type Place, SETTINGS } from './navigation'
 import ShortcutsHelp from './ShortcutsHelp.vue'
 import { shortcutsOpen } from './shortcuts'
 import WhereDialog from './WhereDialog.vue'
+import { whereOpen } from './where'
 
 const router = useRouter()
 const route = useRoute()
@@ -139,7 +140,6 @@ const where = computed(() =>
           : 'The page reads the folders you give it and changes nothing. Nothing leaves this computer.',
       },
 )
-const whereOpen = ref(false)
 /** The sidebar as a drawer on narrow screens. */
 const open = ref(false)
 

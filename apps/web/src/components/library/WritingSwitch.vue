@@ -3,13 +3,17 @@
  * Fixing in the browser, for a page that has no livesaver behind it: an experiment its user
  * switches on, after reading what a page cannot do that livesaver on the computer can.
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { GET_LIVESAVER } from '../../lib/links'
+import { browserFacts, waysOf } from '../../lib/ways'
 import { useLibraryStore } from '../../stores/library'
 import { useWritingStore } from '../../stores/writing'
+import CopyText from '../common/CopyText.vue'
 
 const writing = useWritingStore()
 const library = useLibraryStore()
+/** A browser that edits folders only after a step in its own settings (Brave) is told which. */
+const way = computed(() => waysOf(browserFacts()).edit)
 /** The limits are shown, and wait to be read. */
 const asking = ref(false)
 const understood = ref(false)
@@ -93,6 +97,12 @@ async function switchOn(): Promise<void> {
         This browser does not let a page edit a folder, so this page only reads. Chrome and Edge do.
         In every browser, <code class="text-xs">livesaver web</code> on your computer fixes, with a
         backup of every set and an undo.
+      </p>
+      <p v-if="way.address" class="max-w-2xl text-sm" data-testid="writing-step">
+        {{ way.text }} The switch is then in this place.
+        <span class="mt-1 block">
+          The flag: <CopyText :text="way.address" what="the address of the flag" />
+        </span>
       </p>
       <UButton v-bind="GET_LIVESAVER" size="sm" color="neutral" variant="subtle" />
     </div>

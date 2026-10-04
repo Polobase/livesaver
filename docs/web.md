@@ -117,12 +117,22 @@ reads; `livesaver web --pair` connects it to the livesaver of the same computer:
   public site reaches this computer), and lets the paired site read its answers. Every other
   origin is refused as before, and the token and the address checks stay as they are. Without
   `--pair`, the site is a stranger like any other.
-- **A browser has the last word.** Chrome, Edge, Firefox and Brave ask the user whether the page
-  may reach this computer; Safari does not allow it. While a browser asks, the page says that
-  it is connecting; refused, it says that livesaver does not answer and that the app livesaver
-  serves itself works everywhere; either way it can go on on its own. Checked with the app as
-  deployed on the site: Chromium connects and scans once that permission is given, and WebKit
-  refuses.
+- **A browser has the last word.** Chrome, Edge and Firefox ask the user whether the page may
+  reach this computer. Brave refuses without asking, unless the site was allowed under
+  `brave://settings/content/localhostAccess`. Safari does not allow it: to WebKit, a request to
+  `http://127.0.0.1` from a page of an `https` site is mixed content. While a browser asks, the
+  page says that it is connecting. A browser that refuses says nothing, and to the page that is
+  the same as a livesaver that is gone: it says that livesaver does not answer, what this
+  browser needs, and links to livesaver's own address, which serves the same app and which any
+  browser opens (going there is no request of a page). Either way it can go on on its own.
+  Checked with the app as deployed on the site: Chromium connects and scans once that
+  permission is given, and WebKit refuses.
+- **The page says it for the browser at hand** (`lib/ways.ts`): for each of the two ways a page
+  can fix (connected, or editing the folder itself) whether it works, works after a step in the
+  browser's own settings, or does not. Brave is known by `navigator.brave` (its user agent is
+  Chrome's), the others by their user agents. A page cannot link to a browser's settings
+  (`brave://…`), so those addresses are shown to be copied. The dialog also takes a pairing
+  link that is pasted, and connects the tab that is open.
 - **Both sides name their protocol** (`api` in `/api/info`, `WEB_API`). A page that livesaver
   serves always fits; a connected page may be older or newer than its livesaver, and says so
   instead of misreading its answers.
@@ -194,7 +204,7 @@ A page gets a folder in one of three ways (`packages/web/src/source.ts`):
 |---|---|---|
 | folder upload (`<input webkitdirectory>`) | all | every file of the folder at once; nothing is uploaded anywhere |
 | drag and drop (entries API) | all | the folder's entries; the page lists them and fetches a file when it is read |
-| `showDirectoryPicker` (File System Access API) | Chrome, Edge (off by default in Brave) | a handle; folders are listed and files opened on demand |
+| `showDirectoryPicker` (File System Access API) | Chrome, Edge (in Brave behind `brave://flags/#file-system-access-api`) | a handle; folders are listed and files opened on demand |
 
 `WebFs` mounts these folders at absolute paths and implements the read-only `FsRead` port.
 
@@ -340,7 +350,7 @@ there.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
   review, fix, undo, the history, a page that is opened again) against both engines; the app's
   own sums and words (states, plans, advice, what a run was and what its undo does).
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 219 tests.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 227 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
@@ -379,6 +389,12 @@ there.
   - A page from one address connected to livesaver at another: the pairing link, a fix and
     its undo across the two, a reload that stays connected, disconnecting; a livesaver that was
     not started for pairing, and one of another version.
+  - How a page can fix: what each engine is told about itself (the two ways, and a pairing
+    link that is pasted into a tab that is open), and what Brave is told. Brave cannot be driven
+    by a test: it is made up in Chromium by what tells it apart (`navigator.brave`, and no
+    folder to edit). Its two steps with the addresses to copy, a connection it keeps back, and
+    the app at livesaver's own address one link away. **Whether Brave's own settings then let
+    the page through is not covered by a test**; it is tried by hand.
   - What a test waits for gets three times as long on a CI, whose machines are slower in
     spurts.
 - `bun run test:node`: the built `livesaver web` under Node.js serves the app it ships with.

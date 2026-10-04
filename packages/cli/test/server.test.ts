@@ -5,7 +5,7 @@ import { request as httpRequest } from 'node:http'
 import { join } from 'node:path'
 import { Inventory } from '@livesaver/plugins'
 import { copyFixtures, tempDir, writeFile } from '@livesaver/test-kit'
-import { pairingLink, SITE_APP } from '../src/commands/web.js'
+import { pairingHint, pairingLink, SITE_APP } from '../src/commands/web.js'
 import {
   TOKEN_HEADER,
   type WebEvent,
@@ -229,6 +229,15 @@ test('the pairing link opens the app elsewhere with where livesaver is and its t
   expect(pairingLink('http://localhost:4173/app', 'http://127.0.0.1:1', 't')).toBe(
     'http://localhost:4173/app/#/connect?at=http%3A%2F%2F127.0.0.1%3A1&token=t',
   )
+})
+
+test('the command line says what to do when a browser keeps the page from this computer', () => {
+  const hint = pairingHint('http://127.0.0.1:5483/').join('\n')
+  // A browser that refuses says nothing: the setting of the one that has one is named, and
+  // the address that every browser opens.
+  expect(hint).toContain('brave://settings/content/localhostAccess')
+  expect(hint).toContain('Safari always does')
+  expect(hint).toContain('The app at http://127.0.0.1:5483/ is the same one')
 })
 
 test('a development server may stand in front: its address is allowed, the token still needed', async () => {

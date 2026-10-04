@@ -37,6 +37,21 @@ export function pairingIn(hash: string): Pairing | undefined {
   return valid(query.get('at'), query.get('token'))
 }
 
+/**
+ * The pairing in a link as `livesaver web --pair` prints it, wherever it was copied from: the
+ * whole address, or what stands behind its `#`.
+ */
+export function pairingOf(link: string): Pairing | undefined {
+  const text = link.trim()
+  const at = text.indexOf(ROUTE)
+  return at < 0 ? undefined : pairingIn(text.slice(at))
+}
+
+/** Keeps a pairing for the tab: the page is connected from its next load on. */
+export function keepPairing(store: PairingStore, pairing: Pairing): void {
+  store.setItem(KEY, JSON.stringify(pairing))
+}
+
 export function readPairing(store: PairingStore): Pairing | undefined {
   try {
     const kept = JSON.parse(store.getItem(KEY) ?? 'null') as Partial<Pairing> | null
@@ -62,6 +77,6 @@ export function takePairing(
   if (!location.hash.startsWith(ROUTE)) return undefined
   const pairing = pairingIn(location.hash)
   history.replaceState(null, '', `${location.pathname}${location.search}#/`)
-  if (pairing) store.setItem(KEY, JSON.stringify(pairing))
+  if (pairing) keepPairing(store, pairing)
   return pairing
 }

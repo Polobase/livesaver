@@ -6,7 +6,14 @@
 import type { EngineWorker } from '@livesaver/web'
 import { BrowserEngine } from './browser.js'
 import { ComputerEngine, localToken } from './computer.js'
-import { clearPairing, type Pairing, readPairing, takePairing } from './pairing.js'
+import {
+  clearPairing,
+  keepPairing,
+  type Pairing,
+  pairingOf,
+  readPairing,
+  takePairing,
+} from './pairing.js'
 import { browserState, canWriteHere, writingSwitchedOn } from './storage.js'
 import type { Engine } from './types.js'
 
@@ -23,6 +30,29 @@ function store(): Storage | undefined {
 export function takePairingFromAddress(): Pairing | undefined {
   const tab = store()
   return tab ? takePairing(window.location, window.history, tab) : undefined
+}
+
+/**
+ * Connects the page that is open to the livesaver a pairing link names (what `livesaver web
+ * --pair` printed), for a tab that was not opened by that link. `false`: it is no such link.
+ */
+export function connectWith(link: string): boolean {
+  const tab = store()
+  const pairing = pairingOf(link)
+  if (!tab || !pairing) return false
+  keepPairing(tab, pairing)
+  window.location.reload()
+  return true
+}
+
+/**
+ * Where the livesaver is that the page was connected to. It serves the app itself there, which
+ * a browser lets through even when it keeps a page of a site from reaching this computer.
+ */
+export function pairedAt(): string | undefined {
+  const tab = store()
+  const at = (tab ? readPairing(tab) : undefined)?.at
+  return at ? `${at}/` : undefined
 }
 
 /** Lets go of the livesaver the page was connected to: it is a page on its own again. */
