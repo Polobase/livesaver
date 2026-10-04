@@ -30,11 +30,17 @@ export function wantedOf(search: readonly Pick<KnownFolder, 'holds'>[]): Wanted 
 export function requestKey(request: {
   readonly projects: readonly { id: string; path: string }[]
   readonly search: readonly { id: string; path: string; vendor: boolean }[]
+  readonly installed?: readonly { id: string }[]
   readonly options: object
 }): string {
   return JSON.stringify([
     request.projects.map(({ id, path }) => [id, path]),
     request.search.map(({ id, path, vendor }) => [id, path, vendor]),
     request.options,
+    ...(request.installed?.length ? [request.installed.map(({ id }) => id)] : []),
   ])
 }
+
+/** The names the engines give what a folder holds that says what is installed. */
+export const PLUGIN_FOLDER = 'Plug-ins'
+export const PLUGIN_DATABASE = "Live's plug-in database"

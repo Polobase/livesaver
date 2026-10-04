@@ -49,4 +49,5 @@ export {
   simpleName,
 } from './inventory.js'
 export { KNOWN, type Known, omnisphereState } from './known.js'
+export { type PluginDatabase, parsePluginDatabase } from './live-database.js'
 export { type ModuleClass, type ModuleInfo, parseModuleInfo } from './moduleinfo.js'

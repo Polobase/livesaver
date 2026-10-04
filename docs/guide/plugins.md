@@ -13,7 +13,7 @@ Live finds a plug-in by its format and its id, never by its name. livesaver read
 | Not installed | Live finds no plug-in of this format with this id. A set that uses it opens with a placeholder. |
 | Rosetta only | It is installed, but contains only Intel code: Live loads it only when Live itself runs under Rosetta. |
 | Installed | Live loads it. |
-| Not known | In a browser without livesaver, the app cannot see what is installed. |
+| Not known | In a browser without livesaver, the app cannot see what is installed, until you [show it your plug-in folders](browser.md#showing-it-what-is-installed). |
 
 Open a plug-in to see what to do about it, the sets that use it, where it is installed, and whether the same plug-in is installed in another format.
 

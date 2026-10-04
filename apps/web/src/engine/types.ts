@@ -48,6 +48,11 @@ export interface LibraryFolder {
 export interface ScanRequest {
   readonly projects: readonly LibraryFolder[]
   readonly search: readonly LibraryFolder[]
+  /**
+   * In a browser: folders that say what is installed (plug-in folders, the folder of Live's
+   * plug-in database). livesaver on the computer looks for itself.
+   */
+  readonly installed?: readonly LibraryFolder[]
   readonly options: ScanOptions
 }
 
@@ -104,6 +109,13 @@ export interface Scan {
   readonly seconds: Readonly<Partial<Record<Phase, number>>>
   /** Where a browser placed the folders (it does not know where a folder lies on disk). */
   readonly folders: readonly LocatedFolder[]
+  /** In a browser: what the folders that say what is installed held (left out: none given). */
+  readonly installed?: {
+    /** The plug-in folders that were found, at the paths they were placed at. */
+    readonly roots: readonly string[]
+    /** Live's plug-in database was among them. */
+    readonly database: boolean
+  }
 }
 
 export interface FixRequest extends ScanRequest {
@@ -125,6 +137,8 @@ export interface Fixed {
 
 export interface UpgradeRequest {
   readonly projects: readonly LibraryFolder[]
+  /** In a browser: the folders that say what is installed, Live's plug-in database among them. */
+  readonly installed?: readonly LibraryFolder[]
   /** Only these plug-ins, by name; without it, every plug-in that can be converted. */
   readonly plugins?: readonly string[]
   /** The project folders to upgrade; without it, every project. */

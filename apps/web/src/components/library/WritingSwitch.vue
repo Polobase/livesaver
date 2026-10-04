@@ -68,8 +68,8 @@ async function switchOn(): Promise<void> {
     <template v-if="writing.possible">
       <p class="text-sm text-muted">
         An experiment. Chrome and Edge can let a page edit a folder you choose, so this page can fix
-        on its own: with a backup of every set, and an undo. It has limits that livesaver on your
-        computer does not have.
+        samples and upgrade plug-ins on its own: with a backup of every set, and an undo. It has
+        limits that livesaver on your computer does not have.
       </p>
       <USwitch
         class="mt-3"

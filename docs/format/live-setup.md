@@ -61,6 +61,10 @@ livesaver reads these two values with simple patterns and falls back to the fold
 - **Safe reading:**
   - The databases are in WAL mode. Opening one plainly read-only failed, and `?mode=ro&immutable=1` can return a stale snapshot after a crash.
   - livesaver **copies `.db` plus `-wal`/`-shm` to a temp folder** and opens the copy.
+  - Where there is no SQLite (a page in a browser), the plug-in database is read from the file
+    itself (`readSqliteTable`, `parsePluginDatabase`): the table pages, with the committed pages
+    of the `-wal` file in place of the database's, as SQLite reads them. On a real database
+    (269 plug-ins, 288 modules) it gives the rows SQLite gives.
 
 ## Other roots
 - `~/Music/Ableton/User Library` and `~/Music/Ableton/Factory Packs`: Live's defaults (livesaver reads the real ones from `Library.cfg`)

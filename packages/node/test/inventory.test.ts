@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, readFileSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
 import { encodeBinaryPlist, type PlistValue, type PluginRef } from '@livesaver/core'
-import { type Inventory, loadInventory, parseAuval } from '@livesaver/plugins'
+import { type Inventory, loadInventory, parseAuval, parsePluginDatabase } from '@livesaver/plugins'
 import { tempDir, writeFile } from '@livesaver/test-kit'
 import {
   loadInstalledPlugins,
@@ -155,6 +155,9 @@ describe('the catalog (CatalogTest)', () => {
     )
     mkdirSync(join(root, 'VST3', 'Massive.vst3'), { recursive: true })
     const c = await catalog()
+    // Read from the file itself, as a browser has to, the database says the same.
+    const file = new Uint8Array(readFileSync(join(dbDir, 'Live-plugins-1.db')))
+    expect(parsePluginDatabase(file)).toEqual(await readLivePluginDatabase(dbDir))
     expect(c.status(ref('VST2', '1483109208', 'Serum')).state).toBe('installed')
     expect(c.status(ref('VST2', '1315523937', 'Massive')).state).toBe('rosetta')
     expect(c.status(ref('VST2', '42', 'Deleted')).state).toBe('missing')

@@ -7,14 +7,13 @@
  * copy of the same projects on disk.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
-import { gunzipSync } from 'node:zlib'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { copyFixtures, fileRefBodies, readSet, stripSampleRefs, tempDir } from '@livesaver/test-kit'
 import type { Browser, Page } from 'playwright'
 import { build } from '../build.js'
 import { serve } from '../serve.js'
+import { filesIn, fill, handOut, sha1, unstamped, written, xml } from './handed.js'
 import {
   barriers,
   closeWith,
@@ -37,97 +36,6 @@ afterAll(() => site?.stop())
 const REPO = join(import.meta.dir, '..', '..', '..')
 const SET = 'Brokenpath Project/Brokenpath.als'
 const COPY = 'Brokenpath Project/Samples/Imported/1.wav'
-
-/** Every file below a folder of the disk, by its path in it. */
-function filesIn(dir: string, base = dir): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory()
-      ? filesIn(join(dir, entry.name), base)
-      : [relative(base, join(dir, entry.name))],
-  )
-}
-const sha1 = (data: Uint8Array) => createHash('sha1').update(data).digest('hex')
-/** Backups are named by the second they were made in, and what an undo takes out by its time. */
-const unstamped = (path: string) =>
-  path
-    .replace(/\[\d{4}-\d\d-\d\d \d{6}\]/, '[when]')
-    .replace(/^\.livesaver-trash\/[^/]+\//, '.livesaver-trash/[when]/')
-
-/**
- * The folder the "dialog" hands out: `projects` in the browser's own file system. It is made
- * before the app starts, on every load, and takes the place of the folder dialog.
- */
-async function handOut(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const folder = async () => {
-      const root = await navigator.storage.getDirectory()
-      const disk = await root.getDirectoryHandle('disk', { create: true })
-      return disk.getDirectoryHandle('projects', { create: true })
-    }
-    Object.assign(window, { showDirectoryPicker: folder, projectsFolder: folder })
-  })
-}
-
-/** Puts files into the folder that is handed out. */
-async function fill(page: Page, dir: string): Promise<void> {
-  const files = filesIn(dir).map((path) => ({
-    path,
-    data: readFileSync(join(dir, path)).toString('base64'),
-  }))
-  await page.evaluate(async (all) => {
-    const top = await (
-      window as unknown as { projectsFolder: () => Promise<FileSystemDirectoryHandle> }
-    ).projectsFolder()
-    for (const { path, data } of all) {
-      const parts = path.split('/')
-      const name = parts.pop() as string
-      let folder = top
-      for (const part of parts) folder = await folder.getDirectoryHandle(part, { create: true })
-      const stream = await (await folder.getFileHandle(name, { create: true })).createWritable()
-      await stream.write(Uint8Array.from(atob(data), (char) => char.charCodeAt(0)))
-      await stream.close()
-    }
-  }, files)
-}
-
-/** What lies in the folder that is handed out: every file's checksum, and the sets themselves. */
-async function written(page: Page): Promise<Map<string, { sha1: string; data?: Buffer }>> {
-  const files = await page.evaluate(async () => {
-    const top = await (
-      window as unknown as { projectsFolder: () => Promise<FileSystemDirectoryHandle> }
-    ).projectsFolder()
-    const out: { path: string; sha1: string; data: string }[] = []
-    const walk = async (folder: FileSystemDirectoryHandle, prefix: string) => {
-      for await (const entry of folder.values()) {
-        if (entry.kind === 'directory') {
-          await walk(entry as FileSystemDirectoryHandle, `${prefix}${entry.name}/`)
-          continue
-        }
-        const bytes = new Uint8Array(
-          await (await (entry as FileSystemFileHandle).getFile()).arrayBuffer(),
-        )
-        const digest = new Uint8Array(await crypto.subtle.digest('SHA-1', bytes))
-        const small = bytes.length < 200_000
-        out.push({
-          path: prefix + entry.name,
-          sha1: [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join(''),
-          data: small ? btoa(String.fromCharCode(...bytes)) : '',
-        })
-      }
-    }
-    await walk(top, '')
-    return out
-  })
-  return new Map(
-    files.map(({ path, sha1: sum, data }) => [
-      path,
-      { sha1: sum, ...(data ? { data: Buffer.from(data, 'base64') } : {}) },
-    ]),
-  )
-}
-
-const xml = (data: Buffer | undefined) =>
-  new TextDecoder().decode(gunzipSync(data ?? Buffer.alloc(0)))
 
 for (const [name, type] of ENGINES) {
   describe(`fixing in the page in ${name}`, () => {
@@ -448,6 +356,40 @@ for (const [name, type] of ENGINES) {
         expect([...files.keys()].map(unstamped)).toContain(`.livesaver-trash/[when]/${COPY}`)
         // The scan that follows finds the set to fix again, and not the copy that was taken out.
         await goTo('Overview')
+        await page
+          .getByTestId('fix-card')
+          .getByText('1 set in 1 project')
+          .waitFor({ timeout: 30_000 * PATIENCE })
+      },
+      90_000 * PATIENCE,
+    )
+
+    test(
+      'one project is fixed from the list of projects, and taken back from the overview',
+      async () => {
+        const original = sha1(readFileSync(join(fixturesProjects(), SET)))
+        await goTo('Samples')
+        await page.getByRole('button', { name: 'Fix Brokenpath Project' }).click()
+        const dialog = page.getByRole('dialog')
+        expect(await dialog.getByRole('heading', { level: 2 }).innerText()).toBe(
+          'Fix "Brokenpath Project"',
+        )
+        await dialog.getByTestId('review-continue').click()
+        await dialog.getByRole('checkbox', { name: 'Ableton Live is closed' }).check()
+        // Which project was chosen goes to the page's worker with the fix: it has to arrive.
+        await dialog.getByTestId('review-apply').click()
+        await dialog.getByTestId('review-done').waitFor({ timeout: 30_000 * PATIENCE })
+        expect(await textOf(dialog.getByTestId('review-fix'))).toContain(
+          'Fixed: 1 set rewritten, 1 file copied',
+        )
+        await closeWith(dialog, dialog.getByTestId('review-done'))
+        expect(xml((await written(page)).get(SET)?.data)).toContain('Samples/Imported/1.wav')
+
+        await goTo('Overview')
+        await page.getByTestId('progress').waitFor({ state: 'hidden', timeout: 30_000 * PATIENCE })
+        await page.getByTestId('fixed').getByRole('button', { name: 'Undo this fix' }).click()
+        await page.getByTestId('undone').waitFor({ timeout: 30_000 * PATIENCE })
+        expect((await written(page)).get(SET)?.sha1).toBe(original)
         await page
           .getByTestId('fix-card')
           .getByText('1 set in 1 project')

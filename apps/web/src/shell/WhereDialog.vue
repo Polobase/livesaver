@@ -47,9 +47,9 @@ function connect(): void {
       <div class="space-y-4 text-sm" data-testid="where-dialog">
         <template v-if="state === 'alone'">
           <p v-if="engines.capabilities.fix" data-testid="where-writing">
-            The page reads the folders you give it, and fixes samples in the project folders you
-            chose for editing (an experiment you switched on in the Settings). It scans samples and
-            plug-ins, and shows everything a scan finds.
+            The page reads the folders you give it, and fixes samples and upgrades plug-ins in the
+            project folders you chose for editing (an experiment you switched on in the Settings).
+            It scans samples and plug-ins, and shows everything a scan finds.
           </p>
           <p v-else>
             The page reads the folders you give it and changes nothing. It scans samples and

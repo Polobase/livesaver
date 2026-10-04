@@ -20,7 +20,13 @@ const props = defineProps<{ kind: FolderKind; title: string; hint: string; disab
 const engines = useEngineStore()
 const library = useLibraryStore()
 const writing = useWritingStore()
-const folders = computed(() => (props.kind === 'projects' ? library.projects : library.search))
+const folders = computed(() =>
+  props.kind === 'projects'
+    ? library.projects
+    : props.kind === 'search'
+      ? library.search
+      : library.installed,
+)
 /** With fixing in the browser switched on, a project folder is handed over to be edited. */
 const forEditing = computed(() => props.kind === 'projects' && writing.on)
 
@@ -29,7 +35,10 @@ const browsing = ref(false)
 const start = computed(
   () => library.projects.at(-1)?.path ?? library.suggested[0] ?? engines.start?.home ?? '',
 )
-const add = (folder: FolderListing) => library.addPath(props.kind, folder)
+// (Only a browser is handed folders that say what is installed.)
+const add = (folder: FolderListing) => {
+  if (props.kind !== 'installed') library.addPath(props.kind, folder)
+}
 
 // --- in a browser: handed over
 const input = useTemplateRef<HTMLInputElement>('input')

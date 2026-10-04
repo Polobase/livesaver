@@ -7,6 +7,7 @@ import { useEngineStore } from '../../stores/engine'
 import { usePluginsStore } from '../../stores/plugins'
 import { useScanStore } from '../../stores/scan'
 import ScrollRegion from '../common/ScrollRegion.vue'
+import ReadyInBrowser from '../fix/ReadyInBrowser.vue'
 import RescanStatus from '../scan/RescanStatus.vue'
 import ScanProgress from '../scan/ScanProgress.vue'
 
@@ -26,10 +27,15 @@ const open = computed({
     if (!value) plugins.close()
   },
 })
+/** livesaver on the computer sees whether Live runs; a page asks its user (`ReadyInBrowser`). */
+const onComputer = computed(() => engines.capabilities.liveStatus)
+const pageReady = ref(false)
 watch(
   () => plugins.review !== undefined,
   (isOpen) => {
-    if (isOpen) step.value = 0
+    if (!isOpen) return
+    step.value = 0
+    pageReady.value = false
   },
 )
 
@@ -121,7 +127,12 @@ async function apply(): Promise<void> {
           </ul>
         </div>
 
-        <ul v-if="step === 1" class="space-y-3" data-testid="upgrade-ready">
+        <ReadyInBrowser
+          v-if="step === 1 && !onComputer"
+          v-model:ready="pageReady"
+          name="upgrade-ready"
+        />
+        <ul v-else-if="step === 1" class="space-y-3" data-testid="upgrade-ready">
           <li class="flex gap-3">
             <UIcon
               :name="liveRunning ? 'i-lucide-circle-x' : 'i-lucide-circle-check'"
@@ -238,7 +249,7 @@ async function apply(): Promise<void> {
             v-if="step === 1 && sum"
             icon="i-lucide-circle-arrow-up"
             :label="`Upgrade ${plural(sum.sets, 'set')}`"
-            :disabled="liveRunning"
+            :disabled="onComputer ? liveRunning : !pageReady"
             data-testid="upgrade-apply"
             @click="apply"
           />

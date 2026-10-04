@@ -1,7 +1,8 @@
 /** What a page and the engine that scans its folders say to each other. */
-import type { CheckView, PluginsView } from '@livesaver/ops'
+import type { CheckView, PluginsView, UpgradeView } from '@livesaver/ops'
 import type { FsUsage } from '../fs.js'
 import type { DirectoryHandleLike, FolderSource } from '../source.js'
+import type { InstalledFolders } from './installed.js'
 
 export interface FolderInput {
   readonly id: string
@@ -21,6 +22,11 @@ export interface ScanOptions {
 export interface ScanRequest {
   readonly projects: readonly FolderInput[]
   readonly search: readonly FolderInput[]
+  /**
+   * Folders that say what is installed: plug-in folders, and the folder of Live's plug-in
+   * database. They are not searched for samples.
+   */
+  readonly installed?: readonly FolderInput[]
   readonly options: ScanOptions
 }
 
@@ -42,7 +48,13 @@ export interface WireFolder extends Omit<FolderInput, 'source'> {
 export interface WireRequest {
   readonly projects: readonly WireFolder[]
   readonly search: readonly WireFolder[]
+  readonly installed?: readonly WireFolder[]
   readonly options: ScanOptions
+}
+
+export interface WireUpgrade extends WireRequest {
+  readonly names?: readonly string[]
+  readonly only?: readonly string[]
 }
 
 export type ToEngine =
@@ -53,6 +65,9 @@ export type ToEngine =
       readonly certainOnly?: boolean
     } & WireRequest)
   | ({ readonly type: 'undo'; readonly run: string } & WireRequest)
+  /** What an upgrade of plug-ins would do, and the upgrade itself. */
+  | ({ readonly type: 'plan-upgrade' } & WireUpgrade)
+  | ({ readonly type: 'upgrade' } & WireUpgrade)
   /** The answer to an `open` event. */
   | { readonly type: 'file'; readonly request: number; readonly file: File | undefined }
 
@@ -63,13 +78,18 @@ export interface LocatedFolder {
   readonly how: 'typed' | 'found' | 'unknown'
 }
 
-export type ScanPhase = 'locating' | 'indexing' | 'checking' | 'reporting'
+export type ScanPhase = 'locating' | 'indexing' | 'checking' | 'plugins' | 'reporting'
 
 /** A scan in a page: the samples, and the plug-ins the sets use. */
 export interface BrowserScan {
   readonly samples: CheckView
-  /** Which plug-ins the sets use. Whether they are installed, a page cannot see. */
+  /**
+   * Which plug-ins the sets use; and whether they are installed, if the page was handed
+   * folders that say so (`plugins.inventory`).
+   */
   readonly plugins: PluginsView
+  /** What the folders that say what is installed held (left out: none were given). */
+  readonly installed?: InstalledFolders
   /** Report files as the command line writes them: name → content. */
   readonly reports: Readonly<Record<string, string>>
   /** Where the folders were placed (a page does not know where a folder lies on disk). */
@@ -149,11 +169,41 @@ export type UndoEvent =
   | { readonly type: 'undone'; readonly undone: BrowserUndone }
   | { readonly type: 'failed'; readonly message: string }
 
+/**
+ * An upgrade of VST2 plug-ins to VST3, in the projects that were scanned or in some of them.
+ * Which VST3 plug-ins Live has is read from its plug-in database, which has to be among the
+ * folders that say what is installed.
+ */
+export interface UpgradeRequest extends ScanRequest {
+  /** Only these plug-ins, by name; without it, every plug-in that can be converted. */
+  readonly names?: readonly string[]
+  /** The project folders to upgrade, as the scan placed them; without it, every project. */
+  readonly only?: readonly string[]
+}
+
+export interface BrowserUpgraded {
+  /** The run, to undo it. */
+  readonly run: string
+  readonly sets: number
+  readonly upgrade: UpgradeView
+  /** Sets that were not written, with the reason. */
+  readonly errors: readonly { readonly set: string; readonly error: string }[]
+}
+
+export type UpgradeEvent =
+  | { readonly type: 'phase'; readonly phase: ScanPhase | 'upgrading' }
+  | ProgressEvent
+  | { readonly type: 'planned'; readonly upgrade: UpgradeView }
+  | { readonly type: 'upgraded'; readonly upgraded: BrowserUpgraded }
+  /** `run`: it wrote something before it failed, which can be undone. */
+  | { readonly type: 'failed'; readonly message: string; readonly run?: string }
+
 /** What the engine's worker posts: the events of a run, and its requests for files. */
 export type FromEngine =
   | ScanEvent
   | FixEvent
   | UndoEvent
+  | UpgradeEvent
   /** The engine needs a file of an uploaded folder (answered with a `file` message). */
   | {
       readonly type: 'open'

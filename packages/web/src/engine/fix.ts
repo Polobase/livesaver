@@ -63,7 +63,7 @@ const writableHandle = (folder: FolderInput): WritableDirectoryHandleLike | unde
 }
 
 /** The folders of a request with the page's storage beside them, and write access to both. */
-async function prepareToWrite(request: ScanRequest, options: WriteEngineOptions) {
+export async function prepareToWrite(request: ScanRequest, options: WriteEngineOptions) {
   if (request.projects.length === 0) throw new Error('No project folder was given.')
   for (const folder of request.projects)
     if (!writableHandle(folder))
@@ -105,8 +105,24 @@ function unplaced(request: ScanRequest, prepared: Prepared): string[] {
     .map(({ name }) => name)
 }
 
-const alone = (options: WriteEngineOptions, work: () => Promise<void>) =>
+/** Runs `work` while nothing else of the page writes. */
+export const alone = (options: WriteEngineOptions, work: () => Promise<void>) =>
   options.exclusive ? options.exclusive(work) : work()
+
+/** The projects of a request that were asked for, or all: each lies in a folder that was given. */
+export async function targetsOf(
+  prepared: Prepared,
+  asked: readonly string[] | undefined,
+): Promise<readonly string[]> {
+  const only = (asked ?? []).map((root) => posix.normpath(root))
+  for (const root of only) {
+    if (!prepared.targets.some((target) => isInside(root, target)))
+      throw new Error(`This folder is not in a project folder that was scanned: ${root}`)
+    if ((await prepared.host.fs.kind(root)) !== 'directory')
+      throw new Error(`This folder does not exist: ${root}`)
+  }
+  return only.length ? only : prepared.targets
+}
 
 export async function fixFolders(
   request: FixRequest,
@@ -128,15 +144,7 @@ export async function fixFolders(
         throw new Error(
           `livesaver does not know where ${nowhere.map((name) => `“${name}”`).join(' and ')} ${nowhere.length === 1 ? 'lies' : 'lie'} on your disk, and a fix writes into the sets where their files are. Set the path of the folder, scan again, and fix then.`,
         )
-      // The projects that were asked for, or all: each lies in a folder that was given.
-      const only = (request.only ?? []).map((root) => posix.normpath(root))
-      for (const root of only) {
-        if (!prepared.targets.some((target) => isInside(root, target)))
-          throw new Error(`This folder is not in a project folder that was scanned: ${root}`)
-        if ((await host.fs.kind(root)) !== 'directory')
-          throw new Error(`This folder does not exist: ${root}`)
-      }
-      const targets = only.length ? only : prepared.targets
+      const targets = await targetsOf(prepared, request.only)
 
       run = await newRun(host, 'collect', {
         targets,

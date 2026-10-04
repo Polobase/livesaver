@@ -12,6 +12,7 @@ import { blockerLines, upgradeSum } from '../../lib/upgrade'
 import { useEngineStore } from '../../stores/engine'
 import { usePluginsStore } from '../../stores/plugins'
 import { useScanStore } from '../../stores/scan'
+import { useWritingStore } from '../../stores/writing'
 import DataTable, { type Column } from '../common/DataTable.vue'
 import PathText from '../common/PathText.vue'
 import TableToolbar from '../common/TableToolbar.vue'
@@ -20,6 +21,7 @@ import ScanProgress from '../scan/ScanProgress.vue'
 const engines = useEngineStore()
 const plugins = usePluginsStore()
 const scans = useScanStore()
+const writing = useWritingStore()
 
 // The plan of the scan that is shown, made once this tab is looked at.
 const wanted = computed(
@@ -31,6 +33,8 @@ function plan(): void {
 }
 onMounted(plan)
 watch([wanted, () => plugins.plan], plan)
+/** A page plans with Live's plug-in database, which its user has to hand it: the way there. */
+const needsDatabase = computed(() => engines.kind === 'browser' && !scans.scan?.installed?.database)
 
 /** The plug-ins that are ticked for the upgrade: all that can convert, until one is unticked. */
 const unticked = ref(new Set<string>())
@@ -99,7 +103,11 @@ const why = (row: UpgradeSetRow) =>
       <UEmpty
         icon="i-lucide-circle-arrow-up"
         title="Upgrading needs livesaver on your computer"
-        description="Switching a set from a VST2 plug-in to its VST3 rewrites the set, and needs to know which VST3 plug-ins Live has. Run “livesaver web” on your computer: it opens this app with livesaver behind it, which can write, back up and undo."
+        :description="
+          writing.possible
+            ? 'Switching a set from a VST2 plug-in to its VST3 rewrites the set, and needs to know which VST3 plug-ins Live has. Run “livesaver web” on your computer: it opens this app with livesaver behind it, which can write, back up and undo. Or let this page do it: switch on “Fix in this browser” in the Settings, and add Live’s database folder.'
+            : 'Switching a set from a VST2 plug-in to its VST3 rewrites the set, and needs to know which VST3 plug-ins Live has. Run “livesaver web” on your computer: it opens this app with livesaver behind it, which can write, back up and undo.'
+        "
         :actions="[{ ...GET_LIVESAVER, color: 'neutral', variant: 'subtle' }]"
       />
     </div>
@@ -116,11 +124,22 @@ const why = (row: UpgradeSetRow) =>
         title="Nothing can be upgraded here"
         :description="plugins.problem"
         role="note"
+        data-testid="no-plan"
         :actions="[
+          ...(needsDatabase
+            ? [
+                {
+                  label: 'Add the folder in the Settings',
+                  to: '/settings',
+                  color: 'neutral' as const,
+                  variant: 'subtle' as const,
+                },
+              ]
+            : []),
           {
             label: 'Try again',
             color: 'neutral',
-            variant: 'subtle',
+            variant: needsDatabase ? 'ghost' : 'subtle',
             onClick: () => {
               plugins.problem = ''
               void plugins.loadPlan()

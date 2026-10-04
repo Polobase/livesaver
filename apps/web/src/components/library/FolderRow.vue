@@ -74,7 +74,9 @@ const canMark = computed(
           {{ facts.join(' · ') }}
         </span>
       </div>
+      <!-- (Where a folder that says what is installed lies, the page works out by itself.) -->
       <div
+        v-if="kind !== 'installed'"
         class="flex flex-wrap items-center gap-x-2 text-xs text-muted"
         data-testid="folder-place"
       >

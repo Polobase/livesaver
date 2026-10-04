@@ -74,7 +74,7 @@ const found = computed(() => {
             You changed them after the last scan: scan again to see what the changes do.
           </template>
         </p>
-        <LibrarySetup class="mt-4" />
+        <LibrarySetup class="mt-4" plugins />
         <div
           v-if="engines.capabilities.ownSettings"
           class="mt-5 flex flex-wrap items-center gap-3 border-t border-default pt-4"

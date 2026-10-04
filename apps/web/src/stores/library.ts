@@ -15,7 +15,11 @@ import type {
 import { LIBRARY_NAME, LIVE_CONTENT, wantedOf } from '../lib/library.js'
 import { useEngineStore } from './engine.js'
 
-export type FolderKind = 'projects' | 'search'
+/**
+ * `installed`: in a browser, folders that say what is installed (plug-in folders, the folder
+ * of Live's plug-in database). livesaver on the computer looks for itself.
+ */
+export type FolderKind = 'projects' | 'search' | 'installed'
 
 const nameOf = (path: string) => path.split('/').filter(Boolean).pop() ?? path
 
@@ -23,13 +27,15 @@ export const useLibraryStore = defineStore('library', () => {
   const engines = useEngineStore()
   const projects = ref<KnownFolder[]>([])
   const search = ref<KnownFolder[]>([])
+  const installed = ref<KnownFolder[]>([])
   const options = ref<ScanOptions>({ packLimitMB: 50, matchLibraryPath: false })
   /** Where a browser's scan placed the folders it was handed. */
   const located = ref<ReadonlyMap<string, LocatedFolder>>(new Map())
   /** Folders checked before on this computer, to offer while no project folder is given. */
   const suggested = ref<readonly string[]>([])
 
-  const list = (kind: FolderKind) => (kind === 'projects' ? projects : search)
+  const list = (kind: FolderKind) =>
+    kind === 'projects' ? projects : kind === 'search' ? search : installed
 
   function init(start: Start): void {
     projects.value = start.projects.map((folder) => ({ ...folder, holds: [], exists: true }))
@@ -39,7 +45,10 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   /** Adds a folder of this computer by what its listing says (its path names it). */
-  function addPath(kind: FolderKind, folder: Pick<FolderListing, 'path' | 'holds'>): void {
+  function addPath(
+    kind: Exclude<FolderKind, 'installed'>,
+    folder: Pick<FolderListing, 'path' | 'holds'>,
+  ): void {
     const folders = list(kind)
     if (folders.value.some((known) => known.path === folder.path)) return
     const name = nameOf(folder.path)
@@ -98,7 +107,7 @@ export const useLibraryStore = defineStore('library', () => {
     id: string,
     change: Partial<Pick<KnownFolder, 'vendor' | 'path' | 'access'>>,
   ): void {
-    for (const folders of [projects, search])
+    for (const folders of [projects, search, installed])
       folders.value = folders.value.map((folder) =>
         folder.id === id ? { ...folder, ...change } : folder,
       )
@@ -109,6 +118,7 @@ export const useLibraryStore = defineStore('library', () => {
     return {
       projects: projects.value.map(plain),
       search: search.value.map(plain),
+      ...(installed.value.length ? { installed: installed.value.map(plain) } : {}),
       options: { ...options.value },
     }
   })
@@ -121,9 +131,14 @@ export const useLibraryStore = defineStore('library', () => {
   /** Live's own content always counts as installed: there is nothing to tick for it. */
   const isLiveContent = (folder: KnownFolder) => folder.holds.includes(LIVE_CONTENT)
 
+  /** What the folders that say what is installed hold, taken together. */
+  const installedHolds = computed(() => new Set(installed.value.flatMap((folder) => folder.holds)))
+
   return {
     projects,
     search,
+    installed,
+    installedHolds,
     options,
     located,
     suggested,

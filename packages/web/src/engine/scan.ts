@@ -32,7 +32,8 @@ import { createWorkerParser, defaultWorkerCount, type ParseWorker } from '../par
 import type { FolderSource } from '../source.js'
 import type { WritableMount } from '../write.js'
 import { APP_RESOURCES_IN } from './ableton.js'
-import type { FolderInput, LocatedFolder, ScanEvent, ScanRequest } from './protocol.js'
+import { installedIn, withAppleUnits } from './installed.js'
+import type { FolderInput, LocatedFolder, ScanEvent, ScanPhase, ScanRequest } from './protocol.js'
 
 /** Sets read to learn where a project folder lies; their stored paths agree, so a few suffice. */
 const SAMPLE_SETS = 24
@@ -275,11 +276,17 @@ export async function scanFolders(
   emit: (event: ScanEvent) => void,
   options: ScanEngineOptions,
 ): Promise<void> {
-  const seconds = { locating: 0, indexing: 0, checking: 0, reporting: 0 }
-  let phase: keyof typeof seconds = 'locating'
+  // (A phase that a scan does not have is not timed: the plug-ins only with folders for them.)
+  const seconds: Partial<Record<ScanPhase, number>> = {
+    locating: 0,
+    indexing: 0,
+    checking: 0,
+    reporting: 0,
+  }
+  let phase: ScanPhase = 'locating'
   let since = performance.now()
-  const enter = (next: keyof typeof seconds) => {
-    seconds[phase] += (performance.now() - since) / 1000
+  const enter = (next: ScanPhase) => {
+    seconds[phase] = (seconds[phase] ?? 0) + (performance.now() - since) / 1000
     since = performance.now()
     phase = next
     emit({ type: 'phase', phase: next })
@@ -321,11 +328,24 @@ export async function scanFolders(
     })
     await parser.close()
 
+    // The plug-ins were read with the samples. What is installed, a page cannot see by itself:
+    // without folders that say so, the rows say which plug-ins are used and where, not whether
+    // they are there.
+    const given = request.installed ?? []
+    let installed: Awaited<ReturnType<typeof installedIn>> | undefined
+    if (given.length) {
+      enter('plugins')
+      installed = await installedIn(given)
+    }
     enter('reporting')
     const env = result.projects[0]?.env ?? new Environment(config, probe)
     const reports = await buildReports(result.results, result.base, probe)
-    // The plug-ins were read with the samples. What is installed, a page cannot see: the rows
-    // say which plug-ins are used and where, not whether they are there.
+    const inventory = installed
+      ? withAppleUnits(
+          installed.inventory,
+          result.results.flatMap((set) => (set.plugins ?? []).map((use) => use.ref)),
+        )
+      : undefined
     const audit = auditSets(
       result.results.map(({ setPath, projectRoot, plugins }) => ({
         setPath,
@@ -333,14 +353,19 @@ export async function scanFolders(
         ...(plugins ? { plugins } : {}),
       })),
       result.base,
-      { inventory: new Inventory([]) },
+      inventory && installed
+        ? { inventory, catalog: installed.catalog }
+        : { inventory: new Inventory([]) },
     )
     seconds.reporting = (performance.now() - since) / 1000
     emit({
       type: 'scanned',
       scan: {
         samples: checkView(result, env),
-        plugins: pluginsView(audit, undefined),
+        plugins: pluginsView(audit, inventory),
+        ...(installed
+          ? { installed: { roots: installed.roots, database: installed.database } }
+          : {}),
         reports,
         folders,
         usage: host.fs.usage,

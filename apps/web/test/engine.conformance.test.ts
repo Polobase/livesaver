@@ -7,7 +7,7 @@
  * What only one of them can do is tested below, and that the other refuses it.
  */
 import { describe, expect, test } from 'bun:test'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { uploadedFolder, writeFile } from '@livesaver/test-kit'
 import {
@@ -19,7 +19,7 @@ import {
   Unreachable,
   Unsupported,
 } from '../src/engine/index.js'
-import { OPTIONS, shown, useLibrary } from './engine-setup.js'
+import { installPlugins, OPTIONS, shown, useLibrary } from './engine-setup.js'
 
 const lib = useLibrary()
 const { computer, browser, editing } = lib
@@ -187,20 +187,6 @@ describe('only livesaver on this computer', () => {
     expect((await engine.status()).freeBytes).toBeUndefined()
   })
 
-  test('upgrades plug-ins and takes it back', async () => {
-    const { engine, request } = computer()
-    const set = join(lib.now.projects, 'VST2toVST3 Project', 'VST2toVST3.als')
-    const before = readFileSync(set)
-    const upgraded = await engine.upgrade({ projects: request.projects, plugins: ['Serum'] })
-    expect([upgraded.sets, upgraded.errors]).toEqual([1, []])
-    expect(upgraded.upgrade.rows.map((row) => [row.plugin, row.converted, row.written])).toEqual([
-      ['Serum', true, true],
-    ])
-    expect(readFileSync(set)).not.toEqual(before)
-    expect((await engine.undo(upgraded.run)).restored).toBe(1)
-    expect(readFileSync(set)).toEqual(before)
-  })
-
   test('lists the folders of a folder, and says so when livesaver is gone', async () => {
     const { engine } = computer()
     const listing = await engine.folders(lib.now.tmp.path)
@@ -255,6 +241,35 @@ describe('only the browser', () => {
       folders: scan.folders,
     })
     expect(scan.samples.ableton.userLibrary).toBe('/Ableton/User Library')
+  })
+
+  test('is told what is installed by folders: the plug-in folder, and Live’s database', async () => {
+    const { engine, request } = browser()
+    const { plugins, database } = installPlugins(lib.now.tmp.path)
+    const told = [
+      engine.add(uploadedFolder(plugins), 'installed'),
+      engine.add(uploadedFolder(database), 'installed'),
+    ]
+    expect(told.map((folder) => folder.holds)).toEqual([['Plug-ins'], ["Live's plug-in database"]])
+    const progress: Progress[] = []
+    const scan = await engine.scan({ ...request, installed: told }, (e) => progress.push(e))
+    // The engine still cannot see for itself; the scan knows, because it was shown.
+    expect([engine.capabilities.installedPlugins, scan.plugins.inventory]).toEqual([false, true])
+    expect(scan.installed).toEqual({ roots: ['/Library/Audio/Plug-Ins'], database: true })
+    expect(scan.plugins.uses.map((use) => [use.name, use.format, use.state]).sort()).toEqual([
+      ['Massive', 'VST2', 'missing'],
+      ['Massive', 'VST3', 'installed'],
+      ['Omnisphere', 'VST2', 'missing'],
+      ['Omnisphere', 'VST3', 'missing'],
+      ['Serum', 'VST2', 'rosetta'],
+      ['Serum', 'VST3', 'installed'],
+    ])
+    expect(scan.plugins.counts).toMatchObject({ missing: 3, rosetta: 1 })
+    expect(progress.some((event) => event.type === 'phase' && event.phase === 'plugins')).toBe(true)
+    // The samples are what they are without these folders: plug-ins are no place to look in.
+    const plain = await engine.scan(request)
+    expect(shown(scan).totals).toEqual(shown(plain).totals)
+    expect([plain.plugins.inventory, plain.installed]).toEqual([false, undefined])
   })
 
   test('a folder it no longer has must be added again; a scan can be stopped', async () => {

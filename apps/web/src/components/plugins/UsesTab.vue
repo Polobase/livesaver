@@ -67,8 +67,28 @@ function note(use: PluginUseRow): string {
       data-testid="no-inventory"
     >
       These are the plug-ins your sets use. Whether they are installed, a page in a browser cannot
-      see: open the app with <code class="text-xs">livesaver web</code> to compare them with what is
-      on this computer.
+      see by itself: add your plug-in folder and Live's database folder in the
+      <RouterLink to="/settings" class="underline underline-offset-2">Settings</RouterLink>, or open
+      the app with <code class="text-xs">livesaver web</code> to compare them with what is on this
+      computer.
+    </p>
+    <p
+      v-else-if="scan.installed && (!scan.installed.database || !scan.installed.roots.length)"
+      class="border-b border-default px-4 py-2.5 text-sm text-muted sm:px-6"
+      role="note"
+      data-testid="partial-inventory"
+    >
+      <template v-if="!scan.installed.roots.length">
+        No plug-in folder was among the folders that say what is installed, so every plug-in counts
+        as not installed. Add <code class="text-xs">/Library/Audio/Plug-Ins</code> in the Settings.
+      </template>
+      <template v-else>
+        Live's plug-in database was not among the folders that say what is installed. Without it a
+        plug-in is known only if its bundle says which one it is (an Audio Unit does, and a newer
+        VST3): most VST plug-ins count as not installed. Add the folder
+        <code class="text-xs">Live Database</code>
+        in the Settings.
+      </template>
     </p>
     <TableToolbar
       v-model:query="query"

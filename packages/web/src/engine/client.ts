@@ -2,10 +2,12 @@
  * The page side of the engine: sends the folders of a request to the engine's worker, hands it
  * the files it asks for, and passes on what it reports.
  */
+import type { UpgradeView } from '@livesaver/ops'
 import type {
   BrowserFixed,
   BrowserScan,
   BrowserUndone,
+  BrowserUpgraded,
   FixEvent,
   FixRequest,
   FolderInput,
@@ -14,6 +16,8 @@ import type {
   ScanRequest,
   ToEngine,
   UndoRequest,
+  UpgradeEvent,
+  UpgradeRequest,
   WireFolder,
   WireRequest,
 } from './protocol.js'
@@ -37,6 +41,7 @@ export function wireFolder(folder: FolderInput): WireFolder {
 const wireRequest = (request: ScanRequest): WireRequest => ({
   projects: request.projects.map(wireFolder),
   search: request.search.map(wireFolder),
+  ...(request.installed ? { installed: request.installed.map(wireFolder) } : {}),
   options: request.options,
 })
 
@@ -65,7 +70,7 @@ function runInWorker<T>(
   done: (event: FromEngine) => Outcome<T>,
 ): { result: Promise<T>; stop: () => void } {
   const worker = spawn()
-  const folders = [...request.projects, ...request.search]
+  const folders = [...request.projects, ...request.search, ...(request.installed ?? [])]
   let stop = () => {}
   const result = new Promise<T>((resolve, reject) => {
     stop = () => {
@@ -150,4 +155,35 @@ export function undoInWorker(
   return runInWorker(spawn, request, message, 'undo', (event) =>
     event.type === 'undone' ? { value: event.undone } : undefined,
   ).result
+}
+
+const upgradeMessage = (type: 'plan-upgrade' | 'upgrade', request: UpgradeRequest): ToEngine => ({
+  type,
+  ...wireRequest(request),
+  ...(request.names ? { names: request.names } : {}),
+  ...(request.only ? { only: request.only } : {}),
+})
+
+/** What an upgrade of VST2 plug-ins to VST3 would do, planned in a worker of its own. */
+export function planUpgradeInWorker(
+  spawn: () => EngineWorker,
+  request: UpgradeRequest,
+  onEvent: (event: UpgradeEvent) => void,
+): Promise<UpgradeView> {
+  return runInWorker(spawn, request, upgradeMessage('plan-upgrade', request), 'plan', (event) => {
+    onEvent(event as UpgradeEvent)
+    return event.type === 'planned' ? { value: event.upgrade } : undefined
+  }).result
+}
+
+/** The upgrade, in a worker of its own. Like a fix, it cannot be stopped. */
+export function upgradeInWorker(
+  spawn: () => EngineWorker,
+  request: UpgradeRequest,
+  onEvent: (event: UpgradeEvent) => void,
+): Promise<BrowserUpgraded> {
+  return runInWorker(spawn, request, upgradeMessage('upgrade', request), 'upgrade', (event) => {
+    onEvent(event as UpgradeEvent)
+    return event.type === 'upgraded' ? { value: event.upgraded } : undefined
+  }).result
 }

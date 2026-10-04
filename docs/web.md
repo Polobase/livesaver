@@ -7,19 +7,21 @@
   `livesaver plugins audit`, and it can fix what it finds like `livesaver collect --apply`: all
   projects, a selection, or one, after a review, with an undo. See
   [On this computer](#on-this-computer).
-- **On its own in a browser** (any static host): it is handed folders, scans them itself with
-  the same code (`@livesaver/ops`) on a browser host (`@livesaver/web`), and never writes. The
-  sections from [How it is built](#how-it-is-built) to
+- **On its own in a browser** (any static host): it is handed folders and scans them itself
+  with the same code (`@livesaver/ops`) on a browser host (`@livesaver/web`). It only reads,
+  unless its user switches fixing on where a browser lets a page edit a folder (Chrome, Edge):
+  then it fixes samples and upgrades plug-ins itself, with a backup of every set and an undo.
+  The sections from [How it is built](#how-it-is-built) to
   [What differs from the command line](#on-its-own-what-differs-from-the-command-line) are
   about this.
 
 The same files serve both: relative URLs and hash routes, so they run at any path. What the app
-cannot do where it runs is shown and explained, not hidden: on its own it says that fixing needs
-livesaver, and how to get it.
+cannot do where it runs is shown and explained, not hidden: on its own it says how it can fix
+from there, for the browser it is in.
 
-A browser cannot do the fixing itself today. Writing needs the File System Access API, which
-Brave, Safari and Firefox do not offer and whose handles hide files (see below); and a page
-could neither keep a journal for an undo nor see that Live is running.
+Fixing in the page is an experiment behind a switch. Writing needs the File System Access API,
+which Safari and Firefox do not offer (Brave only behind a flag) and whose handles hide files;
+and a page cannot see that Live is running. See [Fixing in a browser](#fixing-in-a-browser).
 
 ## The screens
 | Place | What it shows | What can be done |
@@ -105,7 +107,8 @@ could neither keep a journal for an undo nor see that Live is running.
 
 ## The app elsewhere, connected to this computer
 The app on livesaver's site is the same files as the app livesaver serves. On its own it only
-reads; `livesaver web --pair` connects it to the livesaver of the same computer:
+reads (unless fixing in the page is switched on); `livesaver web --pair` connects it to the
+livesaver of the same computer:
 
 - **The pairing link** opens the app with where livesaver is and its token behind the `#` of
   the address (`#/connect?at=http://127.0.0.1:5483&token=…`), a part a browser does not send to
@@ -161,8 +164,8 @@ it:
 |---|---|---|
 | what it is | livesaver on this computer, over the requests above | the browser: a worker over the folders the page was handed (`scanInWorker`, `serveEngine` in `@livesaver/web`) |
 | folders | by their paths | uploaded or dropped; where they lie is worked out |
-| can | everything | scan; and, switched on by its user in Chrome or Edge, fix samples, undo, and keep a history (see [Fixing in a browser](#fixing-in-a-browser)) |
-| plug-ins | with what is installed | which are used, and where; installed or not is `unknown` |
+| can | everything | scan; and, switched on by its user in Chrome or Edge, fix samples, upgrade plug-ins, undo, and keep a history (see [Fixing in a browser](#fixing-in-a-browser)) |
+| plug-ins | with what is installed | which are used, and where; installed or not if it was handed the folders that say so (see [What is installed, in a browser](#what-is-installed-in-a-browser)), else `unknown` |
 
 What an engine cannot do is in its `capabilities`, and asking for it fails as `Unsupported`, so
 a screen shows and explains it instead of hiding it. An engine that is gone (livesaver was
@@ -171,8 +174,8 @@ notices that in one place, whichever screen asked. One suite of tests
 (`apps/web/test/engine.conformance.test.ts`) runs the same scenarios against both, and demands
 that both show the same for the same library. The browser's engine runs in it twice: reading
 only, and with fixing switched on over a project folder that can be edited. The engines that
-write (livesaver, and the browser with fixing switched on) share the scenario of a fix and its
-undo (`engine.writing.test.ts`).
+write (livesaver, and the browser with fixing switched on) share the scenarios of a fix and of
+an upgrade of plug-ins, each with its undo (`engine.writing.test.ts`).
 
 ## How it is built
 - **The page** (Vue, Pinia, Nuxt UI in Vue mode, Tailwind) holds the state in stores (engine,
@@ -278,7 +281,45 @@ What a page cannot do, and says before the switch goes on:
 | free space | checked | unknown |
 | names with `:`, or a space at an end | seen and written | hidden from the page, and a file cannot be made with such a name: the set is left alone, with the reason |
 | what an undo needs | livesaver's state folder | the browser's storage for the site: cleared with the site's data |
-| plug-ins | upgrade, with undo | not at all: a page does not see what is installed |
+| plug-ins | what is installed is looked up; upgrade, with undo | what is installed is what the page was shown; upgrade, with undo, once that includes Live's plug-in database |
+
+**What goes to a worker is made anew.** A fix and an upgrade run in a worker, and are told which
+projects or plug-ins were chosen. An app keeps such choices in a state that wraps them (Vue's
+does), and a browser refuses to send a wrapped object to a worker: the engine sends copies. (A
+fix of one project failed on that until a test went through the app's state instead of calling
+the engine directly.)
+
+## What is installed, in a browser
+A page cannot look for plug-ins, but it can be shown them: the Settings take folders that say
+what is installed (`installedIn` in `packages/web/src/engine/installed.ts`).
+
+- **A plug-in folder** (`/Library/Audio/Plug-Ins`, or a folder above it): its `VST3`, `VST` and
+  `Components` folders are read as the command line reads them (`loadInventory`), with the
+  processors each bundle is built for.
+- **The folder of Live's plug-in database** (`Live Database`): `Live-plugins-*.db` says which
+  plug-ins Live scanned, by their ids and per processor. Without it a plug-in is known only if
+  its bundle says which one it is (an Audio Unit; a VST3 with a `moduleinfo.json`), and the
+  page says that the database is missing.
+- **The database is read as a file.** A page has no SQLite. `readSqliteTable` in
+  `@livesaver/core` reads a table from the file format itself (table b-trees, overflow pages,
+  the row id that stands in for an integer key), and takes the write-ahead log beside the
+  database into account: while Live runs, what it scanned last is only in there.
+  `parsePluginDatabase` in `@livesaver/plugins` is the query the command line runs in SQL. On
+  a real database both give the same rows (269 plug-ins, 288 modules).
+- **Where the plug-in folder lies** a browser does not say, and the database names bundles by
+  their paths: the folder is placed where most of those paths lead into it.
+- **The Audio Units of macOS itself** lie in a system folder a page is not given: one that a
+  set uses is taken to be there.
+- **The upgrade to VST3** is the command line's `upgradePlugins` over the write port of a fix
+  in the page, with the VST3 plug-ins Live knows taken from the database folder: without that
+  folder there is no upgrade, and the page says what it needs. The run is kept and undone like
+  a fix. An upgrade writes no path into a set, so it does not ask where the folders lie.
+- **A plan that could not be made is made again after the next scan**: what stood in its way
+  (no database folder) may have been added since.
+- **On a real Mac**, read-only: shown its two plug-in folders (13,700 files) and Live's database
+  folder, this code finds what the command line finds of the same folders: 354 plug-ins in
+  three formats, each with the same id, place and processors, and the same 70 VST3 plug-ins
+  Live knows. It takes a quarter of a second, once the browser has listed the folders.
 
 ## Where a folder lies on disk
 A browser never tells a page a folder's path, but sets store absolute paths, and those are
@@ -329,7 +370,8 @@ there.
 - A scan is read-only: nothing is collected or rewritten, and patched sets are only counted,
   not scanned strictly (`quickPlan`). (A fix in the browser scans every set it writes strictly,
   like the command line.)
-- Plug-ins: which are used and where, not whether they are installed (a page cannot see that).
+- Plug-ins: which are used and where. Whether they are installed only once the page was shown
+  the folders that say so.
 - Only the given folders are seen. The command line sees the whole disk.
 - Symbolic links are not seen: a browser leaves them out of a dropped folder. The command line
   indexes links to files.
@@ -342,15 +384,23 @@ there.
   (`WebFsWrite`) over folders in memory that behave like a browser's; a fix through them
   against the command line's pipeline on the same fixtures (the same references in the set,
   the same files with the same content), its run in the page's storage, its undo byte for
-  byte, and what it refuses.
+  byte, and what it refuses. What is installed, from folders handed to a page, against the
+  inventory the command line makes of the same folders; an upgrade of plug-ins through handles
+  against the command line's pipeline (the same set, byte for byte), and its undo.
+- `packages/core/test`, `packages/plugins/test`: Live's plug-in database read from its file,
+  against SQLite on the same file: with rows that overflow a page, tables of several levels,
+  and a write-ahead log that holds what the database does not have yet (also with a log from
+  an earlier state, and one that ends in the middle of a change).
 - `packages/cli/test`: what the page asks of this computer, on temporary copies of the fixtures:
   a check, a scan, a fix of all, of some and of one project, with and without the uncertain
   matches, an upgrade of plug-ins, undo, the history and its reports, and that the server
   answers only its own page.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
   review, fix, undo, the history, a page that is opened again) against both engines; the app's
-  own sums and words (states, plans, advice, what a run was and what its undo does).
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 227 tests.
+  own sums and words (states, plans, advice, what a run was and what its undo does). In a
+  browser that lets a page edit folders: one project fixed alone through the app's state, the
+  folders that say what is installed, and an upgrade that is planned, written and taken back.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 250 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
@@ -365,11 +415,17 @@ there.
     downloaded, a step shown in Finder, an undo that asks first and is then seen everywhere.
   - The settings: what livesaver found, a folder shown in Finder, the reset to the command
     line's settings; what every page says when livesaver is gone, or was started again.
+  - What is installed, shown to a page, in the three engines: what the page says without the
+    folders, with the plug-in folder alone, and with Live's database, where it says what
+    livesaver says of the same plug-ins. In Chromium, an upgrade to VST3 that the page makes
+    itself: what it needs first, its plan, the review, and the set it writes against the set
+    livesaver writes for the same project on disk; the history, and the undo.
   - Fixing in the page (Chromium): the switch and its dialog, a folder that can only be read,
     a folder of the disk that is dropped (read through its handle at once, and refused for
     editing by the test browser, which the page says), a fix after the review, compared with
     what `livesaver collect --apply` writes on the same projects on disk (the same references,
-    the same copies, the same backup), the history, the undo, a reload. WebKit and Firefox say
+    the same copies, the same backup), the history, the undo, one project fixed from the list
+    of projects and taken back, a reload. WebKit and Firefox say
     that they cannot. No test browser lets a page write to a folder of the disk without a
     person saying yes (the headless one refuses, the full one waits for its prompt), and the
     folder dialog cannot be driven: the project folder that is fixed in this test lies in the

@@ -43,15 +43,23 @@ export const usePluginsStore = defineStore('plugins', () => {
   )
   const status = shallowRef<Status>()
 
-  // A plan is of one scan: once the sets were scanned again, it has to be made again.
+  // A plan is of one scan: once the sets were scanned again, it has to be made again. And what
+  // kept it from being made may no longer hold (in a browser, Live's database was added since).
   watch(
     () => scans.scan,
     (scan, before) => {
-      if (before !== undefined && scan !== before) plan.value = undefined
+      if (before === undefined || scan === before) return
+      plan.value = undefined
+      problem.value = ''
     },
   )
 
   const folders = computed(() => scans.scanned?.projects ?? [])
+  /** In a browser: the folders the scan was told what is installed by, for the upgrade too. */
+  const told = computed(() => {
+    const installed = scans.scanned?.installed
+    return installed?.length ? { installed } : {}
+  })
 
   async function loadPlan(): Promise<boolean> {
     if (planning.value || folders.value.length === 0) return false
@@ -60,9 +68,11 @@ export const usePluginsStore = defineStore('plugins', () => {
     progress.value = starting('plugins')
     const of = scans.scan
     try {
-      const made = await engines.engine().planUpgrade({ projects: folders.value }, (event) => {
-        progress.value = advance(progress.value, event)
-      })
+      const made = await engines
+        .engine()
+        .planUpgrade({ projects: folders.value, ...told.value }, (event) => {
+          progress.value = advance(progress.value, event)
+        })
       // The sets were scanned again meanwhile: this plan is of what was there before.
       if (scans.scan === of) plan.value = made
       return true
@@ -119,7 +129,7 @@ export const usePluginsStore = defineStore('plugins', () => {
     try {
       upgraded.value = await engines
         .engine()
-        .upgrade({ projects: folders.value, plugins: asked.plugins }, (event) => {
+        .upgrade({ projects: folders.value, ...told.value, plugins: asked.plugins }, (event) => {
           progress.value = advance(progress.value, event)
         })
     } catch (error) {

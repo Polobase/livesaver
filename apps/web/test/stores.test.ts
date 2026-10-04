@@ -410,6 +410,39 @@ describe('in a browser that lets a page edit folders', () => {
     expect(history.runs.length).toBe(1)
   })
 
+  test('one project is fixed alone: what the page chose travels to the worker', async () => {
+    setActivePinia(createPinia())
+    const folder = memoryFolder(projects)
+    const state = new MemoryDirectory('')
+    const storage = async () => state
+    const engines = useEngineStore()
+    engines.use(
+      new BrowserEngine({
+        spawn: () => localEngineWorker({ cores: 4, state: storage }),
+        state: storage,
+        writing: () => true,
+      }),
+    )
+    await engines.load()
+    const library = useLibraryStore()
+    const scans = useScanStore()
+    const fix = useFixStore()
+    library.addSources('projects', [folderFromHandle(folder)])
+    library.addSources('search', [uploadedFolder(samples)])
+    expect(await scans.run()).toBe(true)
+    // The review keeps the chosen projects in the app's state, which a browser cannot send to
+    // a worker as it is (it wraps what it keeps): the engine sends plain copies.
+    const root = scans.scan?.samples.projectRows.find((row) =>
+      row.root.endsWith('/Other Project'),
+    )?.root
+    fix.open([root as string])
+    expect(await fix.apply()).toBe(true)
+    expect(fix.failure).toBeUndefined()
+    expect(fix.fixed).toMatchObject({ sets: 1, files: 1, errors: [] })
+    const writes = (project: string) => memoryFiles(folder).get(`${project}/Brokenpath.als`)?.writes
+    expect([writes('Other Project'), writes('Brokenpath Project')]).toEqual([1, 0])
+  })
+
   test('an undo without the folder of its run says what the page needs', async () => {
     setActivePinia(createPinia())
     kept.set('livesaver:fix-in-browser', 'on')

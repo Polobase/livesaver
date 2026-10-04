@@ -7,11 +7,15 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { type Catalog, type CatalogEntry, Inventory } from '@livesaver/plugins'
 import {
+  ARM64,
   copyFixtures,
+  livePluginDatabase,
   MemoryDirectory,
   memoryFolder,
+  pluginBundle,
   tempDir,
   uploadedFolder,
+  X86_64,
 } from '@livesaver/test-kit'
 import { folderFromHandle, localEngineWorker } from '@livesaver/web'
 import { startWeb, type WebServer } from 'livesaver'
@@ -33,6 +37,43 @@ const CATALOG: Catalog = new Map<string, CatalogEntry>([
 
 export const OPTIONS = { packLimitMB: 50, matchLibraryPath: false }
 export const SET = 'Brokenpath Project/Brokenpath.als'
+export const VST_SET = 'VST2toVST3 Project/VST2toVST3.als'
+
+/**
+ * Plug-ins on a disk as a Mac has it, below `root`, as the page of a browser is shown them: a
+ * plug-in folder with the VST3 of Serum and Massive and an Intel-only VST2 of Serum, and
+ * Live's database of them. The VST3 of Massive says which plug-in it is (a newer one, with its
+ * `moduleinfo.json`); the others are known through Live's database only. Returns the two
+ * folders to hand to a page.
+ */
+export function installPlugins(root: string): { plugins: string; database: string } {
+  const plugins = join(root, 'Library', 'Audio', 'Plug-Ins')
+  const database = join(root, 'Live Database')
+  const at = '/Library/Audio/Plug-Ins'
+  pluginBundle(join(plugins, 'VST3', 'Serum.vst3'), [X86_64, ARM64])
+  pluginBundle(
+    join(plugins, 'VST3', 'Massive.vst3'),
+    [ARM64],
+    {},
+    {
+      'Contents/Resources/moduleinfo.json': `{"Classes": [{"CID": "${MASSIVE_VST3.toUpperCase()}", "Name": "Massive"}]}`,
+    },
+  )
+  pluginBundle(join(plugins, 'VST', 'Serum.vst'), [X86_64])
+  const serum = `device:vst3:instr:${SERUM_VST3.replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-')}`
+  const massive = `device:vst3:instr:${MASSIVE_VST3.replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-')}`
+  livePluginDatabase(database, [
+    { path: `${at}/VST3/Serum.vst3`, processor: 2, devIdentifier: serum, name: 'Serum' },
+    { path: `${at}/VST3/Massive.vst3`, processor: 2, devIdentifier: massive, name: 'Massive' },
+    {
+      path: `${at}/VST/Serum.vst`,
+      processor: 1,
+      devIdentifier: 'device:vst:instr:1483109208?n=Serum',
+      name: 'Serum',
+    },
+  ])
+  return { plugins, database }
+}
 
 export interface Setup {
   readonly engine: Engine

@@ -5,8 +5,16 @@
  */
 import type { ParseWorker } from '../parser.js'
 import { fixFolders, type StateFolder, undoFolders, type WriteEngineOptions } from './fix.js'
-import type { FolderInput, FromEngine, ToEngine, WireFolder, WireRequest } from './protocol.js'
+import type {
+  FolderInput,
+  FromEngine,
+  ToEngine,
+  WireFolder,
+  WireRequest,
+  WireUpgrade,
+} from './protocol.js'
 import { scanFolders } from './scan.js'
+import { planUpgradeFolders, upgradeFolders } from './upgrade.js'
 
 /** The part of a worker's global scope the engine needs. */
 export interface EngineScope {
@@ -43,6 +51,7 @@ export function serveEngine(scope: EngineScope, options: EngineWorkerOptions): v
   const folders = (wire: WireRequest) => ({
     projects: wire.projects.map(folder),
     search: wire.search.map(folder),
+    ...(wire.installed ? { installed: wire.installed.map(folder) } : {}),
     options: wire.options,
   })
   const emit = (event: FromEngine) => scope.postMessage(event)
@@ -57,13 +66,23 @@ export function serveEngine(scope: EngineScope, options: EngineWorkerOptions): v
       void scanFolders(folders(data), emit, options)
       return
     }
+    const upgrade = (wire: WireUpgrade) => ({
+      ...folders(wire),
+      ...(wire.names ? { names: wire.names } : {}),
+      ...(wire.only ? { only: wire.only } : {}),
+    })
+    // A plan only reads.
+    if (data.type === 'plan-upgrade') {
+      void planUpgradeFolders(upgrade(data), emit, options)
+      return
+    }
     const { state } = options
     if (!state) {
       emit({ type: 'failed', message: 'This page has no storage of its own to keep an undo in.' })
       return
     }
     const writing = { ...options, state }
-    if (data.type === 'fix') {
+    if (data.type === 'fix')
       void fixFolders(
         {
           ...folders(data),
@@ -73,6 +92,7 @@ export function serveEngine(scope: EngineScope, options: EngineWorkerOptions): v
         emit,
         writing,
       )
-    } else void undoFolders({ ...folders(data), run: data.run }, emit, writing)
+    else if (data.type === 'upgrade') void upgradeFolders(upgrade(data), emit, writing)
+    else void undoFolders({ ...folders(data), run: data.run }, emit, writing)
   }
 }

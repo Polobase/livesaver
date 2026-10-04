@@ -8,26 +8,49 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { MemoryDirectory, memoryFiles, memoryFolder, uploadedFolder } from '@livesaver/test-kit'
 import { folderFromHandle, localEngineWorker } from '@livesaver/web'
-import { BrowserEngine, type Progress, RunFailed, Unsupported } from '../src/engine/index.js'
-import { OPTIONS, SET, shown, useLibrary } from './engine-setup.js'
+import {
+  BrowserEngine,
+  type LibraryFolder,
+  type Progress,
+  RunFailed,
+  Unsupported,
+} from '../src/engine/index.js'
+import { installPlugins, OPTIONS, SET, shown, useLibrary, VST_SET } from './engine-setup.js'
 
 const lib = useLibrary()
 const { computer, editing } = lib
 
-/** The engines that write, and the set they write as it is where they write it. */
+/**
+ * The engines that write, and a set they write as it is where they write it. `told`: what a
+ * browser has to be handed to know the VST3 plug-ins Live has (livesaver reads Live's database
+ * itself; these tests give it the same two).
+ */
 const WRITERS = [
   [
     'livesaver on this computer',
     () => ({
       ...computer(),
-      read: () => new Uint8Array(readFileSync(join(lib.now.projects, SET))),
+      read: (set = SET) => new Uint8Array(readFileSync(join(lib.now.projects, set))),
+      told: (): { installed?: LibraryFolder[] } => ({}),
     }),
   ],
   [
     'the browser, in a folder it was given for editing',
     () => {
       const setup = editing()
-      return { ...setup, read: () => memoryFiles(setup.folder).get(SET)?.data ?? new Uint8Array(0) }
+      return {
+        ...setup,
+        read: (set = SET) => memoryFiles(setup.folder).get(set)?.data ?? new Uint8Array(0),
+        told: (): { installed?: LibraryFolder[] } => {
+          const { plugins, database } = installPlugins(lib.now.tmp.path)
+          return {
+            installed: [
+              setup.engine.add(uploadedFolder(plugins), 'installed'),
+              setup.engine.add(uploadedFolder(database), 'installed'),
+            ],
+          }
+        },
+      }
     },
   ],
 ] as const
@@ -68,6 +91,41 @@ for (const [who, setup] of WRITERS) {
       expect(shown(await engine.scan(request))).toEqual(shown(scan))
     })
 
+    test('plans an upgrade of plug-ins, upgrades, and takes it back', async () => {
+      const { engine, request, read, told } = setup()
+      const installed = told()
+      const before = read(VST_SET)
+      const progress: Progress[] = []
+      const plan = await engine.planUpgrade({ projects: request.projects, ...installed }, (e) =>
+        progress.push(e),
+      )
+      expect([plan.sets, plan.changingSets]).toEqual([3, 1])
+      expect(plan.plugins.map((p) => [p.plugin, p.convertibleInstances])).toEqual([
+        ['Massive', 1],
+        ['Omnisphere', 0],
+        ['Serum', 1],
+      ])
+      expect(progress[0]).toEqual({ type: 'phase', phase: 'plugins' })
+      expect(read(VST_SET)).toEqual(before)
+
+      const upgraded = await engine.upgrade({
+        projects: request.projects,
+        ...installed,
+        plugins: ['Serum'],
+      })
+      expect([upgraded.sets, upgraded.errors]).toEqual([1, []])
+      expect(upgraded.upgrade.rows.map((row) => [row.plugin, row.converted, row.written])).toEqual([
+        ['Serum', true, true],
+      ])
+      expect(read(VST_SET)).not.toEqual(before)
+      const [run] = await engine.runs()
+      expect(run).toMatchObject({ id: upgraded.run, command: 'vst3', state: 'applied', sets: 1 })
+      expect(await engine.report(upgraded.run, 'vst3_upgrade.csv')).toContain('Serum')
+
+      expect((await engine.undo(upgraded.run, request)).restored).toBe(1)
+      expect(read(VST_SET)).toEqual(before)
+    })
+
     test('a fix that cannot run says why, and names no run when nothing was written', async () => {
       const { engine, request } = setup()
       const failed = await engine
@@ -101,13 +159,19 @@ describe('a browser that writes', () => {
     expect(engine.capabilities).toMatchObject({ fix: false, undo: false, history: false })
     expect(engine.fix(request)).rejects.toBeInstanceOf(Unsupported)
     expect(engine.undo('run', request)).rejects.toBeInstanceOf(Unsupported)
+    expect(engine.planUpgrade(request)).rejects.toBeInstanceOf(Unsupported)
+    expect(engine.upgrade(request)).rejects.toBeInstanceOf(Unsupported)
     expect(await engine.runs()).toEqual([])
 
     on = true
-    expect(engine.capabilities).toMatchObject({ fix: true, undo: true, history: true })
-    // What a page still cannot do: see what is installed, upgrade, or look at the computer.
     expect(engine.capabilities).toMatchObject({
-      upgrade: false,
+      fix: true,
+      upgrade: true,
+      undo: true,
+      history: true,
+    })
+    // What a page still cannot do: see by itself what is installed, or look at the computer.
+    expect(engine.capabilities).toMatchObject({
       installedPlugins: false,
       liveStatus: false,
       reveal: false,

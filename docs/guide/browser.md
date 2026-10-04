@@ -1,6 +1,6 @@
 # In the browser
 
-The app also runs on its own, as a page in your browser. It reads the folders you give it and changes nothing: good for a first look, or on a computer where you cannot install anything. In Chrome and Edge it can also fix, if you switch that on: see [Fixing in the page](#fixing-in-the-page).
+The app also runs on its own, as a page in your browser. It reads the folders you give it and changes nothing: good for a first look, or on a computer where you cannot install anything. In Chrome and Edge it can also fix samples and upgrade plug-ins, if you switch that on: see [Fixing in the page](#fixing-in-the-page).
 
 ![The app in a browser on its own: it scans and shows everything, and says what needs livesaver](images/browser-light.webp)
 
@@ -11,10 +11,10 @@ The app also runs on its own, as a page in your browser. It reads the folders yo
 | Scan samples: what is missing, what a fix would do | yes | yes |
 | Missing samples by where they came from, with advice | yes | yes |
 | The plug-ins your sets use | yes | yes |
-| Whether those plug-ins are installed | no: a page cannot see that | yes |
+| Whether those plug-ins are installed | once you [show it your plug-in folders](#showing-it-what-is-installed) | yes |
 | Download the reports | yes | yes |
 | Fix samples, undo, history | in Chrome and Edge, as an experiment you switch on | yes |
-| Upgrade plug-ins to VST3 | no | yes |
+| Upgrade plug-ins to VST3 | in Chrome and Edge, with fixing switched on and Live's database folder given | yes |
 
 What the page cannot do is said where you would look for it, with how to get it.
 
@@ -49,6 +49,17 @@ Until Live's own content is there, the page says that samples of the Core Librar
 
 A browser does not tell a page where a folder lies on your disk, but sets refer to their samples by where they lie. livesaver works it out for your project folders from the sets themselves. For another folder you can type its path (**Set path**), which makes the result the same as on the command line.
 
+## Showing it what is installed
+
+A page cannot look for plug-ins on your Mac, but you can show them to it. In the **Settings**, under **Installed plug-ins**, add:
+
+- **Your plug-in folder**: `/Library/Audio/Plug-Ins` (and `Library/Audio/Plug-Ins` in your home folder, if you have plug-ins there).
+- **The folder of Live's plug-in database**: `Library/Application Support/Ableton/Live Database` in your home folder. Live notes there which plug-ins it scanned, by their ids.
+
+The Library of your home folder is hidden: in the folder dialog, press ⌘⇧G and type the path, starting with `~/Library`.
+
+Scan again, and **Plug-ins** says which plug-ins of your sets are installed, missing, or run only under Rosetta, as it does with livesaver on your Mac. With the plug-in folder alone, a plug-in is known only if its bundle says which one it is (an Audio Unit does, and a newer VST3); most VST plug-ins then count as not installed, and the page says that the database is missing.
+
 ## Fixing in the page
 
 Chrome and Edge can let a page edit a folder you choose. With that, the page fixes on its own: the same fix as livesaver's, with a backup of every set in its project and an undo. It is an experiment, and off until you switch it on:
@@ -56,6 +67,8 @@ Chrome and Edge can let a page edit a folder you choose. With that, the page fix
 1. In the **Settings**, switch on **Fix in this browser**. The page lists what it cannot do; read it.
 2. Add your project folder with **Add folder**. Your browser asks whether the page may edit it.
 3. Scan, then **Review and fix**. The review shows where it takes your project folder to lie, and asks you to confirm that Ableton Live is closed.
+
+**Plug-ins › Upgrade to VST3** works the same way, once the page was [shown Live's plug-in database](#showing-it-what-is-installed): from it the page knows which VST3 plug-ins Live has.
 
 Try it on a copy of a project first.
 
@@ -68,7 +81,7 @@ What a page cannot do that livesaver on your Mac can:
 - **A page has no Trash.** What an undo takes out of a project goes to a hidden folder, `.livesaver-trash`, in your project folder. Delete it when you no longer need it.
 - **It does not see how much room is left** on your disk. The review says how much the copies need.
 - **It needs to know where your folders lie**, because a fix writes that into the sets. For a project folder it takes what the sets say; type the path (**Set path**) if you moved the folder since. For a folder with Ableton's packs or Live's own content you type it.
-- **It cannot upgrade plug-ins**: a page does not see what is installed.
+- **It sees only the plug-ins you show it.** Without the folder of Live's plug-in database it cannot upgrade a plug-in to VST3.
 
 Safari and Firefox do not let a page edit a folder: there the page only reads, and says so.
 

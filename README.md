@@ -128,9 +128,11 @@ your computer, where the browser allows a site to reach it: Chrome, Edge and Fir
 wants the site allowed in its settings, Safari does not. The page says what its browser needs.
 
 The same app also runs without livesaver behind it, on its own in a browser (Chrome, Safari,
-Firefox). Then you choose or drop the folders and it scans them by itself, read-only. (In Chrome
-and Edge it can also fix in a project folder you let it edit: an experiment with limits, off
-until you switch it on. See [In the browser](docs/guide/browser.md).) A browser
+Firefox). Then you choose or drop the folders and it scans them by itself, read-only. Shown your
+plug-in folder and the folder of Live's plug-in database, it also says which plug-ins are
+installed. (In Chrome and Edge it can also fix samples and upgrade plug-ins in a project folder
+you let it edit: an experiment with limits, off until you switch it on. See
+[In the browser](docs/guide/browser.md).) A browser
 does not tell a page where a folder lies on disk: livesaver works that out for project folders
 from the sets themselves. Drop the Ableton Live app on the page as well: it holds the Core
 Library and Live's own list of content it moved between versions, and with it the page reports

@@ -4,6 +4,8 @@
  * user switched fixing on (Chrome and Edge): then it writes into project folders that were
  * chosen for editing, and keeps its runs, with what an undo needs, in the page's own storage.
  */
+
+import type { UpgradeView } from '@livesaver/ops'
 import {
   browserReport,
   browserRun,
@@ -14,10 +16,13 @@ import {
   fixInWorker,
   holdsNames,
   holdsOf,
+  installedHoldsOf,
+  planUpgradeInWorker,
   type ScanEvent,
   type StateFolder,
   scanInWorker,
   undoInWorker,
+  upgradeInWorker,
 } from '@livesaver/web'
 import { LIBRARY_NAME } from '../lib/library.js'
 import {
@@ -38,6 +43,8 @@ import {
   type Status,
   type Undone,
   Unsupported,
+  type Upgraded,
+  type UpgradeRequest,
 } from './types.js'
 
 export interface BrowserOptions {
@@ -66,7 +73,7 @@ export class BrowserEngine implements Engine {
   private ids = 0
   private running: { stop(): void } | undefined
   /** What writes right now ('' = nothing): a fix or an undo is never stopped half-way. */
-  private writes: '' | 'fix' | 'undo' = ''
+  private writes: '' | 'fix' | 'undo' | 'upgrade' = ''
 
   constructor(options: BrowserOptions) {
     this.options = options
@@ -82,7 +89,8 @@ export class BrowserEngine implements Engine {
     return {
       paths: false,
       fix: writing,
-      upgrade: false,
+      // (Which VST3 plug-ins Live has, it reads from Live's database, if it is handed that.)
+      upgrade: writing,
       undo: writing,
       history: writing,
       reveal: false,
@@ -104,7 +112,7 @@ export class BrowserEngine implements Engine {
    * knows it. A sample folder that looks like a vendor's is marked as holding installed
    * libraries. What the page may do in a folder behind a handle is asked with `access`.
    */
-  add(source: FolderSource, kind: 'projects' | 'search'): KnownFolder {
+  add(source: FolderSource, kind: 'projects' | 'search' | 'installed'): KnownFolder {
     const id = `folder-${++this.ids}`
     this.sources.set(id, source)
     const files =
@@ -118,7 +126,7 @@ export class BrowserEngine implements Engine {
       name: source.name || '(folder)',
       path: '',
       vendor: kind === 'search' && LIBRARY_NAME.test(source.name),
-      holds: holdsNames(holdsOf(source)),
+      holds: kind === 'installed' ? installedHoldsOf(source) : holdsNames(holdsOf(source)),
       exists: true,
       ...(files === undefined ? {} : { files }),
       access: this.handle(id) ? 'ask' : 'read',
@@ -169,11 +177,19 @@ export class BrowserEngine implements Engine {
     return { id: folder.id, source, path: folder.path, vendor: folder.vendor }
   }
 
+  /**
+   * A request as it goes to a worker. Everything in it is made anew here: an app keeps what its
+   * user chose in a state that wraps it (Vue's does), and a browser refuses to send a wrapped
+   * object to a worker.
+   */
   private inputs(request: ScanRequest) {
     return {
       projects: request.projects.map((folder) => this.input(folder)),
       search: request.search.map((folder) => this.input(folder)),
-      options: request.options,
+      ...(request.installed?.length
+        ? { installed: request.installed.map((folder) => this.input(folder)) }
+        : {}),
+      options: { ...request.options },
     }
   }
 
@@ -211,6 +227,7 @@ export class BrowserEngine implements Engine {
         at: new Date().toISOString(),
         seconds: scan.seconds,
         folders: scan.folders,
+        ...(scan.installed ? { installed: scan.installed } : {}),
       }
     } catch (error) {
       throw new RunFailed((error as Error).message)
@@ -220,7 +237,7 @@ export class BrowserEngine implements Engine {
   }
 
   /** One run that writes, in a worker of its own; what fails is a `RunFailed`. */
-  private async write<T>(what: 'fix' | 'undo', work: () => Promise<T>): Promise<T> {
+  private async write<T>(what: 'fix' | 'undo' | 'upgrade', work: () => Promise<T>): Promise<T> {
     if (this.writes) throw new RunFailed(`The ${this.writes} that was started is still running.`)
     // Nothing reads while something writes: a scan in between would see half of it.
     this.stop()
@@ -235,22 +252,27 @@ export class BrowserEngine implements Engine {
     }
   }
 
+  /** Refuses unless the page may edit every project folder. */
+  private async editable(projects: readonly LibraryFolder[]): Promise<void> {
+    for (const folder of projects)
+      if ((await this.access(folder.id)) !== 'edit')
+        throw new RunFailed(
+          this.handle(folder.id)
+            ? `This page may not edit the project folder “${folder.name}” yet: allow it first.`
+            : `The project folder “${folder.name}” was added to be read only: add it again with “Add folder”, for editing.`,
+        )
+  }
+
   async fix(request: FixRequest, onProgress?: OnProgress): Promise<Fixed> {
     this.storage('Fixing')
     return this.write('fix', async () => {
       const folders = this.inputs(request)
-      for (const folder of request.projects)
-        if ((await this.access(folder.id)) !== 'edit')
-          throw new RunFailed(
-            this.handle(folder.id)
-              ? `This page may not edit the project folder “${folder.name}” yet: allow it first.`
-              : `The project folder “${folder.name}” was added to be read only: add it again with “Add folder”, for editing.`,
-          )
+      await this.editable(request.projects)
       return fixInWorker(
         this.options.spawn,
         {
           ...folders,
-          ...(request.only ? { only: request.only } : {}),
+          ...(request.only ? { only: [...request.only] } : {}),
           ...(request.certainOnly ? { certainOnly: true } : {}),
         },
         (event) => {
@@ -297,12 +319,40 @@ export class BrowserEngine implements Engine {
     return Promise.reject(new Unsupported('Resetting to settings of its own'))
   }
 
-  planUpgrade(): Promise<never> {
-    return Promise.reject(new Unsupported('Planning an upgrade of plug-ins'))
+  /** The folders of an upgrade: the projects, and what says which VST3 plug-ins Live has. */
+  private upgradeOf(request: UpgradeRequest) {
+    return {
+      ...this.inputs({
+        projects: request.projects,
+        search: [],
+        ...(request.installed ? { installed: request.installed } : {}),
+        options: { packLimitMB: 0, matchLibraryPath: false },
+      }),
+      ...(request.plugins ? { names: [...request.plugins] } : {}),
+      ...(request.only ? { only: [...request.only] } : {}),
+    }
   }
 
-  upgrade(): Promise<never> {
-    return Promise.reject(new Unsupported('Upgrading plug-ins'))
+  async planUpgrade(request: UpgradeRequest, onProgress?: OnProgress): Promise<UpgradeView> {
+    this.storage('Planning an upgrade of plug-ins')
+    try {
+      return await planUpgradeInWorker(this.options.spawn, this.upgradeOf(request), (event) => {
+        if (event.type === 'phase' || event.type === 'progress') onProgress?.(event)
+      })
+    } catch (error) {
+      throw error instanceof RunFailed ? error : new RunFailed((error as Error).message)
+    }
+  }
+
+  async upgrade(request: UpgradeRequest, onProgress?: OnProgress): Promise<Upgraded> {
+    this.storage('Upgrading plug-ins')
+    return this.write('upgrade', async () => {
+      const folders = this.upgradeOf(request)
+      await this.editable(request.projects)
+      return upgradeInWorker(this.options.spawn, folders, (event) => {
+        if (event.type === 'phase' || event.type === 'progress') onProgress?.(event)
+      })
+    })
   }
 
   reveal(): Promise<never> {

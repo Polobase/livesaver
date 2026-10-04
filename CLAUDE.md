@@ -18,12 +18,12 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 | Package | Role | Runtime |
 |---|---|---|
 | `@livesaver/xml` | byte-level XML scanner, element index, byte-exact patcher | anywhere |
-| `@livesaver/core` | Ableton formats, FileRefs, paths, CRC, analysis, plist/CSV/Mach-O, Finder tags, Host ports | anywhere |
+| `@livesaver/core` | Ableton formats, FileRefs, paths, CRC, analysis, plist/CSV/Mach-O, SQLite files (read), Finder tags, Host ports | anywhere |
 | `@livesaver/plugins` | plug-in identity and inventory, VST2→VST3 conversion | anywhere |
 | `@livesaver/ops` | resolve/match, doctor, collect, status, reorg, move, audit, codemods, journal/undo, reports | anywhere |
 | `@livesaver/catalog` | SQLite catalog of sets, incremental index, the `find` language | anywhere |
 | `@livesaver/node` | Node/Bun host: fs, gzip, workers, xattr, Finder comments, SQLite, Live setup and plug-in database | Node/Bun |
-| `@livesaver/web` | browser host: uploaded/dropped/picked folders as a file system (a write port over folder handles), gzip, hash, worker-based parsing; the scan (samples and plug-ins) and the fix that run in a page | browser |
+| `@livesaver/web` | browser host: uploaded/dropped/picked folders as a file system (a write port over folder handles), gzip, hash, worker-based parsing; the scan (samples and plug-ins, with what is installed from folders it is shown), the fix and the plug-in upgrade that run in a page | browser |
 | `livesaver` (packages/cli) | the CLI; `livesaver web` serves the web app and checks, fixes and undoes for it (`src/web/`) | Node/Bun |
 | `livesaver-web` (apps/web) | the web app: Vite, Vue, Nuxt UI; with livesaver behind it it scans and fixes, on its own it scans in workers, read-only unless its user switches fixing on (Chrome, Edge) (private). `.vue` files are type-checked by `vue-tsc` under Node.js (TypeScript 6 in this workspace) | browser |
 | `livesaver-site` (apps/site) | the site: landing page, and the docs of `docs/` as pages (Nuxt, static; private) | build |

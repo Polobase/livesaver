@@ -1,17 +1,26 @@
 <script setup lang="ts">
 /**
- * Whether everything is ready for a fix that the page itself makes. A browser sees less than
- * livesaver on the computer: what it cannot check, its user confirms.
+ * Whether everything is ready for a run that the page itself makes: a fix, or an upgrade of
+ * plug-ins. A browser sees less than livesaver on the computer: what it cannot check, its user
+ * confirms.
  */
 import { computed, ref, watchEffect } from 'vue'
 import { bytes } from '../../lib/format'
-import type { FixPlan } from '../../lib/plan'
 import { isReady, pageReadiness } from '../../lib/ready'
 import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
 
-defineProps<{ plan: FixPlan }>()
+const props = defineProps<{
+  /**
+   * A fix: what its copies need. It also writes into the sets where their files lie, so the
+   * places of the folders have to be known. Left out: an upgrade, which writes no path.
+   */
+  copyBytes?: number
+  /** What the list is called in a test. */
+  name?: string
+}>()
 const ready = defineModel<boolean>('ready', { required: true })
+const fixing = computed(() => props.copyBytes !== undefined)
 const library = useLibraryStore()
 const scans = useScanStore()
 
@@ -24,7 +33,7 @@ const folders = computed(() =>
 )
 const editable = computed(() => folders.value.ask.length + folders.value.readOnly.length === 0)
 watchEffect(() => {
-  ready.value = isReady(folders.value) && liveClosed.value
+  ready.value = (fixing.value ? isReady(folders.value) : editable.value) && liveClosed.value
 })
 
 const problem = ref('')
@@ -41,7 +50,7 @@ const quoted = (names: readonly string[]) => names.map((name) => `“${name}”`
 </script>
 
 <template>
-  <ul class="space-y-3" data-testid="review-ready">
+  <ul class="space-y-3" :data-testid="name ?? 'review-ready'">
     <li class="flex gap-3" data-testid="ready-editable">
       <UIcon
         :name="editable ? 'i-lucide-circle-check' : 'i-lucide-circle-x'"
@@ -82,7 +91,7 @@ const quoted = (names: readonly string[]) => names.map((name) => `“${name}”`
         </template>
       </div>
     </li>
-    <li class="flex gap-3" data-testid="ready-placed">
+    <li v-if="fixing" class="flex gap-3" data-testid="ready-placed">
       <UIcon
         :name="folders.unplaced.length ? 'i-lucide-circle-x' : 'i-lucide-circle-check'"
         class="mt-0.5 size-5 shrink-0"
@@ -132,12 +141,12 @@ const quoted = (names: readonly string[]) => names.map((name) => `“${name}”`
         <UCheckbox v-model="liveClosed" label="Ableton Live is closed" data-testid="live-closed" />
       </div>
     </li>
-    <li class="flex gap-3">
+    <li v-if="copyBytes !== undefined" class="flex gap-3">
       <UIcon name="i-lucide-info" class="mt-0.5 size-5 shrink-0 text-muted" />
       <div>
         <p class="font-medium text-highlighted">Room for the copies</p>
         <p class="text-sm text-muted">
-          The copies need {{ bytes(plan.copyBytes) }}. A page cannot see how much is free where your
+          The copies need {{ bytes(copyBytes) }}. A page cannot see how much is free where your
           projects lie.
         </p>
       </div>

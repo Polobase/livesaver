@@ -83,7 +83,7 @@ function toUpgrade(): void {
       <UsesTab v-if="tab === 'uses'" :scan="scans.scan" @open="use = $event" />
       <template v-else-if="tab === 'installed'">
         <InstalledTab
-          v-if="engines.capabilities.installedPlugins"
+          v-if="scans.scan.plugins.inventory"
           :scan="scans.scan"
           @open="installed = $event"
         />
@@ -91,8 +91,24 @@ function toUpgrade(): void {
           <UEmpty
             icon="i-lucide-plug"
             title="What is installed is not known here"
-            description="A page in a browser cannot see the plug-ins of your computer. Run “livesaver web”: it opens this app with livesaver behind it, which reads Live's plug-in database and the plug-in folders."
-            :actions="[{ ...GET_LIVESAVER, color: 'neutral', variant: 'subtle' }]"
+            :description="
+              engines.kind === 'browser'
+                ? 'A page in a browser cannot see the plug-ins of your computer by itself. Show it: add your plug-in folder and Live’s database folder in the Settings, and scan again. Or run “livesaver web”, which opens this app with livesaver behind it and looks for itself.'
+                : 'livesaver could not read what is installed on this computer.'
+            "
+            :actions="
+              engines.kind === 'browser'
+                ? [
+                    {
+                      label: 'Add the folders in the Settings',
+                      to: '/settings',
+                      color: 'neutral',
+                      variant: 'subtle',
+                    },
+                    { ...GET_LIVESAVER, color: 'neutral', variant: 'ghost' },
+                  ]
+                : []
+            "
           />
         </div>
       </template>

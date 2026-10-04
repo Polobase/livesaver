@@ -186,7 +186,7 @@ async function apply(): Promise<void> {
         <ReadyInBrowser
           v-if="step === 1 && plan && !onComputer"
           v-model:ready="pageReady"
-          :plan="plan"
+          :copy-bytes="plan.copyBytes"
         />
         <ul v-else-if="step === 1 && plan" class="space-y-3" data-testid="review-ready">
           <li class="flex gap-3">

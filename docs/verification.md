@@ -23,9 +23,11 @@ writes runs on temporary copies.
 - `bun run test:web` runs the built web app in a headless browser: on its own (read-only), and
   with livesaver behind it, where it fixes one project, undoes, and fixes all on temporary
   copies, upgrades plug-ins, and undoes runs from the history. Fixing in the page itself
-  (Chromium) is compared with `livesaver collect --apply` on the same projects; its folder lies
-  in the browser's private file system, since no test browser lets a page write to the disk
-  without a person (see [web.md](web.md#how-it-is-tested)). A scan of the size of a real
+  (Chromium) is compared with `livesaver collect --apply` on the same projects, and an upgrade
+  of plug-ins in the page with the set livesaver writes; the folder lies in the browser's
+  private file system, since no test browser lets a page write to the disk without a person
+  (see [web.md](web.md#how-it-is-tested)). Shown a plug-in folder and Live's database folder,
+  the page says of the plug-ins what livesaver says. A scan of the size of a real
   library (9,305 planned changes) must stay quick in its tables. On a real library its report
   files are byte-identical to the command line's (see [web.md](web.md)).
 

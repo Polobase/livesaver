@@ -25,6 +25,7 @@ function sent(message: ToEngine): ToEngine {
     ...message,
     projects: message.projects.map(without),
     search: message.search.map(without),
+    ...(message.installed ? { installed: message.installed.map(without) } : {}),
   })
   const withHandle = (folder: WireFolder): WireFolder => {
     const handle = handles.get(folder.id)
@@ -32,7 +33,12 @@ function sent(message: ToEngine): ToEngine {
       ? { ...folder, source: { ...folder.source, handle } }
       : folder
   }
-  return { ...copy, projects: copy.projects.map(withHandle), search: copy.search.map(withHandle) }
+  return {
+    ...copy,
+    projects: copy.projects.map(withHandle),
+    search: copy.search.map(withHandle),
+    ...(copy.installed ? { installed: copy.installed.map(withHandle) } : {}),
+  }
 }
 
 export function localEngineWorker(options: EngineWorkerOptions = { cores: 1 }): EngineWorker {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** The folders of a scan and how it matches: the same on the first visit and in the settings. */
 import { computed } from 'vue'
+import { PLUGIN_DATABASE, PLUGIN_FOLDER } from '../../lib/library'
 import { useEngineStore } from '../../stores/engine'
 import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
@@ -10,6 +11,8 @@ import ScanOptions from './ScanOptions.vue'
 
 const engines = useEngineStore()
 const library = useLibraryStore()
+/** `plugins`: also the folders that say what is installed (the settings; not the first visit). */
+defineProps<{ plugins?: boolean }>()
 const scans = useScanStore()
 const writing = useWritingStore()
 const onComputer = computed(() => engines.capabilities.paths)
@@ -83,6 +86,39 @@ const onComputer = computed(() => engines.capabilities.paths)
         </div>
       </FolderList>
     </div>
+    <FolderList
+      v-if="plugins && !onComputer"
+      kind="installed"
+      title="Installed plug-ins"
+      hint="Optional. A page cannot see what is installed on your computer, but you can show it: with these folders, the scan says which plug-ins of your sets are missing or run only under Rosetta."
+      :disabled="scans.running"
+    >
+      <div
+        v-if="!library.installedHolds.has(PLUGIN_FOLDER) || !library.installedHolds.has(PLUGIN_DATABASE)"
+        class="mx-4 mb-4 rounded-md bg-elevated/60 p-3 text-sm"
+        data-testid="wanted-installed"
+      >
+        <p class="text-muted">Not added yet:</p>
+        <ul class="mt-1 list-disc space-y-1 ps-5">
+          <li v-if="!library.installedHolds.has(PLUGIN_FOLDER)">
+            your plug-ins: the folder <code class="text-xs">/Library/Audio/Plug-Ins</code> (and
+            <code class="text-xs">Library/Audio/Plug-Ins</code>
+            in your home folder, if you have plug-ins there);
+          </li>
+          <li v-if="!library.installedHolds.has(PLUGIN_DATABASE)">
+            Live's plug-in database: the folder
+            <code class="text-xs">Library/Application Support/Ableton/Live Database</code>
+            in your home folder. It knows the VST plug-ins by their ids; without it most of them
+            cannot be recognised.
+          </li>
+        </ul>
+        <p class="mt-2 text-muted">
+          The Library of your home folder is hidden: in the folder dialog, press
+          <UKbd value="meta" /> <UKbd value="shift" /> <UKbd value="G" /> and type the path,
+          starting with <code class="text-xs">~/Library</code>.
+        </p>
+      </div>
+    </FolderList>
     <p v-if="!onComputer" class="text-sm text-muted">
       Your browser may ask whether to "upload" a folder. Nothing is uploaded: the files are only
       read by this page, on your computer.
