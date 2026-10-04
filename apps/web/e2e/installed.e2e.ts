@@ -25,6 +25,7 @@ import {
   giveFolder,
   PATIENCE,
   restoreState,
+  shown,
   stateIn,
   textOf,
   type Watched,
@@ -62,7 +63,7 @@ for (const [name, type] of ENGINES) {
       await page.goto(site.url)
       await giveFolder(page, 'projects-input', projects)
       await page.getByTestId('scan-library').click()
-      await page.getByTestId('plugins-card').waitFor({ timeout: 30_000 * PATIENCE })
+      await shown(page, page.getByTestId('plugins-card'), 30_000 * PATIENCE)
     }, 60_000 * PATIENCE)
     afterAll(async () => {
       await browser?.close()

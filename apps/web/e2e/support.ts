@@ -106,6 +106,29 @@ export async function giveFolder(page: Page, input: string, folder: string): Pro
 }
 
 /**
+ * Waits for what a scan shows. Should it not come, the error says what the page showed instead:
+ * a test that fails once on a shared machine, and never again, is a riddle otherwise.
+ */
+export async function shown(page: Page, target: Locator, timeout: number): Promise<void> {
+  try {
+    await target.waitFor({ timeout })
+  } catch (error) {
+    const notes = await page
+      .locator('[role=alert], [role=status], [role=note], #headline, [data-testid=progress]')
+      .allInnerTexts()
+      .catch(() => [])
+    const said = notes.map((note) => note.replace(/\s+/g, ' ').trim()).filter((note) => note)
+    const rows = await page
+      .getByTestId('folder-row')
+      .count()
+      .catch(() => -1)
+    throw new Error(
+      `${(error as Error).message}\nThe page showed: ${said.join(' | ') || '(nothing of note)'} (${rows} folder rows, at ${page.url()})`,
+    )
+  }
+}
+
+/**
  * Drops a folder of the disk on an element, as a drag from the file manager does. Only Chromium
  * lets a test do that (through its debugging protocol).
  */
