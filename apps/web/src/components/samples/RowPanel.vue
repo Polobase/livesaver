@@ -4,6 +4,8 @@ import type { ChangeRow, MissingRow } from '@livesaver/ops'
 import { computed } from 'vue'
 import { bytes, count } from '../../lib/format'
 import { ACTION_LABEL, ACTION_WHY, whyLabel, whyText } from '../../lib/health'
+import { absentWords } from '../../lib/library'
+import { useLibraryStore } from '../../stores/library'
 import RevealLink from '../common/RevealLink.vue'
 import ScrollRegion from '../common/ScrollRegion.vue'
 
@@ -14,6 +16,16 @@ const props = defineProps<{
   base: string
 }>()
 const emit = defineEmits<{ close: [] }>()
+const library = useLibraryStore()
+/** Folders of the last visit the scan did not read: a sample that is "not found" may lie there. */
+const notRead = computed(() =>
+  library.waiting.length && props.missing && !props.missing.blind
+    ? absentWords(
+        library.waiting.map((folder) => folder.name),
+        true,
+      ).line
+    : '',
+)
 const open = computed({
   get: () => props.change !== undefined || props.missing !== undefined,
   set: (value) => {
@@ -84,6 +96,12 @@ const found = computed(() => props.missing?.blind === 'unmade' || props.missing?
     <template v-else-if="missing" #body>
       <ScrollRegion :label="title" class="space-y-5 p-4 text-sm sm:p-6">
         <p class="text-muted" data-testid="missing-why">{{ whyText(missing) }}</p>
+        <p v-if="notRead" role="note" data-testid="not-read-line">
+          <UIcon
+            name="i-lucide-triangle-alert"
+            class="me-1 inline size-4 align-text-bottom text-(--status-missing)"
+          />{{ notRead }}
+        </p>
         <dl class="space-y-3">
           <div>
             <dt class="text-muted">{{ missing.device ? 'Max device' : 'Sample' }}</dt>

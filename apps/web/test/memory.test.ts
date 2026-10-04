@@ -95,6 +95,8 @@ describe('the folders of a page after a reload', () => {
     expect(rows(again.library.projects)).toEqual([['projects', '', false, 'folder']])
     expect(rows(again.library.search)).toEqual([['samples', '/Volumes/Samples', true, 'folder']])
     expect([again.library.canScan, again.library.request.projects]).toEqual([false, []])
+    // The page says which folders a scan would not read.
+    expect(again.library.absent.map((folder) => folder.name)).toEqual(['projects', 'samples'])
     // How a scan matches is kept with the folders.
     expect(again.library.options).toEqual({ packLimitMB: 20, matchLibraryPath: true })
     expect(again.library.wanted).toEqual({ libraries: true, live: true })
@@ -104,6 +106,7 @@ describe('the folders of a page after a reload', () => {
     again.library.addSources('projects', [uploadedFolder(projects)])
     expect(rows(again.library.search)).toEqual([['samples', '/Volumes/Samples', true, 'there']])
     expect(rows(again.library.projects)).toEqual([['projects', '', false, 'there']])
+    expect(again.library.absent).toEqual([])
     expect(again.library.request.search.map((folder) => folder.path)).toEqual(['/Volumes/Samples'])
     expect(await again.scans.run()).toBe(true)
     expect(again.scans.scan?.samples.sets).toBe(3)

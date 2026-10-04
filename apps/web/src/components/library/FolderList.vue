@@ -7,7 +7,7 @@
  */
 import { editableFromDrop, foldersFromDrop, foldersFromFiles } from '@livesaver/web'
 import { computed, ref, useTemplateRef } from 'vue'
-import { pickFolderToEdit } from '../../engine/storage'
+import { keepsDroppedFolders, pickFolderToEdit } from '../../engine/storage'
 import type { FolderListing } from '../../engine/types'
 import { count } from '../../lib/format'
 import { useEngineStore } from '../../stores/engine'
@@ -93,12 +93,23 @@ async function drop(event: DragEvent): Promise<void> {
   }
 }
 
+/**
+ * Why a drop is the better way where a browser hands out a handle with it: a project folder
+ * that is to be edited is read in full, and any folder is kept for the next visit.
+ */
+const dropHint = computed(() =>
+  forEditing.value
+    ? 'or drop it here: a dropped folder is read in full'
+    : keepsDroppedFolders()
+      ? 'or drop a folder here: your browser keeps a dropped folder for your next visit'
+      : 'or drop a folder here',
+)
 const waiting = computed(() =>
   reading.value !== undefined
     ? `listing… ${count(reading.value)} files`
     : listing.value
       ? 'a large folder takes a few seconds to appear…'
-      : 'or drop a folder here',
+      : dropHint.value,
 )
 </script>
 

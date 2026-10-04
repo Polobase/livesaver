@@ -4,7 +4,7 @@ import type { ProjectRow, SetRow } from '@livesaver/ops'
 import type { Scan } from '../src/engine/types.js'
 import { bytes, count, percent, plural, seconds, splitPath, when } from '../src/lib/format.js'
 import { projectHealth, setHealth, tally, whyLabel, whyText } from '../src/lib/health.js'
-import { requestKey, wantedOf } from '../src/lib/library.js'
+import { absentWords, requestKey, wantedOf } from '../src/lib/library.js'
 import { FREE_SPACE_MARGIN, fits, planOf } from '../src/lib/plan.js'
 import { advance, starting } from '../src/lib/progress.js'
 import { isReady, pageReadiness } from '../src/lib/ready.js'
@@ -169,6 +169,26 @@ describe('the library', () => {
       libraries: false,
       live: false,
     })
+  })
+
+  test('says which folders of the last visit are not there, before a scan and after one', () => {
+    expect(absentWords(['Shared'], false)).toEqual({
+      title: '1 folder from your last visit has to be added again',
+      text: '“Shared”. A browser hands a page such a folder for one visit. Add it again, by the dialog or a drop: several folders can be dropped at once. Until then a scan does not read it: a sample that lies there counts as not found.',
+      line: '1 folder from your last visit was not read by this scan: a sample that lies in it counts as not found.',
+    })
+    expect(absentWords(['Music', 'Shared'], true)).toEqual({
+      title: 'This scan did not read 2 folders from your last visit',
+      text: '“Music”, “Shared”. Samples that lie in them count as not found here. In the Settings, let the page read them again (their rows say how), then scan again.',
+      line: '2 folders from your last visit were not read by this scan: a sample that lies in them counts as not found.',
+    })
+    // A project folder among them: its sets are not scanned either.
+    expect(absentWords(['Projects', 'Shared'], true, true).text).toBe(
+      '“Projects”, “Shared”. Samples that lie in them count as not found here, and sets in them are not checked. In the Settings, let the page read them again (their rows say how), then scan again.',
+    )
+    expect(absentWords(['Projects'], false, true).text).toContain(
+      'Until then a scan does not read it: a sample that lies there counts as not found, and sets in it are not checked.',
+    )
   })
 
   test('two requests are the same scan if folders, their marks and the options are', () => {

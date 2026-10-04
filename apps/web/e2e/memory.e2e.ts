@@ -7,7 +7,15 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
-import { copyFixtures, tempDir, writeFile } from '@livesaver/test-kit'
+import { liveCrc } from '@livesaver/core'
+import {
+  copyFixtures,
+  deviceSet,
+  makeProject,
+  tempDir,
+  writeFile,
+  writeSet,
+} from '@livesaver/test-kit'
 import { type Browser, type BrowserContext, chromium, type Page } from 'playwright'
 import { build } from '../build.js'
 import { serve } from '../serve.js'
@@ -85,8 +93,15 @@ for (const [name, type] of ENGINES) {
           await names(page, 'search-folders'),
         ]).toEqual([['projects'], ['samples']])
         const kept = rowsOf(page, 'search-folders').first()
+        // (Chromium hands out a handle with a drop, which a page can keep: the row says so.)
         expect(await textOf(kept.getByTestId('folder-waits'))).toBe(
-          'From your last visit: add it again, by the dialog or a drop. A browser hands a page such a folder for one visit. What you typed and ticked for it is kept.',
+          name === 'Chromium'
+            ? 'From your last visit: add it again, by the dialog or a drop. A folder chosen in the dialog is handed to a page for one visit; one you drop here, your browser keeps for your next visit. What you typed and ticked for it is kept.'
+            : 'From your last visit: add it again, by the dialog or a drop. A browser hands a page such a folder for one visit. What you typed and ticked for it is kept.',
+        )
+        // It is said at the top as well: a scan must not be made without them unnoticed.
+        expect(await textOf(page.getByTestId('absent'))).toBe(
+          '2 folders from your last visit have to be added again “projects”, “samples”. A browser hands a page such a folder for one visit. Add them again, by the dialog or a drop: several folders can be dropped at once. Until then a scan does not read them: a sample that lies there counts as not found, and sets in them are not checked.',
         )
         expect(await textOf(kept.getByTestId('folder-path'))).toBe('/Volumes/Disk/samples')
         expect(
@@ -114,6 +129,7 @@ for (const [name, type] of ENGINES) {
         ]).toEqual([['projects'], ['samples']])
         const row = rowsOf(page, 'search-folders').first()
         expect(await row.getByTestId('folder-waits').count()).toBe(0)
+        expect(await page.getByTestId('absent').count()).toBe(0)
         expect(await textOf(row.getByTestId('folder-path'))).toBe('/Volumes/Disk/samples')
         expect(
           await row.getByRole('checkbox', { name: 'Contains installed libraries' }).isChecked(),
@@ -200,6 +216,81 @@ describe('folders behind a handle are read again (Chromium, in a profile that is
   )
 
   test(
+    'a scan without a sample folder of the last visit says so, wherever its result is read',
+    async () => {
+      // A project whose sample lies in the sample folder and nowhere else.
+      const hat = new TextEncoder().encode('RIFF a hat of a drive that is gone')
+      const extra = join(tmp.path, 'extra')
+      writeSet(
+        join(makeProject(extra, 'Song'), 'Song.als'),
+        deviceSet('/Volumes/Gone/Loops/hat.wav', hat.length, liveCrc(hat), {
+          relPath: '../../../Volumes/Gone/Loops/hat.wav',
+        }).replaceAll('MxPatchRef', 'SampleRef'),
+      )
+      writeFile(join(samples, 'Loops', 'hat.wav'), hat)
+      await fill(page, extra)
+      // The sample folder is chosen in the dialog: handed over for this visit only.
+      await page.getByRole('link', { name: 'Settings', exact: true }).click()
+      await giveFolder(page, 'search-input', samples)
+      await page.getByTestId('scan').click()
+      await page.getByRole('link', { name: 'Overview', exact: true }).click()
+      // With the sample folder, every set is complete or can be fixed.
+      const whole = '2 of 4 sets are complete'
+      expect(await eventually(() => page.locator('#headline').innerText(), whole)).toBe(whole)
+      expect(await textOf(page.getByTestId('missing-card'))).toContain('Nothing')
+      expect(await page.getByTestId('not-read').count()).toBe(0)
+
+      // After a reload the project folder is back, the sample folder is not: the page says so
+      // where the folders are, and a scan made all the same says it on every page.
+      await page.waitForTimeout(300)
+      await reload(page)
+      expect(await textOf(page.getByTestId('absent'))).toContain(
+        '1 folder from your last visit has to be added again “samples”.',
+      )
+      expect(await page.getByTestId('not-read').count()).toBe(0)
+      await page.getByTestId('scan-library').click()
+      await page.locator('#headline').waitFor({ timeout: 30_000 * PATIENCE })
+      const notice = page.getByTestId('not-read')
+      expect(await textOf(notice)).toBe(
+        'This scan did not read 1 folder from your last visit “samples”. Samples that lie in it count as not found here. In the Settings, let the page read it again (its row says how), then scan again. To the folders',
+      )
+      expect(await barriers(page)).toEqual([])
+      // The sample that lies in it is "not found": its panel says why that may be.
+      await page.getByRole('link', { name: 'Samples', exact: true }).click()
+      await notice.waitFor()
+      await page.getByRole('cell', { name: 'Song Project', exact: true }).click()
+      const panel = page.getByRole('dialog')
+      await panel.getByText('No file of this name is in the folders that were searched.').waitFor()
+      expect(await textOf(panel.getByTestId('not-read-line'))).toBe(
+        '1 folder from your last visit was not read by this scan: a sample that lies in it counts as not found.',
+      )
+      await page.keyboard.press('Escape')
+      await panel.waitFor({ state: 'hidden' })
+
+      // The notice leads to the folders; added again, the folder is read and the notice gone.
+      await notice.getByRole('link', { name: 'To the folders' }).click()
+      await page.getByTestId('absent').waitFor()
+      expect(await page.getByTestId('not-read').count()).toBe(0)
+      await giveFolder(page, 'search-input', samples)
+      expect(await page.getByTestId('absent').count()).toBe(0)
+      await page.getByTestId('scan').click()
+      await page.getByRole('link', { name: 'Overview', exact: true }).click()
+      await page
+        .getByTestId('missing-card')
+        .getByText('Nothing')
+        .waitFor({ timeout: 30_000 * PATIENCE })
+      expect(await page.getByTestId('not-read').count()).toBe(0)
+      // (For the tests that follow: without the folder that is handed over for one visit.)
+      await page.getByRole('link', { name: 'Settings', exact: true }).click()
+      await rowsOf(page, 'search-folders')
+        .first()
+        .getByRole('button', { name: 'Remove samples' })
+        .click()
+    },
+    90_000 * PATIENCE,
+  )
+
+  test(
     'a dropped folder of the disk is kept; the browser is asked before it is read again',
     async () => {
       await page.getByRole('link', { name: 'Settings', exact: true }).click()
@@ -221,10 +312,13 @@ describe('folders behind a handle are read again (Chromium, in a profile that is
       await notice.getByRole('button', { name: 'Allow it' }).click()
       const refused = '1 folder from your last visit Your browser did not allow “samples”. Allow it'
       expect(await eventually(() => textOf(notice), refused)).toBe(refused)
-      // It is not scanned while it waits; the project folder is, as before.
+      // It is not scanned while it waits; the project folder is, as before. The scan says so.
       await page.getByRole('link', { name: 'Overview', exact: true }).click()
       await page.getByTestId('scan').click()
       await page.locator('#headline').waitFor({ timeout: 30_000 * PATIENCE })
+      expect(await textOf(page.getByTestId('not-read'))).toContain(
+        'This scan did not read 1 folder from your last visit “samples”.',
+      )
     },
     60_000 * PATIENCE,
   )

@@ -4,17 +4,37 @@
  * back), and a scan that failed (it may have been started from any page).
  */
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import CopyText from '../components/common/CopyText.vue'
 import { disconnect, pairedAt } from '../engine/create'
+import { absentWords } from '../lib/library'
 import { browserFacts, unreachableAdvice, waysOf } from '../lib/ways'
 import { useEngineStore } from '../stores/engine'
+import { useLibraryStore } from '../stores/library'
 import { useScanStore } from '../stores/scan'
 
 const engines = useEngineStore()
+const library = useLibraryStore()
 const scans = useScanStore()
+const route = useRoute()
 const reload = () => window.location.reload()
 const ways = computed(() => waysOf(browserFacts()))
 const site = window.location.origin
+
+/**
+ * A scan that was made while folders of the last visit were not read (to be added again, or
+ * the browser to be asked for): what it shows as not found may lie in them. (The settings say
+ * so themselves, at the folders.)
+ */
+const notRead = computed(() =>
+  scans.scan && !scans.running && library.waiting.length && route.path !== '/settings'
+    ? absentWords(
+        library.waiting.map((folder) => folder.name),
+        true,
+        library.projects.some((folder) => folder.waits === 'folder'),
+      )
+    : undefined,
+)
 
 /** A connected page waits for its livesaver's first answer: a browser may be asking the user. */
 const connecting = computed(() => engines.paired && engines.loading && !engines.problem)
@@ -74,9 +94,21 @@ const actions = computed(() => [
 
 <template>
   <div
-    v-if="engines.problem || connecting || (scans.problem && !scans.running)"
+    v-if="engines.problem || connecting || (scans.problem && !scans.running) || notRead"
     class="space-y-3 border-b border-default p-4 sm:px-6"
   >
+    <UAlert
+      v-if="notRead"
+      color="neutral"
+      variant="outline"
+      icon="i-lucide-triangle-alert"
+      :ui="{ icon: 'text-(--status-missing)' }"
+      :title="notRead.title"
+      :description="notRead.text"
+      role="status"
+      data-testid="not-read"
+      :actions="[{ label: 'To the folders', color: 'neutral', variant: 'subtle', to: '/settings' }]"
+    />
     <!-- A page of a site reaches this computer only if the browser lets it, and some ask first. -->
     <UAlert
       v-if="connecting"

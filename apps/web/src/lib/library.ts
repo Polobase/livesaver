@@ -26,6 +26,33 @@ export function wantedOf(search: readonly Pick<KnownFolder, 'holds'>[]): Wanted 
   }
 }
 
+/**
+ * What the page says of folders of the last visit that are not read yet: a browser hands a page
+ * an uploaded folder for one visit, and wants to be asked again for one it kept. `scanned`: a
+ * scan was made without them, and what it shows is to be read with that in mind: a sample that
+ * lies in such a folder counts as not found. `projects`: a project folder is among them, whose
+ * sets are not scanned either.
+ */
+export function absentWords(
+  names: readonly string[],
+  scanned: boolean,
+  projects = false,
+): { title: string; text: string; line: string } {
+  const n = names.length
+  const [folders, them] = n === 1 ? ['1 folder', 'it'] : [`${n} folders`, 'them']
+  const listed = names.map((name) => `“${name}”`).join(', ')
+  const sets = projects ? `, and sets in ${them} are not checked` : ''
+  return {
+    title: scanned
+      ? `This scan did not read ${folders} from your last visit`
+      : `${folders} from your last visit ${n === 1 ? 'has' : 'have'} to be added again`,
+    text: scanned
+      ? `${listed}. Samples that lie in ${them} count as not found here${sets}. In the Settings, let the page read ${them} again (${n === 1 ? 'its row says' : 'their rows say'} how), then scan again.`
+      : `${listed}. A browser hands a page such a folder for one visit. Add ${them} again, by the dialog or a drop: several folders can be dropped at once. Until then a scan does not read ${them}: a sample that lies there counts as not found${sets}.`,
+    line: `${folders} from your last visit ${n === 1 ? 'was' : 'were'} not read by this scan: a sample that lies in ${them} counts as not found.`,
+  }
+}
+
 /** The request of a scan as one text: two requests are the same scan if these are equal. */
 export function requestKey(request: {
   readonly projects: readonly { id: string; path: string }[]

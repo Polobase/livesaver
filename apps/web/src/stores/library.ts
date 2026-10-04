@@ -184,6 +184,21 @@ export const useLibraryStore = defineStore('library', () => {
     ),
   )
 
+  /**
+   * Folders of the last visit whose files the page was handed for that visit only: until they
+   * are added again, a scan does not read them.
+   */
+  const absent = computed(() =>
+    [...projects.value, ...search.value, ...installed.value].filter(
+      (folder) => folder.waits === 'folder',
+    ),
+  )
+
+  /** Every folder of the last visit that a scan does not read yet, whatever it waits for. */
+  const waiting = computed(() =>
+    [...projects.value, ...search.value, ...installed.value].filter((folder) => folder.waits),
+  )
+
   const request = computed<ScanRequest>(() => {
     const plain = ({ id, name, path, vendor }: KnownFolder) => ({ id, name, path, vendor })
     const told = there(installed.value)
@@ -222,6 +237,8 @@ export const useLibraryStore = defineStore('library', () => {
     access,
     allow,
     asleep,
+    absent,
+    waiting,
     allowEditing,
     remove,
     update,

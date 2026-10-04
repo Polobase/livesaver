@@ -273,7 +273,12 @@ A browser hands a page the files of a folder for one visit. What a page can keep
 - **The lists**, with what was typed and ticked and how a scan matches: as text in the
   browser's storage for the site, written at once, so that a reload right after a change does
   not lose it. A folder that comes back as a row only waits to be added again; added again, it
-  takes its place with its settings.
+  takes its place with its settings. Until then a scan does not read it, and a sample that
+  lies in it counts as not found. The same holds for a folder the browser kept and wants to
+  be asked for. So the page says which folders are not there before a scan is made, and after
+  a scan that was made without them it says so on every page, and beside the samples that
+  were not found (`absent` and `waiting` in the library store). (It was not said at first,
+  and a library scanned after a reload looked as if its sample folders held nothing.)
 - **A folder's handle**, in the browser's database, where the browser handed one out: for a
   folder chosen for editing, and for a dropped folder, whose drop offers a handle beside its
   entries in Chromium (`kept` on a listing). A handle is read again on the next visit once the

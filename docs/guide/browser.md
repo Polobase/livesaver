@@ -64,6 +64,8 @@ So drop the folders you want kept. Two kinds of folders a browser does not keep 
 
 In a private window the page keeps the list, and no folder. To make the page forget a folder, remove it from its list.
 
+A folder that waits is not read, whether it is to be added again or your browser wants to be asked. A scan made without it counts the samples in it as not found: the page says which folders are not there before you scan, and after such a scan on every page. Allow or add the folders first; several can be dropped at once.
+
 ## Where a folder lies
 
 A browser does not tell a page where a folder lies on your disk, but sets refer to their samples by where they lie. livesaver works it out from the sets themselves: for your project folders, and for Ableton's own (the Live app, the User Library, the Factory Packs). For another folder you can type its path (**Set path**), which makes the result the same as on the command line.

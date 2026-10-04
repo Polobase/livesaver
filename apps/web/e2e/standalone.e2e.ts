@@ -252,7 +252,12 @@ for (const [name, type] of ENGINES) {
           }
         }
         await added.waitFor()
-        expect(await hint.innerText()).toBe('or drop a folder here')
+        // (Chromium hands out a handle with a drop, which a page can keep.)
+        expect(await hint.innerText()).toBe(
+          name === 'Chromium'
+            ? 'or drop a folder here: your browser keeps a dropped folder for your next visit'
+            : 'or drop a folder here',
+        )
       },
       30_000 * PATIENCE,
     )

@@ -3,7 +3,7 @@
 import { computed, ref } from 'vue'
 import { keepsDroppedFolders } from '../../engine/storage'
 import { plural } from '../../lib/format'
-import { PLUGIN_DATABASE, PLUGIN_FOLDER } from '../../lib/library'
+import { absentWords, PLUGIN_DATABASE, PLUGIN_FOLDER } from '../../lib/library'
 import { useEngineStore } from '../../stores/engine'
 import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
@@ -34,6 +34,14 @@ async function allowAll(): Promise<void> {
   }
 }
 const keepsDrops = keepsDroppedFolders()
+/** Folders of the last visit that are not there: said before a scan is made without them. */
+const absent = computed(() =>
+  absentWords(
+    library.absent.map((folder) => folder.name),
+    false,
+    library.projects.some((folder) => folder.waits === 'folder'),
+  ),
+)
 </script>
 
 <template>
@@ -61,6 +69,16 @@ const keepsDrops = keepsDroppedFolders()
           onClick: allowAll,
         },
       ]"
+    />
+    <UAlert
+      v-if="library.absent.length"
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-folder-clock"
+      :title="absent.title"
+      :description="absent.text"
+      role="status"
+      data-testid="absent"
     />
     <div class="grid gap-4 lg:grid-cols-2">
       <FolderList

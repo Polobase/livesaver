@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** One folder of the library: what it is, where it lies, and (for a sample folder) whose it is. */
 import { computed, ref } from 'vue'
+import { keepsDroppedFolders } from '../../engine/storage'
 import type { KnownFolder, LocatedFolder } from '../../engine/types'
 import { count, plural } from '../../lib/format'
 import { LIVE_CONTENT } from '../../lib/library'
@@ -78,6 +79,11 @@ const facts = computed(() =>
 )
 /** Live's own content always counts as installed: there is nothing to tick for it. */
 const canMark = computed(() => props.kind === 'search' && !isLive.value)
+/**
+ * A browser that hands out a handle for a dropped folder lets a page keep that folder (not the
+ * Live app, for which it hands out none): a folder that waits is best dropped this time.
+ */
+const keptIfDropped = computed(() => keepsDroppedFolders() && !isLive.value)
 </script>
 
 <template>
@@ -146,6 +152,10 @@ const canMark = computed(() => props.kind === 'search' && !isLive.value)
             Your browser would keep it, but would then not show
             {{ count(folder.lost) }}
             of its files (it hides some names from a folder it keeps).
+          </template>
+          <template v-else-if="keptIfDropped">
+            A folder chosen in the dialog is handed to a page for one visit; one you drop here, your
+            browser keeps for your next visit.
           </template>
           <template v-else>A browser hands a page such a folder for one visit.</template>
           What you typed and ticked for it is kept.

@@ -15,8 +15,10 @@ import {
   whyLabel,
   whyText,
 } from '../../lib/health'
+import { absentWords } from '../../lib/library'
 import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
+import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
 import PathText from '../common/PathText.vue'
 import RevealLink from '../common/RevealLink.vue'
@@ -27,7 +29,17 @@ const props = defineProps<{ scan: Scan; root?: string; setPath?: string }>()
 const emit = defineEmits<{ close: []; changes: [search: string] }>()
 const engines = useEngineStore()
 const fix = useFixStore()
+const library = useLibraryStore()
 const scans = useScanStore()
+/** Folders of the last visit the scan did not read: what is "not found" may lie in them. */
+const notRead = computed(() =>
+  library.waiting.length
+    ? absentWords(
+        library.waiting.map((folder) => folder.name),
+        true,
+      ).line
+    : '',
+)
 
 /** Changes and missing samples listed here; the tabs list them all. */
 const LISTED = 30
@@ -194,6 +206,12 @@ function fixIt(): void {
           <h3 id="panel-missing" class="font-semibold text-highlighted">
             What stays missing ({{ count(detail.missing.length) }})
           </h3>
+          <p v-if="notRead" class="mt-1 text-sm" role="note" data-testid="not-read-line">
+            <UIcon
+              name="i-lucide-triangle-alert"
+              class="me-1 inline size-4 align-text-bottom text-(--status-missing)"
+            />{{ notRead }}
+          </p>
           <ul class="mt-2 divide-y divide-default rounded-lg border border-default text-sm">
             <li
               v-for="row in detail.missing.slice(0, LISTED)"
