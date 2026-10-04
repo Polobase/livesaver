@@ -88,14 +88,18 @@ export async function commandKey(page: Page): Promise<'Meta' | 'Control'> {
  * again, unless a row for it has appeared in the meantime.
  */
 export async function giveFolder(page: Page, input: string, folder: string): Promise<void> {
-  const rows = page.getByTestId('folder-row')
-  const before = await rows.count()
+  // The folders the page has: a folder of an earlier visit that is added again takes the row
+  // that waited for it, so the rows that wait are not counted.
+  const there = async () =>
+    (await page.getByTestId('folder-row').count()) -
+    (await page.getByTestId('folder-waits').count())
+  const before = await there()
   for (let tries = 1; ; tries++) {
     try {
       await page.getByTestId(input).setInputFiles(folder, { timeout: 10_000 })
       return
     } catch (error) {
-      if ((await rows.count()) > before) return
+      if ((await there()) > before) return
       if (tries === 3) throw error
     }
   }
