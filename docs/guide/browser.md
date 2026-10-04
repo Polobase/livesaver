@@ -33,6 +33,8 @@ In every browser, `livesaver web` opens the app from your own computer, with liv
 
 On the overview, **How this page can fix** says the same for the browser you are in, with the commands and the addresses of your browser's settings to copy.
 
+![The two ways a page can fix, said for the browser it is in](images/ways-light.webp)
+
 ## Giving it folders
 
 Choose a folder with **Add folder**, or drop it on the page. Your browser may ask whether to “upload” the folder: that is its word for letting a page read it. Nothing is uploaded; the files stay where they are and are read there.

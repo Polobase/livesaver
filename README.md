@@ -168,7 +168,7 @@ what the command line reports.
 | [`@livesaver/plugins`](packages/plugins) | Plug-in identity and inventory (installed, native or Rosetta), byte-exact VST2→VST3 conversion |
 | [`@livesaver/catalog`](packages/catalog) | Catalog of sets, plug-ins and samples in SQLite (FTS5), incremental indexing, the `find` language |
 | [`@livesaver/node`](packages/node) | Node.js/Bun host: file system, gzip, worker threads, Finder tags and comments, Live setup discovery |
-| [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a file system, worker-based parsing, a scan of samples and plug-ins in the page, and a fix through folder handles |
+| [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a file system, worker-based parsing, a scan of samples and plug-ins in the page (with what is installed, from folders it is shown), and a fix and a plug-in upgrade through folder handles |
 | [`livesaver`](packages/cli) | The command-line tool |
 | [`apps/web`](apps/web) | The web app: Vite, Vue, Nuxt UI (not published) |
 | [`apps/site`](apps/site) | The site: landing page and the docs as pages (Nuxt, static; not published) |

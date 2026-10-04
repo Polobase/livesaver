@@ -174,6 +174,10 @@ async function shots(scheme: 'light' | 'dark'): Promise<void> {
   await own.getByTestId('scan-library').click()
   await own.getByTestId('fix-card').waitFor()
   await shot('browser', own)
+  // What it says about fixing from there, for the browser it is in.
+  await own.getByTestId('how-to-fix').click()
+  await own.getByTestId('where-dialog').waitFor()
+  await shot('ways', own)
   await own.close()
 
   // Runs for the history: one project fixed alone, then the rest, then an upgrade.

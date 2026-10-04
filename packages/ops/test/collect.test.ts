@@ -1,130 +1,33 @@
-/** collect with --apply in temp dirs: relinking, collecting, Max devices, packs, old formats. */
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+/**
+ * collect with --apply in temp dirs: relinking, collecting, packs, old formats. (Max devices:
+ * `collect-devices.test.ts`.)
+ */
+import { beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  EMPTY_REMAP,
-  fileRefs,
-  liveCrc,
-  REL_DOCUMENT,
-  REL_PACK,
-  REL_PROJECT,
-  remapKey,
-} from '@livesaver/core'
+import { liveCrc, REL_DOCUMENT, REL_PACK, REL_PROJECT } from '@livesaver/core'
 import { createNodeHost } from '@livesaver/node'
 import {
-  amxd,
   copyFixtures,
   deviceSet,
-  docFromText,
   fileRefBodies,
   fixturesDir,
   LIVE9_SET,
   makeProject,
   OLD_SET,
-  oldDeviceSet,
   readSet,
   snapshot,
   stripSampleRefs,
-  tempDir,
   WINDOWS_PATH,
   writeFile,
   writeSet,
 } from '@livesaver/test-kit'
-import {
-  applyWriter,
-  buildReports,
-  DEFAULT_PACK_LIMIT,
-  type DoctorResult,
-  doctor,
-  type EnvConfig,
-  Probe,
-  summary,
-} from '../src/index.js'
+import { summary } from '../src/index.js'
+import { csv, mtimeUs, refsOf, useCollect } from './collect-kit.js'
 
 const fixtures = fixturesDir()
 
-let tmp: { path: string; cleanup: () => void }
-let runs = 0
-beforeEach(() => {
-  tmp = tempDir()
-})
-afterEach(() => tmp.cleanup())
-
-function env(config: Partial<EnvConfig> = {}): EnvConfig {
-  return {
-    userLibrary: '',
-    factoryPacks: '',
-    appResources: '',
-    preferredRoots: [],
-    vendorLibraries: [],
-    remap: EMPTY_REMAP,
-    ...config,
-  }
-}
-
-interface Run extends DoctorResult {
-  readonly reports: Record<string, string>
-}
-
-async function run(
-  targets: string[],
-  search: string[],
-  options: {
-    env?: Partial<EnvConfig>
-    apply?: boolean
-    packLimit?: number
-    matchLibraryPath?: boolean
-  } = {},
-): Promise<Run> {
-  const host = createNodeHost({ write: true })
-  const probe = new Probe(host.fs, host.hash)
-  const context = { id: `test-${++runs}`, dir: join(tmp.path, `run-${runs}`) }
-  const result = await doctor(host, {
-    targets,
-    searchRoots: search,
-    env: env(options.env),
-    packCopyLimit: options.packLimit ?? DEFAULT_PACK_LIMIT,
-    matchLibraryPath: options.matchLibraryPath ?? false,
-    probe,
-    ...(options.apply ? { writer: applyWriter(host, context, probe) } : {}),
-  })
-  return { ...result, reports: await buildReports(result.results, result.base, probe) }
-}
-
-/** Rows of a generated CSV as objects (BOM, CRLF, minimal quoting). */
-function csv(text: string): Record<string, string>[] {
-  const rows: string[][] = []
-  let row: string[] = []
-  let field = ''
-  let quoted = false
-  const s = text.replace(/^\ufeff/, '')
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i] as string
-    if (quoted) {
-      if (c === '"' && s[i + 1] === '"') {
-        field += '"'
-        i++
-      } else if (c === '"') quoted = false
-      else field += c
-    } else if (c === '"') quoted = true
-    else if (c === ',') {
-      row.push(field)
-      field = ''
-    } else if (c === '\r' && s[i + 1] === '\n') {
-      row.push(field)
-      rows.push(row)
-      row = []
-      field = ''
-      i++
-    } else field += c
-  }
-  const [head = [], ...body] = rows
-  return body.map((r) => Object.fromEntries(head.map((h, k) => [h, r[k] ?? ''])))
-}
-
-const mtimeUs = (p: string) => Math.round(Number(statSync(p, { bigint: true }).mtimeNs) / 1000)
-const refsOf = async (path: string) => fileRefs(await docFromText(readSet(path)))
+const { tmp, run } = useCollect()
 
 describe('Brokenpath', () => {
   let projects: string
@@ -226,183 +129,6 @@ describe('collect external', () => {
       expect(ref.path).toBe(join(project, 'Samples', 'Imported', '1.wav'))
     }
     expect(existsSync(join(project, 'Samples', 'Imported', '1.wav.asd'))).toBe(true)
-  })
-})
-
-describe('Max devices', () => {
-  const LFO = join('Presets', 'Audio Effects', 'Max Audio Effect', 'Imported', 'LFO.amxd')
-
-  test('a missing device from a USB stick is relinked and collected', async () => {
-    const library = join(tmp.path, 'library')
-    const data = amxd()
-    const source = writeFile(join(library, 'Stick Project', LFO), data)
-    const project = makeProject(tmp.path, 'Track')
-    const setPath = join(project, 'Track 2.als')
-    const stick = `/Volumes/NO NAME/Stick Project/${LFO}`
-    writeSet(
-      setPath,
-      deviceSet(stick, data.length, liveCrc(data), { relPath: `../../../../..${stick}` }),
-    )
-    const mtime = mtimeUs(setPath)
-
-    const r = await run([project], [library], { apply: true })
-    const result = r.results[0]
-    expect(result?.error).toBe('')
-    expect(result?.changes.map((c) => [c.action, c.newPath, c.certain])).toEqual([
-      ['repaired', LFO, true],
-    ])
-    const [ref] = await refsOf(setPath)
-    const copied = join(project, LFO)
-    expect([ref?.kind, ref?.relType, ref?.relPath, ref?.path]).toEqual([
-      'device',
-      REL_PROJECT,
-      LFO,
-      copied,
-    ])
-    expect(ref?.lastMod).toBe(String(Math.floor(statSync(copied).mtimeMs / 1000)))
-    expect(readFileSync(copied)).toEqual(readFileSync(source))
-    expect(mtimeUs(setPath)).toBeGreaterThanOrEqual(mtime)
-    expect(existsSync(join(project, 'Samples'))).toBe(false)
-    expect((await run([project], [library], { apply: true })).results[0]?.changes).toEqual([])
-  })
-
-  test('device types go to their preset folders', async () => {
-    const cases: [string, string, string][] = [
-      ['iiii', 'DS Tom.amxd', join('Presets', 'Instruments', 'Max Instrument', 'Imported')],
-      ['mmmm', 'Arp.amxd', join('Presets', 'MIDI Effects', 'Max MIDI Effect', 'Imported')],
-      ['natt', 'Tool.amxd', join('Presets', 'Imported')],
-    ]
-    for (const [code, name, folder] of cases) {
-      const library = join(tmp.path, `lib-${code}`)
-      const data = amxd(code)
-      writeFile(join(library, name), data)
-      const project = makeProject(tmp.path, `Types ${code}`)
-      writeSet(
-        join(project, 'S.als'),
-        deviceSet(`/old/disk/${name}`, data.length, liveCrc(data), {
-          relPath: `../../old/disk/${name}`,
-        }),
-      )
-      const r = await run([project], [library], { apply: true })
-      expect(r.results[0]?.error).toBe('')
-      expect(existsSync(join(project, folder, name))).toBe(true)
-    }
-  })
-
-  test('a Live 10 device from another project reuses the identical copy', async () => {
-    const other = makeProject(tmp.path, 'Other')
-    const data = amxd()
-    writeFile(join(other, LFO), data)
-    const project = makeProject(tmp.path, 'Own')
-    writeFile(join(project, LFO), data)
-    const setPath = join(project, 'Own.als')
-    const text = oldDeviceSet(data.length, liveCrc(data))
-    writeSet(setPath, text)
-
-    const r = await run([project], [], { apply: true })
-    expect([r.results[0]?.error, r.results[0]?.changes.map((c) => c.action)]).toEqual([
-      '',
-      ['collected'],
-    ])
-    expect(r.projects[0]?.copiedFiles).toBe(0)
-    const now = readSet(setPath)
-    const [ref] = await refsOf(setPath)
-    expect([ref?.relType, ref?.relDirs, ref?.name]).toEqual([
-      REL_PROJECT,
-      ['Presets', 'Audio Effects', 'Max Audio Effect', 'Imported'],
-      'LFO.amxd',
-    ])
-    expect(ref?.hintPath).toBe(join(project, LFO))
-    expect(now).toContain('<RelativePathElement Id="44" Dir="Presets" />')
-    expect(stripSampleRefs(now)).toBe(stripSampleRefs(text))
-  })
-
-  test('pack devices stay in the pack', async () => {
-    const packs = join(tmp.path, 'packs')
-    const data = amxd()
-    const packFile = writeFile(
-      join(packs, 'Creative Extensions', 'Devices', 'Color Limiter.amxd'),
-      data,
-    )
-    writeFile(
-      join(packs, 'Creative Extensions', 'Ableton Folder Info', 'Properties.cfg'),
-      'FolderConfigData\n{\n  String PackUniqueID = "www.ableton.com/250";\n  String PackDisplayName = "Creative Extensions";\n}\n',
-    )
-    const project = makeProject(tmp.path, 'Pack')
-    const inPack = join(project, 'In Pack.als')
-    writeSet(
-      inPack,
-      deviceSet(packFile, data.length, liveCrc(data), {
-        relType: REL_PACK,
-        relPath: 'Devices/Color Limiter.amxd',
-        packName: 'Creative Extensions',
-        packId: 'www.ableton.com/250',
-      }),
-    )
-    const moved = join(project, 'Moved.als')
-    writeSet(
-      moved,
-      deviceSet(
-        'E:\\Ableton\\Factory Packs\\Creative Extensions\\Devices\\Color Limiter.amxd',
-        data.length,
-        liveCrc(data),
-      ),
-    )
-    const before = readSet(inPack)
-    const r = await run([project], [packs], { env: { factoryPacks: packs }, apply: true })
-    const byName = new Map(r.results.map((x) => [x.setPath.split('/').at(-1), x]))
-    expect([byName.get('In Pack.als')?.changes, byName.get('In Pack.als')?.counts.kept]).toEqual([
-      [],
-      1,
-    ])
-    expect(readSet(inPack)).toBe(before)
-    const [change] = byName.get('Moved.als')?.changes ?? []
-    expect(change?.method).toContain('kept in the pack (Max device)')
-    const [ref] = await refsOf(moved)
-    expect([ref?.relType, ref?.relPath, ref?.packId]).toEqual([
-      REL_PACK,
-      'Devices/Color Limiter.amxd',
-      'www.ableton.com/250',
-    ])
-    expect(existsSync(join(project, 'Presets'))).toBe(false)
-  })
-
-  test("a Live device is left to Live (Live's remap table)", async () => {
-    const app = join(tmp.path, 'App-Resources')
-    writeFile(
-      join(app, 'Builtin', 'Devices', 'Audio Effects', 'LFO', 'Ableton Folder Info', 'LFO.amxd'),
-      amxd('aaaa', 'new'),
-    )
-    const remap = {
-      mapping: new Map<string, readonly [number, string, string]>([
-        [
-          remapKey(5, 'www.ableton.com/0', 'Devices/Audio Effects/Max Audio Effect/LFO.amxd'),
-          [7, '', 'Devices/Audio Effects/LFO/Ableton Folder Info/LFO.amxd'],
-        ],
-      ]),
-      packNames: new Map<string, string>(),
-    }
-    const library = join(tmp.path, 'library')
-    const data = amxd('aaaa', 'old')
-    writeFile(join(library, 'Old Project', LFO), data)
-    const project = makeProject(tmp.path, 'Ten')
-    const setPath = join(project, 'Ten.als')
-    const old =
-      '/Applications/Ableton Live 10 Suite.app/Contents/App-Resources/Core Library/Devices/Audio Effects/Max Audio Effect/LFO.amxd'
-    writeSet(
-      setPath,
-      deviceSet(old, data.length, liveCrc(data), {
-        relType: REL_PACK,
-        relPath: 'Devices/Audio Effects/Max Audio Effect/LFO.amxd',
-        packName: 'Core Library',
-        packId: 'www.ableton.com/0',
-      }),
-    )
-    const before = readSet(setPath)
-    const r = await run([project], [library], { env: { appResources: app, remap }, apply: true })
-    const result = r.results[0]
-    expect([result?.changes, result?.counts.kept, result?.error]).toEqual([[], 1, ''])
-    expect(readSet(setPath)).toBe(before)
   })
 })
 
