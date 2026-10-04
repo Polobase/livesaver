@@ -272,6 +272,132 @@ describe('a scan in the page', () => {
     expect(result.changes.map((c) => c.source)).toEqual(['/Mine/Loops/Kick/1.wav'])
   })
 
+  describe("Ableton's own folders are placed where the sets say they lie", () => {
+    const APP = '/Applications/Ableton Live 12 Suite.app'
+    /** A set that names one file of the Core Library, as the Live of `creator` stores it. */
+    const coreSet = (app: string, creator = 'Ableton Live 12.3.2') =>
+      deviceSet(`${app}/Contents/App-Resources/Core Library/Samples/c.wav`, 10, 0, {
+        relType: REL_PACK,
+        relPath: 'Samples/c.wav',
+        packName: 'Core Library',
+        packId: CORE_LIBRARY_PACK_ID,
+      })
+        .replaceAll('MxPatchRef', 'SampleRef')
+        .replace('Ableton Live 12.3.2', creator)
+    /** The Live app on a disk, with one sample in its Core Library. */
+    const liveApp = () => {
+      const app = join(tmp.path, 'Ableton Live 12 Suite.app')
+      writeFile(join(app, 'Contents', 'App-Resources', 'Core Library', 'Samples', 'c.wav'), 'RIFF')
+      return app
+    }
+
+    test('whichever folder of the Live app is given', async () => {
+      const project = makeProject(tmp.path, 'Song')
+      writeSet(join(project, 'Song.als'), coreSet(APP))
+      const app = liveApp()
+      const given = [
+        ['', APP],
+        ['Contents', `${APP}/Contents`],
+        ['Contents/App-Resources', `${APP}/Contents/App-Resources`],
+        ['Contents/App-Resources/Core Library', `${APP}/Contents/App-Resources/Core Library`],
+      ] as const
+      for (const [inside, at] of given) {
+        const { result } = await check(
+          [folder('p', pickedFolder(project))],
+          [folder('live', uploadedFolder(join(app, inside)))],
+        )
+        expect([inside, result.folders[1]]).toEqual([
+          inside,
+          { id: 'live', path: at, how: 'found' },
+        ])
+        expect(result.ableton.coreLibrary).toBe(`${APP}/Contents/App-Resources/Core Library`)
+        // The set's own path leads there now: the sample is where the set says.
+        expect(result.counts['not-found']).toBe(0)
+      }
+    })
+
+    test('the User Library and the Factory Packs, in the folder that holds them', async () => {
+      const home = '/Users/someone/Music/Ableton'
+      const project = makeProject(tmp.path, 'Song')
+      writeSet(
+        join(project, 'Song.als'),
+        deviceSet(`${home}/Factory Packs/Pack/Samples/b.wav`, 4, 0, {
+          relType: REL_PACK,
+          relPath: 'Samples/b.wav',
+          packName: 'Pack',
+          packId: 'www.ableton.com/1',
+        }).replaceAll('MxPatchRef', 'SampleRef'),
+      )
+      writeFile(join(tmp.path, 'Ableton', 'User Library', 'Samples', 'a.wav'), 'RIFF')
+      writeFile(join(tmp.path, 'Ableton', 'Factory Packs', 'Pack', 'Samples', 'b.wav'), 'RIFF')
+      const { result } = await check(
+        [folder('p', pickedFolder(project))],
+        [folder('a', uploadedFolder(join(tmp.path, 'Ableton')))],
+      )
+      expect(result.folders[1]).toEqual({ id: 'a', path: home, how: 'found' })
+      expect(result.ableton).toMatchObject({
+        userLibrary: `${home}/User Library`,
+        factoryPacks: `${home}/Factory Packs`,
+      })
+    })
+
+    test('a set of an older Live names the app of its time: the newest sets decide', async () => {
+      const project = makeProject(tmp.path, 'Song')
+      const old = '/Applications/Ableton Live 10 Suite.app'
+      writeSet(join(project, 'A old.als'), coreSet(old, 'Ableton Live 10.1.30'))
+      writeSet(join(project, 'B old.als'), coreSet(old, 'Ableton Live 10.1.30'))
+      writeSet(join(project, 'C new.als'), coreSet(APP))
+      const { result } = await check(
+        [folder('p', pickedFolder(project))],
+        [folder('live', uploadedFolder(join(liveApp(), 'Contents')))],
+      )
+      expect(result.folders[1]).toEqual({ id: 'live', path: `${APP}/Contents`, how: 'found' })
+    })
+
+    test('a path that was typed may be any path into the app', async () => {
+      const project = makeProject(tmp.path, 'Song')
+      writeSet(join(project, 'Song.als'), coreSet('/Applications/Ableton Live 10 Suite.app'))
+      const contents = join(liveApp(), 'Contents')
+      for (const typed of [
+        APP,
+        `${APP}/`,
+        `${APP}/Contents`,
+        `${APP}/Contents/App-Resources`,
+        `${APP}/Contents/App-Resources/Core Library`,
+      ]) {
+        const { result } = await check(
+          [folder('p', pickedFolder(project))],
+          [folder('live', uploadedFolder(contents), { path: typed })],
+        )
+        expect([typed, result.folders[1]]).toEqual([
+          typed,
+          { id: 'live', path: `${APP}/Contents`, how: 'typed' },
+        ])
+      }
+    })
+
+    test('where no set says so, the place stays unknown: nothing is made up', async () => {
+      const project = makeProject(tmp.path, 'Song')
+      // The set names a file that is not in the folder that was given.
+      writeSet(
+        join(project, 'Song.als'),
+        coreSet(APP).replaceAll('Samples/c.wav', 'Samples/other.wav'),
+      )
+      const contents = join(liveApp(), 'Contents')
+      // A folder of the user's with a "Core Library" in it is not the app's, whatever sets say.
+      const mine = join(tmp.path, 'Mine')
+      writeFile(join(mine, 'Core Library', 'Samples', 'other.wav'), 'RIFF')
+      const { result } = await check(
+        [folder('p', pickedFolder(project))],
+        [folder('live', uploadedFolder(contents)), folder('m', uploadedFolder(mine))],
+      )
+      expect(result.folders.slice(1)).toEqual([
+        { id: 'live', path: '/Contents', how: 'unknown' },
+        { id: 'm', path: '/Mine', how: 'unknown' },
+      ])
+    })
+  })
+
   test('a failure is reported, not thrown', async () => {
     const broken = { kind: 'files', name: 'x', files: null } as unknown as FolderInput['source']
     const events: ScanEvent[] = []

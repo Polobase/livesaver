@@ -49,7 +49,9 @@ Until Live's own content is there, the page says that samples of the Core Librar
 
 ## Where a folder lies
 
-A browser does not tell a page where a folder lies on your disk, but sets refer to their samples by where they lie. livesaver works it out for your project folders from the sets themselves. For another folder you can type its path (**Set path**), which makes the result the same as on the command line.
+A browser does not tell a page where a folder lies on your disk, but sets refer to their samples by where they lie. livesaver works it out from the sets themselves: for your project folders, and for Ableton's own (the Live app, the User Library, the Factory Packs). For another folder you can type its path (**Set path**), which makes the result the same as on the command line.
+
+Of the Live app you can give any folder: the app itself (dropped on the page), or its `Contents`, `Contents/App-Resources` or `Contents/App-Resources/Core Library` folder. If you type its path, any path into the app will do, such as `/Applications/Ableton Live 12 Suite.app`.
 
 ## Showing it what is installed
 
@@ -82,7 +84,7 @@ What a page cannot do that livesaver on your Mac can:
 - **The browser hides files with some names** in a folder it lets a page edit: a name with a “/” as Finder shows it, or with a space at its start or end. Such samples count as missing in the page, and a fix cannot copy a file to such a name; the set is then left as it is, and the page says so.
 - **A page has no Trash.** What an undo takes out of a project goes to a hidden folder, `.livesaver-trash`, in your project folder. Delete it when you no longer need it.
 - **It does not see how much room is left** on your disk. The review says how much the copies need.
-- **It needs to know where your folders lie**, because a fix writes that into the sets. For a project folder it takes what the sets say; type the path (**Set path**) if you moved the folder since. For a folder with Ableton's packs or Live's own content you type it.
+- **It needs to know where your folders lie**, because a fix writes that into the sets. It takes what the sets say: for a project folder, and for the folders with Ableton's packs and Live's own content. The review shows these places; type the path (**Set path**) if one is wrong because you moved the folder since, or if your sets say nothing about it.
 - **It sees only the plug-ins you show it.** Without the folder of Live's plug-in database it cannot upgrade a plug-in to VST3.
 
 Safari and Firefox do not let a page edit a folder: there the page only reads, and says so.

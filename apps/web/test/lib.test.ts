@@ -274,10 +274,13 @@ describe('what a fix in a browser needs before it starts', () => {
       ask: [],
       readOnly: [],
       unplaced: [],
-      // Where the project folders lie is shown, to be looked at: a fix writes it into the sets.
+      // Where the folders lie that a fix names in the sets is shown, to be looked at: the
+      // project folders, and Ableton's own.
       places: [
         { id: 'Projects', name: 'Projects', path: '/Projects', how: 'found' },
         { id: 'Old Projects', name: 'Old Projects', path: '/Old Projects', how: 'typed' },
+        { id: 'Ableton', name: 'Ableton', path: '/Ableton', how: 'typed' },
+        { id: 'Live', name: 'Live', path: '/Live', how: 'found' },
       ],
     })
     expect(isReady(ready)).toBe(true)

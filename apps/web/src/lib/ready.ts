@@ -23,7 +23,10 @@ export interface PageReadiness {
   readonly readOnly: readonly string[]
   /** Folders whose place on disk is not known, though a fix writes it into the sets. */
   readonly unplaced: readonly string[]
-  /** Where the project folders lie, as the scan placed them: to be looked at before a fix. */
+  /**
+   * Where the folders lie whose places a fix writes into the sets, as the scan placed them (the
+   * project folders, and Ableton's own): to be looked at before a fix.
+   */
   readonly places: readonly (LocatedFolder & { readonly name: string })[]
 }
 
@@ -38,6 +41,10 @@ export function pageReadiness(
   const known = new Map([...library.projects, ...library.search].map((f) => [f.id, f]))
   const placed = new Map(scan.folders.map((f) => [f.id, f]))
   const unknown = new Set(scan.folders.filter((f) => f.how === 'unknown').map((f) => f.id))
+  /** Sample folders that a fix names in the sets: Ableton's packs, and Live's own content. */
+  const named = scanned.search.filter((folder) =>
+    (known.get(folder.id)?.holds ?? []).some((held) => NAMED_IN_SETS.includes(held)),
+  )
   const ask: { id: string; name: string }[] = []
   const readOnly: string[] = []
   for (const { id, name } of scanned.projects) {
@@ -48,15 +55,10 @@ export function pageReadiness(
   return {
     ask,
     readOnly,
-    unplaced: [
-      ...scanned.projects.filter((folder) => unknown.has(folder.id)),
-      ...scanned.search.filter(
-        (folder) =>
-          unknown.has(folder.id) &&
-          (known.get(folder.id)?.holds ?? []).some((held) => NAMED_IN_SETS.includes(held)),
-      ),
-    ].map((folder) => folder.name),
-    places: scanned.projects.flatMap((folder) => {
+    unplaced: [...scanned.projects, ...named]
+      .filter((folder) => unknown.has(folder.id))
+      .map((folder) => folder.name),
+    places: [...scanned.projects, ...named].flatMap((folder) => {
       const at = placed.get(folder.id)
       return at && at.how !== 'unknown' ? [{ ...at, name: folder.name }] : []
     }),

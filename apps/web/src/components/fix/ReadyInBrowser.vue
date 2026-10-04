@@ -120,7 +120,7 @@ const quoted = (names: readonly string[]) => names.map((name) => `“${name}”`
           <li v-for="at in folders.places" :key="at.id" class="break-all">
             <span class="font-medium text-highlighted">{{ at.name }}</span>
             <span class="text-muted">
-              lies at {{ at.path }} ({{ at.how === 'typed' ? 'as you typed' : 'as its sets say' }})
+              lies at {{ at.path }} ({{ at.how === 'typed' ? 'as you typed' : 'as your sets say' }})
             </span>
           </li>
         </ul>

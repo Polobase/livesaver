@@ -6,12 +6,14 @@ import { count } from '../../lib/format'
 import { LIVE_CONTENT } from '../../lib/library'
 import { useEngineStore } from '../../stores/engine'
 import { type FolderKind, useLibraryStore } from '../../stores/library'
+import { useScanStore } from '../../stores/scan'
 import { useWritingStore } from '../../stores/writing'
 import RevealLink from '../common/RevealLink.vue'
 
 const props = defineProps<{ folder: KnownFolder; kind: FolderKind; disabled?: boolean }>()
 const engines = useEngineStore()
 const library = useLibraryStore()
+const scans = useScanStore()
 const writing = useWritingStore()
 /** With fixing in the browser switched on: whether the page may write into a project folder. */
 const access = computed(() =>
@@ -38,16 +40,23 @@ const HOW: Record<LocatedFolder['how'], string> = {
 /** A browser does not know where a folder lies: it is typed, or worked out by a scan. */
 const editing = ref(false)
 const at = computed(() => library.located.get(props.folder.id))
+/** Live's own content lies in the Live app: asked for its path, any path into the app will do. */
+const isLive = computed(() => props.folder.holds.includes(LIVE_CONTENT))
 const place = computed(() => {
   if (engines.capabilities.paths) return props.folder.path
   const typed = props.folder.path.trim()
-  return typed || (at.value && at.value.how !== 'unknown' ? at.value.path : '')
+  // What was typed may be another folder of the app than this one: the scan says which path
+  // it took the folder to have (until the path is changed again).
+  if (typed) return at.value?.how === 'typed' && !scans.stale ? at.value.path : typed
+  return at.value && at.value.how !== 'unknown' ? at.value.path : ''
 })
-const how = computed(() =>
-  !engines.capabilities.paths && !props.folder.path.trim() && at.value && place.value
-    ? HOW[at.value.how]
-    : '',
-)
+const how = computed(() => {
+  if (engines.capabilities.paths || !at.value || !place.value) return ''
+  const typed = props.folder.path.trim()
+  if (!typed) return HOW[at.value.how]
+  // (Typed as it is shown needs no word; the path of another folder of the app does.)
+  return place.value === typed.replace(/(?<=.)\/+$/, '') ? '' : 'from the path you typed'
+})
 const facts = computed(() =>
   [
     props.folder.files === undefined
@@ -57,9 +66,7 @@ const facts = computed(() =>
   ].filter((fact) => fact),
 )
 /** Live's own content always counts as installed: there is nothing to tick for it. */
-const canMark = computed(
-  () => props.kind === 'search' && !props.folder.holds.includes(LIVE_CONTENT),
-)
+const canMark = computed(() => props.kind === 'search' && !isLive.value)
 </script>
 
 <template>
@@ -127,7 +134,11 @@ const canMark = computed(
         :model-value="folder.path"
         size="sm"
         class="w-full"
-        placeholder="Where the folder lies on disk, e.g. /Users/you/Music"
+        :placeholder="
+          isLive
+            ? 'Any path into the Live app, e.g. /Applications/Ableton Live 12 Suite.app'
+            : 'Where the folder lies on disk, e.g. /Users/you/Music'
+        "
         :aria-label="`Path of ${folder.name} on disk`"
         autocomplete="off"
         spellcheck="false"

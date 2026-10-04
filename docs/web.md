@@ -264,7 +264,7 @@ a dialog that lists the limits below and wants a tick. Only where the browser ha
 - **Places must be known.** A fix writes absolute paths into the sets: of the project, and of a
   pack that keeps its large files and Max devices. A project folder, or a folder with the
   Factory Packs or Live's content, that was placed at a stand-in path refuses the fix; the
-  review says so before, and shows where it takes the project folders to lie.
+  review says so before, and shows where it takes these folders to lie.
 - **A set that changed since it was read is not written.** A file behind a handle is fetched
   anew when its state is asked, so a set that Live saved between the reading and the writing is
   noticed (size and time), as on the command line.
@@ -330,9 +330,22 @@ compared with the folders' paths.
   The folder is the one with its name in that path. Projects moved inside the folder since then
   do not matter; if the folder itself was renamed, its location is unknown.
 - **Sample folders** that hold a project folder, or lie directly in one, are placed by it.
-- Every other folder gets a stand-in path (`/<name>`), unless the user types its path. Other
-  stored paths are no evidence: a path that no longer exists would move a folder to a place
-  where it is not, and the missing file would then seem to exist, unchecked.
+- **Ableton's own folders** (the Live app or one of its folders down to the Core Library, the
+  User Library, the Factory Packs, or the folder that holds those two) are placed by the paths
+  the sets store for files in them (`leadsTo` in `packages/web/src/locate.ts`): a stored path
+  counts if it names the folder by its name and the file it names is in the folder. Live finds
+  what lies in these folders by its own rules whatever the stored path says, so a stale path
+  does no harm here, and a fix that names such a folder in a set should name it as Live would.
+  Sets of older Lives name the app of their time: the sets of the newest Live decide, and more
+  sets are read (up to 48) while only older ones gave a lead. On a real library the app's
+  `Contents` folder and `Music/Ableton` are placed this way, in two seconds.
+- **A path that is typed for a folder of the Live app** may be any path into the app (the app,
+  its `Contents`, `App-Resources` or the Core Library): asked where "Contents" lies, one pastes
+  the path of the app. The folder is placed at its own path in that app (`liveFolderPath`).
+- Every other folder gets a stand-in path (`/<name>`), unless the user types its path. For a
+  folder of the user's, other stored paths are no evidence: a path that no longer exists would
+  move a folder to a place where it is not, and the missing file would then seem to exist,
+  unchecked.
 
 With a stand-in path, a file that a set references by an absolute path into that folder is not
 "outside the project" but "missing", and is found again by name and fingerprint: the result is
@@ -379,7 +392,8 @@ there.
 ## How it is tested
 - `packages/web/test`: `WebFs` over fake handles, uploads and listings; a `doctor` run over the
   browser host equals a run over the Node host on the fixtures; the scan (locating, Ableton's
-  folders, the Live app given as a folder, the remap table, the plug-ins, the shaped result);
+  folders and where they lie by what the sets store, the Live app given as a folder, the remap
+  table, the plug-ins, the shaped result);
   and the conversation between the page and the engine's worker. Writing through handles
   (`WebFsWrite`) over folders in memory that behave like a browser's; a fix through them
   against the command line's pipeline on the same fixtures (the same references in the set,
@@ -400,7 +414,7 @@ there.
   own sums and words (states, plans, advice, what a run was and what its undo does). In a
   browser that lets a page edit folders: one project fixed alone through the app's state, the
   folders that say what is installed, and an upgrade that is planned, written and taken back.
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 250 tests.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 257 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
@@ -415,6 +429,10 @@ there.
     downloaded, a step shown in Finder, an undo that asks first and is then seen everywhere.
   - The settings: what livesaver found, a folder shown in Finder, the reset to the command
     line's settings; what every page says when livesaver is gone, or was started again.
+  - Where Ableton's own folders lie, in the three engines: the Live app's `Contents` folder and
+    `Music/Ableton` are placed by what the sets store, and a path typed for the app's folder
+    may be any path into the app. In Chromium, the review of a fix in the page shows those
+    places and is ready without a path being typed.
   - What is installed, shown to a page, in the three engines: what the page says without the
     folders, with the plug-in folder alone, and with Live's database, where it says what
     livesaver says of the same plug-ins. In Chromium, an upgrade to VST3 that the page makes

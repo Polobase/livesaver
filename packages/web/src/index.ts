@@ -61,7 +61,20 @@ export { planUpgradeFolders, upgradeFolders } from './engine/upgrade.js'
 export { type EngineScope, type EngineWorkerOptions, serveEngine } from './engine/worker.js'
 export { type FsUsage, type Mount, WebFs } from './fs.js'
 export { createWebHost, type WebHost, webCodec, webHash } from './host.js'
-export { type Located, locateFolder, type ProjectAnchor } from './locate.js'
+export {
+  type Landmark,
+  type Lead,
+  type LiveLevel,
+  type Located,
+  leadsTo,
+  liveFolderPath,
+  liveLandmark,
+  locateFolder,
+  type ProjectAnchor,
+  placeByLeads,
+  type StoredPath,
+  versionNumber,
+} from './locate.js'
 export {
   createWorkerParser,
   defaultWorkerCount,
