@@ -215,6 +215,17 @@ export interface KnownFolder extends LibraryFolder {
   readonly files?: number
   /** In a browser: what the page may do in it. On this computer livesaver reads and writes. */
   readonly access?: FolderAccess
+  /**
+   * In a browser: a folder of an earlier visit that cannot be read yet. The browser wants to be
+   * asked again before the page reads it (`permission`), or the page was handed its files for
+   * that visit only, and the folder has to be added again (`folder`).
+   */
+  readonly waits?: 'permission' | 'folder'
+  /**
+   * With `waits: 'folder'`: the browser would keep this folder for a page, but would not show
+   * this many of its files then (their names). That is why it was not kept.
+   */
+  readonly lost?: number
 }
 
 /** Where things are on this computer, as livesaver found them. */
@@ -236,9 +247,14 @@ export interface Start {
   readonly version: string
   /** The installed Live ('' = none found, or not known). */
   readonly live: string
-  /** The last scan's folders and options, else this computer's settings. */
-  readonly projects: readonly LibraryFolder[]
+  /**
+   * The last scan's folders and options, else this computer's settings. In a browser: the
+   * folders of the last visit, as far as a browser lets a page keep them.
+   */
+  readonly projects: readonly (LibraryFolder | KnownFolder)[]
   readonly search: readonly KnownFolder[]
+  /** In a browser: the folders of the last visit that say what is installed. */
+  readonly installed?: readonly KnownFolder[]
   readonly options: ScanOptions
   /** Folders checked before, to offer while no project folder is given (paths). */
   readonly suggested: readonly string[]

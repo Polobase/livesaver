@@ -17,7 +17,9 @@ const scans = useScanStore()
 const writing = useWritingStore()
 /** With fixing in the browser switched on: whether the page may write into a project folder. */
 const access = computed(() =>
-  writing.on && props.kind === 'projects' ? (props.folder.access ?? 'read') : undefined,
+  writing.on && props.kind === 'projects' && !props.folder.waits
+    ? (props.folder.access ?? 'read')
+    : undefined,
 )
 const refused = ref('')
 /** The browser asks its user, in answer to this click. */
@@ -26,6 +28,15 @@ async function allow(): Promise<void> {
   try {
     if ((await library.allowEditing(props.folder.id)) !== 'edit')
       refused.value = 'Your browser did not allow it.'
+  } catch (error) {
+    refused.value = (error as Error).message
+  }
+}
+/** A folder of the last visit: the browser is asked to let the page read it again. */
+async function allowAgain(): Promise<void> {
+  refused.value = ''
+  try {
+    if (!(await library.allow(props.folder.id))) refused.value = 'Your browser did not allow it.'
   } catch (error) {
     refused.value = (error as Error).message
   }
@@ -71,12 +82,20 @@ const canMark = computed(() => props.kind === 'search' && !isLive.value)
 
 <template>
   <li class="flex items-start gap-3 px-3 py-2.5" data-testid="folder-row">
-    <UIcon name="i-lucide-folder" class="mt-0.5 size-5 shrink-0 text-muted" />
+    <UIcon
+      :name="folder.waits ? 'i-lucide-folder-clock' : 'i-lucide-folder'"
+      class="mt-0.5 size-5 shrink-0 text-muted"
+    />
     <div class="min-w-0 flex-1 space-y-1">
       <div class="flex flex-wrap items-baseline gap-x-2">
-        <span class="font-medium text-highlighted" data-testid="folder-name">{{
-          folder.name
-        }}</span>
+        <span
+          class="font-medium"
+          :class="folder.waits ? 'text-muted' : 'text-highlighted'"
+          data-testid="folder-name"
+          >{{
+            folder.name
+          }}</span
+        >
         <span v-if="facts.length" class="text-xs text-muted" data-testid="folder-facts">
           {{ facts.join(' · ') }}
         </span>
@@ -101,6 +120,36 @@ const canMark = computed(() => props.kind === 'search' && !isLive.value)
           :label="editing ? 'Done' : place ? 'Change path' : 'Set path'"
           @click="editing = !editing"
         />
+      </div>
+      <!-- A folder of the last visit: what a browser lets a page keep of it decides what is left to do. -->
+      <div
+        v-if="folder.waits"
+        class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+        data-testid="folder-waits"
+      >
+        <template v-if="folder.waits === 'permission'">
+          From your last visit. Your browser wants to be asked before this page reads it again.
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="subtle"
+            label="Allow"
+            :aria-label="`Allow ${folder.name}`"
+            :disabled="disabled"
+            @click="allowAgain"
+          />
+          <span v-if="refused" role="alert">{{ refused }}</span>
+        </template>
+        <template v-else>
+          From your last visit: add it again, by the dialog or a drop.
+          <template v-if="folder.lost">
+            Your browser would keep it, but would then not show
+            {{ count(folder.lost) }}
+            of its files (it hides some names from a folder it keeps).
+          </template>
+          <template v-else>A browser hands a page such a folder for one visit.</template>
+          What you typed and ticked for it is kept.
+        </template>
       </div>
       <div
         v-if="access"

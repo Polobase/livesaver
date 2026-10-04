@@ -92,6 +92,8 @@ export {
   foldersFromDrop,
   foldersFromFiles,
   handlesFromDrop,
+  hiddenByHandle,
+  lostBehindHandle,
 } from './source.js'
 export {
   type SyncAccessLike,

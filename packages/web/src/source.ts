@@ -47,7 +47,38 @@ export type FolderSource =
       readonly name: string
       readonly paths: readonly string[]
       readonly open: (index: number) => Promise<File | undefined>
+      /**
+       * The same folder as a handle, where a browser hands one out for a drop (Chromium). A
+       * page can keep a handle for a later visit, which it cannot do with a listing.
+       */
+      readonly kept?: DirectoryHandleLike
     }
+
+/**
+ * Chromium shows a page no entry with such a name behind a handle: one of these characters (a
+ * `:` is what Finder shows as `/`), or a space at its start or end.
+ */
+export function hiddenByHandle(name: string): boolean {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are part of the rule
+  return /[":*/<>?\\|\u0000-\u001f]/.test(name) || name !== name.trim()
+}
+
+/**
+ * How many files of a folder a handle would not show, by the paths of a listing that shows
+ * them all: a file below a name a handle hides. Files a scan passes over anyway do not count
+ * (what lies in a hidden folder, `._` files, the icon file of a folder).
+ */
+export function lostBehindHandle(paths: readonly string[]): number {
+  let lost = 0
+  for (const path of paths) {
+    const parts = path.split('/')
+    const name = parts.at(-1) ?? ''
+    if (name.startsWith('._') || name.includes('\r')) continue
+    if (parts.some((part) => part.startsWith('.'))) continue
+    if (parts.some(hiddenByHandle)) lost++
+  }
+  return lost
+}
 
 /** A folder as its handle (see above for what a handle does not show). */
 export function folderFromHandle(handle: DirectoryHandleLike): FolderSource {
@@ -95,6 +126,9 @@ export function foldersFromFiles(files: Iterable<File>): FolderSource[] {
   return [...folders].map(([name, list]) => ({ kind: 'files', name, files: list }))
 }
 
+/** How long a browser gets to hand out the handle of a dropped folder, once it is listed. */
+const HANDLE_PATIENCE = 1000
+
 /** Entries are read 100 at a time (Chromium), and a reader is done when it returns none. */
 async function readEntries(dir: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> {
   const reader = dir.createReader()
@@ -141,14 +175,30 @@ export function foldersFromDrop(
   items: DataTransferItemList,
   onFiles: (count: number) => void = () => {},
 ): Promise<FolderSource[]> {
-  const dropped: FileSystemDirectoryEntry[] = []
+  const dropped: {
+    entry: FileSystemDirectoryEntry
+    handle: Promise<DirectoryHandleLike | undefined>
+  }[] = []
   for (const item of items) {
     const entry = item.kind === 'file' ? item.webkitGetAsEntry() : null
-    if (entry?.isDirectory) dropped.push(entry as FileSystemDirectoryEntry)
+    if (!entry?.isDirectory) continue
+    // Where the browser also hands out a handle for what was dropped, it is taken along: the
+    // page reads the folder through its entries, which show every file, and can keep the handle.
+    const handed = item as DataTransferItem & {
+      getAsFileSystemHandle?: () => Promise<{ kind?: string } | null>
+    }
+    const handle = handed.getAsFileSystemHandle
+      ? handed
+          .getAsFileSystemHandle()
+          .then((got) => (got?.kind === 'directory' ? (got as DirectoryHandleLike) : undefined))
+          // (No handle for this folder: one of the system's, or the browser hands out none.)
+          .catch(() => undefined)
+      : Promise.resolve(undefined)
+    dropped.push({ entry: entry as FileSystemDirectoryEntry, handle })
   }
   return (async () => {
     const folders: FolderSource[] = []
-    for (const entry of dropped) {
+    for (const { entry, handle } of dropped) {
       const listing: Listing = { paths: [], files: [] }
       await listBelow(entry, '', listing, onFiles)
       const { paths, files } = listing
@@ -159,7 +209,13 @@ export function foldersFromDrop(
           if (file) file.file(resolve, () => resolve(undefined))
           else resolve(undefined)
         })
-      folders.push({ kind: 'listing', name: entry.name, paths, open })
+      // The listing is the folder; its handle is an extra. A browser that does not answer
+      // (seen in a private window of Chromium) must not keep the drop from arriving.
+      const kept = await Promise.race([
+        handle,
+        new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), HANDLE_PATIENCE)),
+      ])
+      folders.push({ kind: 'listing', name: entry.name, paths, open, ...(kept ? { kept } : {}) })
     }
     return folders
   })()

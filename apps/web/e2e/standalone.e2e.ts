@@ -418,18 +418,32 @@ for (const [name, type] of ENGINES) {
     )
 
     test(
-      'coming back to the page shows its own state, not what the browser remembered',
+      'coming back to the page shows what the page kept, not what the browser remembered',
       async () => {
-        // A browser restores form controls by their order: an option could get the tick of a
-        // folder's box, while the page itself starts with the option off.
+        // A browser restores form controls by their order when one comes back to a page: the
+        // tick of one box would land on another. The page restores its own state instead: the
+        // folders of the last visit, each with its own tick, and how a scan matches.
         await goTo('Settings')
-        await page.getByRole('switch', { name: /Also accept a library file/ }).click()
+        const option = () => page.getByRole('switch', { name: /Also accept a library file/ })
+        const ticks = async () =>
+          Promise.all(
+            (await page.getByRole('checkbox', { name: 'Contains installed libraries' }).all()).map(
+              (box) => box.isChecked(),
+            ),
+          )
+        await option().click()
+        await page.getByRole('checkbox', { name: 'Contains installed libraries' }).last().check()
+        const left = { names: await texts('folder-name'), ticks: await ticks() }
+        expect(left.ticks.at(-1)).toBe(true)
+
         await page.goto('about:blank')
         await page.goBack()
         await page.getByTestId('search-folders').waitFor()
-        expect(await page.getByTestId('folder-row').count()).toBe(0)
-        const option = page.getByRole('switch', { name: /Also accept a library file/ })
-        expect(await option.isChecked()).toBe(false)
+        await page.getByTestId('folder-row').first().waitFor()
+        expect({ names: await texts('folder-name'), ticks: await ticks() }).toEqual(left)
+        expect(await option().isChecked()).toBe(true)
+        // The folders were handed over for that visit: they wait to be added again.
+        expect(await page.getByTestId('folder-waits').count()).toBe(left.names.length)
       },
       30_000 * PATIENCE,
     )

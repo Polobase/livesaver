@@ -75,9 +75,25 @@ export class MemoryDirectory {
   readonly kind = 'directory' as const
   readonly name: string
   readonly entries = new Map<string, MemoryDirectory | MemoryFile>()
+  /**
+   * Whether the browser lets the page into the folder without asking, as a test sets it. A
+   * handle that a page kept from an earlier visit has to be allowed again: `'prompt'`.
+   */
+  permission: 'granted' | 'prompt' = 'granted'
+  /** What the user of the browser answers when asked. */
+  answer: 'granted' | 'denied' = 'granted'
 
   constructor(name: string) {
     this.name = name
+  }
+
+  async queryPermission(): Promise<'granted' | 'prompt'> {
+    return this.permission
+  }
+
+  async requestPermission(): Promise<'granted' | 'denied'> {
+    if (this.answer === 'granted') this.permission = 'granted'
+    return this.answer
   }
 
   async *values(): AsyncIterable<MemoryDirectory | MemoryFile> {

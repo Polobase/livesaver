@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /** The folders of a scan and how it matches: the same on the first visit and in the settings. */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { keepsDroppedFolders } from '../../engine/storage'
+import { plural } from '../../lib/format'
 import { PLUGIN_DATABASE, PLUGIN_FOLDER } from '../../lib/library'
 import { useEngineStore } from '../../stores/engine'
 import { useLibraryStore } from '../../stores/library'
@@ -16,10 +18,50 @@ defineProps<{ plugins?: boolean }>()
 const scans = useScanStore()
 const writing = useWritingStore()
 const onComputer = computed(() => engines.capabilities.paths)
+
+/** Folders of the last visit that the browser wants to be asked for again: all at one click. */
+const refused = ref('')
+async function allowAll(): Promise<void> {
+  refused.value = ''
+  for (const folder of [...library.asleep]) {
+    try {
+      if (!(await library.allow(folder.id)))
+        refused.value = `Your browser did not allow “${folder.name}”.`
+    } catch (error) {
+      // (A browser may want a click of its own for every folder: each row has its button.)
+      refused.value = (error as Error).message
+    }
+  }
+}
+const keepsDrops = keepsDroppedFolders()
 </script>
 
 <template>
   <div class="space-y-4">
+    <UAlert
+      v-if="library.asleep.length"
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-folder-clock"
+      :title="`${plural(library.asleep.length, 'folder')} from your last visit`"
+      :description="
+        refused ||
+        (library.asleep.length === 1
+          ? 'Your browser kept it for this page, and wants to be asked before the page reads it again.'
+          : 'Your browser kept them for this page, and wants to be asked before the page reads them again.')
+      "
+      role="status"
+      data-testid="asleep"
+      :actions="[
+        {
+          label: library.asleep.length === 1 ? 'Allow it' : 'Allow them',
+          color: 'neutral',
+          variant: 'subtle',
+          disabled: scans.running,
+          onClick: allowAll,
+        },
+      ]"
+    />
     <div class="grid gap-4 lg:grid-cols-2">
       <FolderList
         kind="projects"
@@ -119,9 +161,16 @@ const onComputer = computed(() => engines.capabilities.paths)
         </p>
       </div>
     </FolderList>
-    <p v-if="!onComputer" class="text-sm text-muted">
+    <p v-if="!onComputer" class="text-sm text-muted" data-testid="kept-note">
       Your browser may ask whether to "upload" a folder. Nothing is uploaded: the files are only
-      read by this page, on your computer.
+      read by this page, on your computer. This browser keeps the list of your folders for your next
+      visit, with what you typed and ticked.
+      <template v-if="keepsDrops">
+        A folder you dropped here{{ writing.on ? ', or chose for editing,' : '' }}
+        is read again then; {{ writing.on ? 'a sample folder' : 'one' }} you chose with “Add folder”
+        has to be added again.
+      </template>
+      <template v-else>The folders themselves have to be added again then.</template>
       <template v-if="writing.on">
         A project folder is chosen for editing instead, and your browser hides files with some names
         in it (a “/” as Finder shows it, or a space at the start or end of the name): samples named

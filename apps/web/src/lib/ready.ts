@@ -3,18 +3,15 @@
  * edit the project folders, and that it knows where the folders lie whose places a fix writes
  * into the sets. (The engine checks both again: this is to say it before the button is pressed.)
  */
+import { hiddenByHandle } from '@livesaver/web'
 import type { KnownFolder, LocatedFolder, Scan, ScanRequest } from '../engine/types.js'
 import { LIVE_CONTENT } from './library.js'
 
 /**
  * A browser shows a page no file whose name it considers unsafe, in a folder that was chosen
- * for editing: a name with one of these characters (a `:` is what Finder shows as `/`), or with
- * a space at its start or end. A sample named like that counts as missing there.
+ * for editing (see `hiddenByHandle`). A sample named like that counts as missing there.
  */
-export function hiddenFromPage(name: string): boolean {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are part of the rule
-  return /[":*/<>?\\|\u0000-\u001f]/.test(name) || name !== name.trim()
-}
+export const hiddenFromPage = hiddenByHandle
 
 export interface PageReadiness {
   /** Project folders the page may not edit yet: its user can be asked. */

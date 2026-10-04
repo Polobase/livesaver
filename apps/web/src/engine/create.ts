@@ -6,6 +6,7 @@
 import type { EngineWorker } from '@livesaver/web'
 import { BrowserEngine } from './browser.js'
 import { ComputerEngine, localToken } from './computer.js'
+import { browserMemory } from './memory.js'
 import {
   clearPairing,
   keepPairing,
@@ -68,6 +69,8 @@ export function createEngine(): Engine {
   const tab = store()
   const pairing = tab ? readPairing(tab) : undefined
   if (pairing) return new ComputerEngine({ token: pairing.token, base: pairing.at, paired: true })
+  // The folders a page was handed are kept by the browser, as far as it lets a page keep them.
+  const memory = browserMemory()
   return new BrowserEngine({
     spawn: () =>
       new Worker(new URL('./engine.worker.ts', import.meta.url), {
@@ -75,5 +78,6 @@ export function createEngine(): Engine {
       }) as unknown as EngineWorker,
     ...(canWriteHere() ? { state: browserState } : {}),
     writing: writingSwitchedOn,
+    ...(memory ? { memory } : {}),
   })
 }

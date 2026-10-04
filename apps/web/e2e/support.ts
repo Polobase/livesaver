@@ -5,6 +5,7 @@ import { Inventory } from '@livesaver/plugins'
 import type { WebServer } from 'livesaver'
 import {
   type Browser,
+  type BrowserContext,
   type BrowserType,
   chromium,
   firefox,
@@ -47,6 +48,14 @@ export async function watch(
     // process (a test runner may set its own, whatever the system's is).
     timezoneId: Intl.DateTimeFormat().resolvedOptions().timeZone,
   })
+  return watchIn(context, origin)
+}
+
+/**
+ * A watched page in a context that the test made itself: a browser profile that is kept, which
+ * a context of Playwright (a private window) is not.
+ */
+export async function watchIn(context: BrowserContext, origin: string): Promise<Watched> {
   const page = await context.newPage()
   // Something that never appears fails with what was waited for, not with a test's time limit.
   page.setDefaultTimeout(15_000 * PATIENCE)

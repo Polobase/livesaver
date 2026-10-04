@@ -236,6 +236,35 @@ that the existence checks of the 104,000 references need. A dropped folder is on
 (about 2 s for 100,000 files): fetching each of its files (`FileSystemFileEntry.file()`) costs
 about 180 µs, most of a minute for a library.
 
+## Folders across a reload
+A browser hands a page the files of a folder for one visit. What a page can keep
+(`apps/web/src/engine/memory.ts`):
+
+- **The lists**, with what was typed and ticked and how a scan matches: as text in the
+  browser's storage for the site, written at once, so that a reload right after a change does
+  not lose it. A folder that comes back as a row only waits to be added again; added again, it
+  takes its place with its settings.
+- **A folder's handle**, in the browser's database, where the browser handed one out: for a
+  folder chosen for editing, and for a dropped folder, whose drop offers a handle beside its
+  entries in Chromium (`kept` on a listing). A handle is read again on the next visit once the
+  browser allows it (`queryPermission`, and `requestPermission` in answer to a click); one
+  notice asks for all the folders that wait.
+- **A dropped folder is read again through its handle only if that loses nothing.** A handle
+  hides entries with some names; the listing of the drop shows them all, so the page knows how
+  many files the handle would cost (`lostBehindHandle`). If any, the folder is not read through
+  it: its row says how many files it is about, and asks for the drop again. On a real library
+  that is one folder of five: 3,719 of its 83,993 samples have such a name, or lie below a
+  folder with one.
+- **No handle is kept in a private window.** A private window of Chromium (seen in 153) takes
+  a handle into its database, never answers when the handle is asked back, and from then on
+  answers nothing a page asks about folders (not even about its own file system) until the
+  window is closed. A page is not told whether its window is private; it sees the room it is
+  given, which is a share of the computer's memory there and 10 GiB or more elsewhere. Brave
+  tells every page the same number and hands handles back in its private windows too (checked
+  with Brave 1.96 itself). Should a browser not answer after all, the page gives its database
+  one and a half seconds, goes on without, and does not ask again in that tab; and a drop does
+  not wait for a handle that does not come.
+
 ## Fixing in a browser
 Off unless the user switches it on in the Settings (kept in the browser's `localStorage`), after
 a dialog that lists the limits below and wants a tick. Only where the browser has
@@ -411,10 +440,12 @@ there.
   answers only its own page.
 - `apps/web/test`: the two engines against one suite (see above); the stores (library, scan,
   review, fix, undo, the history, a page that is opened again) against both engines; the app's
-  own sums and words (states, plans, advice, what a run was and what its undo does). In a
+  own sums and words (states, plans, advice, what a run was and what its undo does). The
+  folders across a reload, over a memory that is a list: what is kept, what waits for the
+  browser's OK, what is to be added again and takes its settings back. In a
   browser that lets a page edit folders: one project fixed alone through the app's state, the
   folders that say what is installed, and an upgrade that is planned, written and taken back.
-- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 257 tests.
+- `bun run test:web`: the built app in Playwright's Chromium, WebKit and Firefox, 270 tests.
   - On its own: folders through the folder upload and by drops (with names a handle would hide,
     and an app as a folder; drops only in Chromium, which lets a test drop a folder), the
     overview, the tabs with search and filters, the side panels, a downloaded report, the hints.
@@ -429,6 +460,15 @@ there.
     downloaded, a step shown in Finder, an undo that asks first and is then seen everywhere.
   - The settings: what livesaver found, a folder shown in Finder, the reset to the command
     line's settings; what every page says when livesaver is gone, or was started again.
+  - The folders across a reload, with the browser's own database: in the three engines the
+    lists with what was typed and ticked, a folder that is added again, one that is removed.
+    In Chromium with a profile that is kept (a context of Playwright is a private window): a
+    project folder chosen for editing is back and scanned; a dropped folder of the disk is
+    back, and the test browser refuses when asked for it; one with names a kept folder would
+    hide waits to be dropped again. In a private window no handle is kept, the page comes up
+    at once, and its folder access keeps answering. **That a person's browser asks, and reads
+    the folder once allowed, is not covered by a test**; it was seen in Brave itself, run with
+    a profile of its own.
   - Where Ableton's own folders lie, in the three engines: the Live app's `Contents` folder and
     `Music/Ableton` are placed by what the sets store, and a path typed for the app's folder
     may be any path into the app. In Chromium, the review of a fix in the page shows those

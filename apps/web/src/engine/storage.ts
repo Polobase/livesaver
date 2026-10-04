@@ -30,6 +30,15 @@ export function canWriteHere(): boolean {
 }
 
 /**
+ * A dropped folder also comes as a handle (Chrome, Edge): the page can keep it, and read the
+ * folder again on a later visit. Without that, a folder is handed over for one visit.
+ */
+export function keepsDroppedFolders(): boolean {
+  const item = (globalThis as { DataTransferItem?: { prototype: object } }).DataTransferItem
+  return item !== undefined && 'getAsFileSystemHandle' in item.prototype
+}
+
+/**
  * Lets the user choose a folder the page may edit, with the browser's own folder dialog; the
  * browser asks whether the page may. `undefined`: the dialog was closed without a folder.
  */

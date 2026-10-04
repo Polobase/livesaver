@@ -3,7 +3,13 @@ import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { copyFixtures, tempDir, uploadedFolder, writeFile } from '@livesaver/test-kit'
-import { type FolderSource, foldersFromDrop, WebFs } from '../src/index.js'
+import {
+  type FolderSource,
+  foldersFromDrop,
+  hiddenByHandle,
+  lostBehindHandle,
+  WebFs,
+} from '../src/index.js'
 
 let tmp: { path: string; cleanup: () => void }
 let samples: string
@@ -47,6 +53,7 @@ function entryOf(path: string, isDirectory: boolean): unknown {
 interface Item {
   kind: string
   webkitGetAsEntry: () => unknown
+  getAsFileSystemHandle?: () => Promise<unknown>
 }
 
 const folder = (dir: string): Item => ({ kind: 'file', webkitGetAsEntry: () => entryOf(dir, true) })
@@ -121,4 +128,58 @@ test('several folders can be dropped at once; dropped files and text are not fol
   ])
   expect(sources.map((s) => `${s.kind} ${s.name}`)).toEqual(['listing Lib1', 'listing Lib2'])
   expect([...listing(sources[0]).paths].sort()).toEqual(['Kick/1.wav', 'Kick/1.wav.asd'])
+})
+
+test('where the browser also hands out a handle for a dropped folder, it is taken along', async () => {
+  const handle = { kind: 'directory', name: 'Lib1', values: async function* () {} }
+  const [kept, system, none, plain] = await drop([
+    { ...folder(join(samples, 'Lib1')), getAsFileSystemHandle: async () => handle },
+    // A folder of the system: the browser hands out no handle for it, or fails to.
+    { ...folder(join(samples, 'Lib2')), getAsFileSystemHandle: async () => null },
+    {
+      ...folder(join(samples, 'Lib1', 'Kick')),
+      getAsFileSystemHandle: () => Promise.reject(new Error('not allowed')),
+    },
+    // A browser that knows no handles.
+    folder(samples),
+  ])
+  expect(listing(kept).kept).toBe(handle as never)
+  // The folder is read through its entries all the same: they show every file.
+  expect(listing(kept).paths).toContain('Kick/1.wav')
+  expect([listing(system).kept, listing(none).kept, listing(plain).kept]).toEqual([
+    undefined,
+    undefined,
+    undefined,
+  ])
+})
+
+test('a browser that never hands out the handle does not keep the dropped folder from arriving', async () => {
+  // (Seen in a private window of Chromium, once its folder access has stopped answering.)
+  const [source] = await drop([
+    { ...folder(join(samples, 'Lib1')), getAsFileSystemHandle: () => new Promise(() => {}) },
+  ])
+  expect(listing(source).paths).toContain('Kick/1.wav')
+  expect(listing(source).kept).toBeUndefined()
+})
+
+test('which names a handle hides, and how many files of a folder that costs', () => {
+  expect(
+    ['Kick.wav', 'Claps:Snares', ' clap.wav', 'clap.wav ', 'a?.wav', 'Icon\r', 'a|b'].map(
+      hiddenByHandle,
+    ),
+  ).toEqual([false, true, true, true, true, true, true])
+  expect(
+    lostBehindHandle([
+      'Kick/1.wav',
+      // Everything below a folder with such a name is gone with it.
+      'Claps:Snares/a.wav',
+      'Claps:Snares/b.wav',
+      'Loops/ lead.wav',
+      // What a scan passes over anyway is no loss: a folder's icon, what lies in a hidden folder.
+      'Loops/Icon\r',
+      '.Trash/a:b.wav',
+      'Loops/._a:b.wav',
+    ]),
+  ).toBe(3)
+  expect(lostBehindHandle(['Kick/1.wav', 'Loops/2.wav'])).toBe(0)
 })

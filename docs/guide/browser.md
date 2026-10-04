@@ -47,6 +47,23 @@ Worth adding as sample folders:
 
 Until Live's own content is there, the page says that samples of the Core Library cannot be found.
 
+## Your folders on your next visit
+
+The page keeps the list of your folders in your browser: with the paths you typed, the ticks, and how a scan matches. What it can keep of a folder itself depends on how the browser handed it over:
+
+| The folder was | After a reload, or on your next visit |
+|---|---|
+| dropped on the page in Chrome, Edge or Brave | It is read again. Your browser may want to be asked first: press **Allow**. (Chrome offers "Allow on every visit".) |
+| chosen for editing, with fixing in the page switched on | The same. |
+| chosen with **Add folder**, or dropped in Safari or Firefox | Its row is there with its settings, and waits: add the folder again. A browser hands a page such a folder for one visit. |
+
+So drop the folders you want kept. Two kinds of folders a browser does not keep even then, and their rows say so:
+
+- A folder with files whose names a browser hides in a folder it keeps (a "/" as Finder shows it, or a space at the start or end of a name). Read again that way, the scan would not see those files, so the page asks for the folder to be dropped again instead, and says how many files it is about.
+- The Live app.
+
+In a private window the page keeps the list, and no folder. To make the page forget a folder, remove it from its list.
+
 ## Where a folder lies
 
 A browser does not tell a page where a folder lies on your disk, but sets refer to their samples by where they lie. livesaver works it out from the sets themselves: for your project folders, and for Ableton's own (the Live app, the User Library, the Factory Packs). For another folder you can type its path (**Set path**), which makes the result the same as on the command line.

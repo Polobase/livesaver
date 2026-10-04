@@ -1,7 +1,7 @@
 /** The folders and options of a scan: project folders, sample folders, and how to match. */
 import type { FolderSource } from '@livesaver/web'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { BrowserEngine } from '../engine/browser.js'
 import type {
   FolderAccess,
@@ -38,10 +38,27 @@ export const useLibraryStore = defineStore('library', () => {
     kind === 'projects' ? projects : kind === 'search' ? search : installed
 
   function init(start: Start): void {
-    projects.value = start.projects.map((folder) => ({ ...folder, holds: [], exists: true }))
+    projects.value = start.projects.map((folder) => ({ holds: [], exists: true, ...folder }))
     search.value = [...start.search]
+    installed.value = [...(start.installed ?? [])]
     options.value = { ...start.options }
     suggested.value = start.suggested
+    // A folder of the last visit behind a handle: what the page may do in it now is asked.
+    for (const folder of [...projects.value, ...search.value, ...installed.value])
+      if (folder.access === 'ask') void access(folder.id)
+  }
+
+  /**
+   * In a browser the folders are noted for the next visit after every change: the lists, what
+   * was typed and ticked, and of each folder what the browser lets a page keep.
+   */
+  function remember(): void {
+    if (engines.kind !== 'browser') return
+    void (engines.engine() as BrowserEngine).keep({
+      projects: projects.value,
+      search: search.value,
+      installed: installed.value,
+    })
   }
 
   /** Adds a folder of this computer by what its listing says (its path names it). */
@@ -72,10 +89,43 @@ export const useLibraryStore = defineStore('library', () => {
   function addSources(kind: FolderKind, sources: readonly FolderSource[]): void {
     const engine = engines.engine() as BrowserEngine
     const folders = list(kind)
-    const added = sources.map((source) => engine.add(source, kind))
-    folders.value = [...folders.value, ...added]
+    const added: KnownFolder[] = []
+    for (const source of sources) {
+      const folder = engine.add(source, kind)
+      // A folder of the last visit that was waiting to be added again: this is it. It takes
+      // the place it had, with the path that was typed for it and its tick.
+      const before = folders.value.find(
+        (known) => known.waits === 'folder' && known.name === folder.name,
+      )
+      if (!before) {
+        folders.value = [...folders.value, folder]
+      } else {
+        engine.remove(before.id)
+        const again = { ...folder, path: before.path, vendor: before.vendor }
+        folders.value = folders.value.map((known) => (known === before ? again : known))
+      }
+      added.push(folder)
+    }
+    remember()
     // What the page may do in a folder behind a handle, the browser says when asked.
     for (const folder of added) if (folder.access === 'ask') void access(folder.id)
+  }
+
+  /**
+   * Asks the user of the browser to let the page read a folder of the last visit again. To be
+   * called from a click: a browser asks its user only then. `false`: it was not allowed.
+   */
+  async function allow(id: string): Promise<boolean> {
+    const engine = engines.engine() as BrowserEngine
+    if (!(await engine.allow(id))) return false
+    for (const folders of [projects, search, installed])
+      folders.value = folders.value.map((folder) => {
+        if (folder.id !== id) return folder
+        const { waits: _waits, ...there } = folder
+        return { ...there, access: 'ask' as const }
+      })
+    await access(id)
+    return true
   }
 
   const set = (id: string, access: FolderAccess) => update(id, { access })
@@ -101,6 +151,7 @@ export const useLibraryStore = defineStore('library', () => {
     const folders = list(kind)
     folders.value = folders.value.filter((folder) => folder.id !== id)
     if (engines.kind === 'browser') (engines.engine() as BrowserEngine).remove(id)
+    remember()
   }
 
   function update(
@@ -111,28 +162,51 @@ export const useLibraryStore = defineStore('library', () => {
       folders.value = folders.value.map((folder) =>
         folder.id === id ? { ...folder, ...change } : folder,
       )
+    // (What the page may do in a folder is asked anew on every visit: nothing to note.)
+    if ('path' in change || 'vendor' in change) remember()
   }
+
+  // How a scan matches is noted with the folders (livesaver on the computer keeps its own).
+  watch(
+    options,
+    (now) => {
+      if (engines.kind === 'browser') (engines.engine() as BrowserEngine).keepOptions(now)
+    },
+    { deep: true },
+  )
+
+  /** The folders a scan can read: not those of the last visit that still wait. */
+  const there = (folders: readonly KnownFolder[]) => folders.filter((folder) => !folder.waits)
+  /** Folders of the last visit that the browser wants to be asked for again. */
+  const asleep = computed(() =>
+    [...projects.value, ...search.value, ...installed.value].filter(
+      (folder) => folder.waits === 'permission',
+    ),
+  )
 
   const request = computed<ScanRequest>(() => {
     const plain = ({ id, name, path, vendor }: KnownFolder) => ({ id, name, path, vendor })
+    const told = there(installed.value)
     return {
-      projects: projects.value.map(plain),
-      search: search.value.map(plain),
-      ...(installed.value.length ? { installed: installed.value.map(plain) } : {}),
+      projects: there(projects.value).map(plain),
+      search: there(search.value).map(plain),
+      ...(told.length ? { installed: told.map(plain) } : {}),
       options: { ...options.value },
     }
   })
 
-  const canScan = computed(() => projects.value.length > 0)
+  const canScan = computed(() => there(projects.value).length > 0)
   /** What a complete scan needs and is not among the sample folders yet. */
-  const wanted = computed(() => wantedOf(search.value))
+  const wanted = computed(() => wantedOf(there(search.value)))
   /** A folder is marked as holding installed libraries, so the rules for vendors' files apply. */
   const libraryMarked = computed(() => search.value.some((folder) => folder.vendor))
   /** Live's own content always counts as installed: there is nothing to tick for it. */
   const isLiveContent = (folder: KnownFolder) => folder.holds.includes(LIVE_CONTENT)
 
   /** What the folders that say what is installed hold, taken together. */
-  const installedHolds = computed(() => new Set(installed.value.flatMap((folder) => folder.holds)))
+  const installedHolds = computed(
+    () => new Set(there(installed.value).flatMap((folder) => folder.holds)),
+  )
 
   return {
     projects,
@@ -146,6 +220,8 @@ export const useLibraryStore = defineStore('library', () => {
     addPath,
     addSources,
     access,
+    allow,
+    asleep,
     allowEditing,
     remove,
     update,

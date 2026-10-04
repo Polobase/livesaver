@@ -268,7 +268,11 @@ for (const [name, type] of ENGINES) {
           timeout: 30_000,
         })
         await page.getByRole('checkbox', { name: 'Massive' }).waitFor()
-        expect(await page.getByRole('checkbox', { name: 'Serum' }).count()).toBe(0)
+        // (The headline read the same before, with Massive unticked: the new plan is there
+        // once Serum is gone from it.)
+        await page
+          .getByRole('checkbox', { name: 'Serum' })
+          .waitFor({ state: 'detached', timeout: 30_000 * PATIENCE })
 
         await page
           .getByTestId('upgraded')
