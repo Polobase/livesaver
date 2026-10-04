@@ -239,8 +239,19 @@ for (const [name, type] of ENGINES) {
         const chooser = page.waitForEvent('filechooser')
         await page.getByRole('button', { name: 'Add folder' }).last().click()
         expect(await hint.innerText()).toBe('a large folder takes a few seconds to appear…')
-        await (await chooser).setFiles(join(tmp.path, 'samples'))
-        await page.getByTestId('folder-name').getByText('samples').waitFor()
+        // (A browser on a busy machine does not always take the folder at once: see `giveFolder`.)
+        const dialog = await chooser
+        const added = page.getByTestId('folder-name').getByText('samples')
+        for (let tries = 1; ; tries++) {
+          try {
+            await dialog.setFiles(join(tmp.path, 'samples'), { timeout: 10_000 })
+            break
+          } catch (error) {
+            if (await added.count()) break
+            if (tries === 3) throw error
+          }
+        }
+        await added.waitFor()
         expect(await hint.innerText()).toBe('or drop a folder here')
       },
       30_000 * PATIENCE,

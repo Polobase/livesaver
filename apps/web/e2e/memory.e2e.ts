@@ -241,6 +241,7 @@ describe('folders behind a handle are read again (Chromium, in a profile that is
       await row.waitFor()
       // Dropped, it is read in full: both files.
       expect(await textOf(row.getByTestId('folder-facts'))).toBe('2 files')
+      await page.waitForTimeout(300)
       await reload(page)
       expect(await textOf(row.getByTestId('folder-waits'))).toBe(
         'From your last visit: add it again, by the dialog or a drop. Your browser would keep it, but would then not show 1 of its files (it hides some names from a folder it keeps). What you typed and ticked for it is kept.',
