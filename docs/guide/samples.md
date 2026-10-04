@@ -43,7 +43,7 @@ You can fix all projects, one (the **Fix** button on its row, or in its panel), 
 A fix does what Live's *Collect All and Save* does, for every project:
 
 - A sample from outside the project is copied to `Samples/Imported` in the project, with its analysis file (`.asd`). A Max for Live device goes to the project's `Presets` folder.
-- The set is rewritten to point at the copy. Only the bytes of the references change; everything else in the set stays as Live saved it.
+- The set is rewritten to point at the copy. Only the bytes of the references change; everything else in the set stays as Live saved it. In Finder the set then shows the date of the fix.
 - Before that, the set as it was is copied to the project's `Backup` folder, named with date and time, as Live names its own backups.
 - A file of a pack or of the Core Library that is larger than 50 MB is not copied: the set points at it in the pack. You can change that limit in the settings.
 

@@ -1,7 +1,14 @@
 /** Console summary of a doctor/collect run. */
 import { isComplete, type Project, type SetResult } from './collect.js'
 import type { Status } from './match.js'
-import { FOUND_NAMES, foundSources, KIND_NAMES, libraryGroups, missingGroups } from './sources.js'
+import {
+  FOUND_NAMES,
+  foundSources,
+  KIND_NAMES,
+  LIBRARY_RULE,
+  libraryGroups,
+  missingGroups,
+} from './sources.js'
 
 export function totalCounts(results: readonly SetResult[]): Record<Status, number> {
   const total: Record<Status, number> = {
@@ -51,6 +58,17 @@ export function summary(
     `  not found ................ ${c['not-found']}`,
     `  ambiguous ................ ${c.ambiguous}`,
     `  different content ........ ${c.mismatch}`,
+  )
+  // Files of an installed library that its vendor re-saved: there, but not confirmed.
+  const inLibrary = results.reduce(
+    (n, r) => n + (r.error ? 0 : r.missing.filter((m) => m.choice.libraryFile).length),
+    0,
+  )
+  if (inLibrary > 0)
+    lines.push(
+      `    in an installed library  ${inLibrary}  (${LIBRARY_RULE} takes them, as uncertain matches)`,
+    )
+  lines.push(
     `Copies: ${files} file${files === 1 ? '' : 's'} (${gigabytes} GB) ${apply ? 'copied' : 'would be copied'} into projects`,
     `Sets ${apply ? 'changed' : 'that would change'}: ${changed.length}`,
   )

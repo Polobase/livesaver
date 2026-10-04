@@ -15,7 +15,8 @@ livesaver edits the files your music lives in. These are the rules it keeps, so 
 - **The result is checked before it replaces the set.** It has to be well-formed, with as many references and devices as before, and every changed reference has to lead to its file.
 - **A backup beside every set.** The set as it was goes to the project's `Backup` folder, named with date and time, as Live names its own backups.
 - **The original is kept as well**, in livesaver's own folder. Live keeps only its newest backups; an undo works after Live has thinned them out.
-- **Written in one step.** The new set is written beside the old one and then takes its place, so there is never a half-written set. Finder tags, comments and dates stay.
+- **Written in one step.** The new set is written beside the old one and then takes its place, so there is never a half-written set. Finder tags and comments stay.
+- **Dated as what it is.** A set that was rewritten carries the date of the fix, as a set does that you save in Live. Its backup keeps the date the set had, and an undo gives the set that date back.
 - **A set that changed in the meantime is left alone.** Between planning and writing, the set must still be the one that was planned for.
 
 ## Afterwards

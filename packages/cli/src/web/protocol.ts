@@ -185,7 +185,7 @@ export interface WebUndone {
   readonly restored: number
   /** Copied files moved to the Trash. */
   readonly trashed: number
-  /** Copied files that stay: another set uses them by now. */
+  /** Copied files that stay: a set that was changed since the run uses them. */
   readonly kept: number
   /** Things changed since the run, which were left alone. */
   readonly changedSince: readonly string[]

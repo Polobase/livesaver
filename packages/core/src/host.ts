@@ -79,9 +79,12 @@ export interface FsWrite {
   copyFile(source: string, destination: string): Promise<void>
   /**
    * Replace an existing file's content atomically, keeping its extended attributes (Finder tags and
-   * comments), mode, and access/modification times.
+   * comments) and mode. Like any file that is saved, it then carries the time of the write: a set
+   * that was rewritten says so in Finder. `modified` (nanoseconds since the epoch) gives it another
+   * time instead: an undo puts back the time the original had. A host that cannot set times
+   * (a browser) ignores it.
    */
-  replaceFile(path: string, data: Uint8Array): Promise<void>
+  replaceFile(path: string, data: Uint8Array, modified?: bigint): Promise<void>
   /** Create a new file; fails if it exists. */
   writeNew(path: string, data: Uint8Array | string): Promise<void>
   /** Append a line and flush it to disk (journals must survive a crash). */

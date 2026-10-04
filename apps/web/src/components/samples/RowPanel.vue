@@ -21,6 +21,10 @@ const open = computed({
   },
 })
 const title = computed(() => props.change?.name ?? props.missing?.name ?? '')
+/** The files of the same name that are not it, without the one a library offers. */
+const others = computed(() =>
+  (props.missing?.candidates ?? []).filter((file) => file !== props.missing?.libraryFile),
+)
 const subtitle = computed(() =>
   props.change
     ? (ACTION_LABEL[props.change.action] ?? props.change.action)
@@ -104,11 +108,21 @@ const subtitle = computed(() =>
               </ul>
             </dd>
           </div>
-          <div v-if="missing.candidates.length">
+          <div v-if="missing.libraryFile" data-testid="library-file">
+            <dt class="text-muted">In your installed library, re-saved by its vendor</dt>
+            <dd class="break-all text-highlighted">
+              {{ missing.libraryFile }} <RevealLink :path="missing.libraryFile" />
+            </dd>
+            <dd class="text-muted">
+              The same name and place, another fingerprint. “Also accept a library file with another
+              fingerprint” takes it, as an uncertain match.
+            </dd>
+          </div>
+          <div v-if="others.length">
             <dt class="text-muted">Files of this name that were found, and are not it</dt>
             <dd>
               <ul>
-                <li v-for="file in missing.candidates" :key="file" class="break-all">
+                <li v-for="file in others" :key="file" class="break-all">
                   {{ file }} <RevealLink :path="file" />
                 </li>
               </ul>

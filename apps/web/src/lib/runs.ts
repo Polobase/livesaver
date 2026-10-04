@@ -195,14 +195,19 @@ export function outcomeFacts(run: Run): RunFact[] {
   }))
 }
 
-/** What an undo of a run does, line by line, to read before it is done. */
+/**
+ * What an undo of a run does, line by line, to read before it is done: of a run that was undone
+ * in part, what is left to take back.
+ */
 export function undoLines(run: Run, where: EngineKind = 'computer'): string[] {
+  // (A livesaver from before this was told says nothing of what stands: then it is all of it.)
+  const { sets, files } = run.standing ?? run
   return [
-    run.sets
-      ? `${plural(run.sets, 'set goes', 'sets go')} back to what ${run.sets === 1 ? 'it was' : 'they were'} before the run, from the originals livesaver kept.`
+    sets
+      ? `${plural(sets, 'set goes', 'sets go')} back to what ${sets === 1 ? 'it was' : 'they were'} before the run, from the originals livesaver kept.`
       : '',
-    run.files
-      ? `${plural(run.files, 'copied file is', 'copied files are')} ${TAKEN_OUT[where]}, unless another set uses ${run.files === 1 ? 'it' : 'them'} by now.`
+    files
+      ? `${plural(files, 'copied file is', 'copied files are')} ${TAKEN_OUT[where]}, unless a set that was changed since the run uses ${files === 1 ? 'it' : 'them'}.`
       : '',
     run.renames
       ? `${plural(run.renames, 'file or folder that was moved goes', 'files or folders that were moved go')} back to where ${run.renames === 1 ? 'it was' : 'they were'}.`
@@ -230,6 +235,7 @@ export const STEP_LABEL: Readonly<Record<string, string>> = {
 const UNDONE: Readonly<Record<string, string>> = {
   restored: 'restored',
   'renamed-back': 'moved back',
+  gone: 'was gone already',
   'changed-since': 'changed since, left alone',
 }
 

@@ -105,7 +105,7 @@ export class NodeFsWrite implements FsWrite {
     }
   }
 
-  async replaceFile(path: string, data: Uint8Array): Promise<void> {
+  async replaceFile(path: string, data: Uint8Array, modified?: bigint): Promise<void> {
     const target = await realpath(path) // write through symlinks instead of replacing them
     const before = await stat(target, { bigint: true })
     const tmp = join(dirname(target), `.${basename(target)}.livesaver-tmp`)
@@ -122,7 +122,8 @@ export class NodeFsWrite implements FsWrite {
       } finally {
         await handle.close()
       }
-      await setTimes(tmp, before.atimeNs, before.mtimeNs)
+      // Written just now, the file says so; only an undo gives it the time of what it puts back.
+      if (modified !== undefined) await setTimes(tmp, before.atimeNs, modified)
       await rename(tmp, target)
     } finally {
       await rm(tmp, { force: true })

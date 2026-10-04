@@ -7,7 +7,7 @@ import type { Action, SetResult } from './collect.js'
 import { MISSING_STATES, type Status } from './match.js'
 import type { Probe } from './probe.js'
 import {
-  HINTS,
+  hintOf,
   KIND_NAMES,
   type Library,
   type LibraryKind,
@@ -15,6 +15,14 @@ import {
   type MissingGroup,
   missingGroups,
 } from './sources.js'
+
+/** What to do about a kind of source: what its libraries are told, taken together. */
+const kindHint = (kind: LibraryKind, libs: readonly Library[]) =>
+  hintOf({
+    kind,
+    samples: libs.reduce((n, lib) => n + lib.samples, 0),
+    inLibrary: libs.reduce((n, lib) => n + lib.inLibrary, 0),
+  })
 
 const MAX_LISTED = 30
 
@@ -196,11 +204,13 @@ function overview(
     '|---|---:|---:|---|',
   ]
   for (const k of order)
-    md.push(`| ${TITLES[k]} | ${n((kinds.get(k) ?? []).length)} | ${n(total(k))} | ${HINTS[k]} |`)
+    md.push(
+      `| ${TITLES[k]} | ${n((kinds.get(k) ?? []).length)} | ${n(total(k))} | ${kindHint(k, kinds.get(k) ?? [])} |`,
+    )
   md.push('', '## Largest gaps', '')
   for (const [i, lib] of libraries.slice(0, 10).entries()) {
     md.push(
-      `${i + 1}. **${lib.name}** (${TITLES[lib.kind]}): ${n(lib.samples)} samples in ${n(lib.projects.size)} projects – ${HINTS[lib.kind]}`,
+      `${i + 1}. **${lib.name}** (${TITLES[lib.kind]}): ${n(lib.samples)} samples in ${n(lib.projects.size)} projects – ${hintOf(lib)}`,
     )
   }
   md.push('', 'After getting them, run again; pass new folders with `--search <path>`.', '')
@@ -226,7 +236,7 @@ function overview(
   for (const k of order) {
     const libs = kinds.get(k) ?? []
     const first = firstColumn[k] ?? 'Source'
-    md.push(`## ${TITLES[k]}`, '', `*What to do:* ${HINTS[k]}`, '')
+    md.push(`## ${TITLES[k]}`, '', `*What to do:* ${kindHint(k, libs)}`, '')
     if (libs.length > 25) {
       md.push(...mdTable(libs.slice(0, 25), first, base))
       md.push('', `<details><summary>All ${libs.length}</summary>`, '')
@@ -317,7 +327,7 @@ export async function buildReports(
       lib.projects.size,
       folders,
       lib.examples.join(', '),
-      HINTS[lib.kind],
+      hintOf(lib),
       listing([...lib.projects].map((p) => display(p, base))),
     ])
   }

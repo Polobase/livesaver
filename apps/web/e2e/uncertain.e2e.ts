@@ -77,9 +77,22 @@ describe('a library with uncertain matches (Chromium)', () => {
   test(
     'the review says what a fix does with the uncertain matches and without',
     async () => {
-      await page.getByRole('switch', { name: /Also accept a library file/ }).click()
       await page.getByTestId('scan-library').click()
       await page.getByTestId('fix-card').waitFor({ timeout: 30_000 * PATIENCE })
+      // A sample of the installed library was re-saved by its vendor: nothing confirms it, so
+      // it counts as missing. The scan says that it is there, and takes it when asked.
+      expect(await textOf(page.getByTestId('fix-card'))).not.toContain('Uncertain matches')
+      const hint = page.getByTestId('missing-card').getByTestId('library-files')
+      expect(await textOf(hint)).toContain(
+        '1 of these is in your installed libraries, at the same place and under the same name, but re-saved by its vendor',
+      )
+      expect(await barriers(page)).toEqual([])
+      await hint.getByTestId('take-library-files').click()
+      await page
+        .getByTestId('fix-card')
+        .getByText('Uncertain matches')
+        .waitFor({ timeout: 30_000 * PATIENCE })
+      expect(await page.getByTestId('library-files').count()).toBe(0)
       expect(await textOf(page.getByTestId('fix-card'))).toContain('Uncertain matches 1')
       await page.getByTestId('review').click()
       const dialog = page.getByRole('dialog')

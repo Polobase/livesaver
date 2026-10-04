@@ -11,7 +11,7 @@ import { MISSING_STATES, type Status } from './match.js'
 import {
   FOUND_NAMES,
   foundSources,
-  HINTS,
+  hintOf,
   KIND_NAMES,
   type LibraryKind,
   libraryGroups,
@@ -32,6 +32,23 @@ export interface SourceRow {
    * library the samples came from (sources of missing samples only, else '').
    */
   readonly advice: LibraryKind | ''
+  /**
+   * How many of its missing samples lie in an installed library with another fingerprint: the
+   * rule for library files (`matchLibraryPath`) takes those. The source is then not something
+   * to get, but something that is there in another version.
+   */
+  readonly inLibrary: number
+}
+
+/** What the rule for library files would repair that is missing while it is off. */
+export interface LibraryFiles {
+  /** Distinct missing samples that have a library file. */
+  readonly samples: number
+  /** References to them, counted per set like every other count. */
+  readonly references: number
+  /** Sets with such a reference, and those of them that would then be complete. */
+  readonly sets: number
+  readonly completeSets: number
 }
 
 /** What a fix does when uncertain matches are left out (`certainOnly`). */
@@ -89,6 +106,11 @@ export interface MissingRow {
   /** The sets that use it (their `path` in `setRows`). */
   readonly usedBy: readonly string[]
   readonly candidates: readonly string[]
+  /**
+   * The file in an installed library that the rule for library files would take for it: the
+   * same name and place, another fingerprint ('' = there is none, or the rule is on).
+   */
+  readonly libraryFile: string
 }
 
 export interface ChangeRow {
@@ -120,6 +142,7 @@ export interface CheckView {
   readonly copyBytes: number
   readonly changingSets: number
   readonly certain: CertainPlan
+  readonly libraryFiles: LibraryFiles
   readonly missingSources: readonly SourceRow[]
   readonly foundSources: readonly SourceRow[]
   readonly projectRows: readonly ProjectRow[]
@@ -177,6 +200,14 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
   })
   const total = (count: (plan: CertainPlan) => number) =>
     projectRows.reduce((n, project) => n + count(project.certain), 0)
+  /** Per set: its missing references, and how many of them a library file would repair. */
+  const offered = r.results
+    .filter((set) => !set.error)
+    .map((set) => ({
+      missing: set.missing.length,
+      inLibrary: set.missing.filter((m) => m.choice.libraryFile).length,
+    }))
+    .filter((set) => set.inLibrary > 0)
   return {
     base: r.base,
     seconds: r.ms / 1000,
@@ -197,13 +228,20 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
       copyFiles: total((plan) => plan.copyFiles),
       copyBytes: total((plan) => plan.copyBytes),
     },
+    libraryFiles: {
+      samples: groups.filter((g) => g.choice.libraryFile).length,
+      references: offered.reduce((n, set) => n + set.inLibrary, 0),
+      sets: offered.length,
+      completeSets: offered.filter((set) => set.inLibrary === set.missing).length,
+    },
     missingSources: libraryGroups(groups).map((lib) => ({
       kind: KIND_NAMES[lib.kind],
       name: lib.name,
       samples: lib.samples,
       projects: lib.projects.size,
-      hint: HINTS[lib.kind],
+      hint: hintOf(lib),
       advice: lib.kind,
+      inLibrary: lib.inLibrary,
     })),
     foundSources: foundSources(r.results, env, r.index.roots).map((f) => ({
       kind: FOUND_NAMES[f.kind],
@@ -212,6 +250,7 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
       projects: f.projects.size,
       hint: '',
       advice: '' as const,
+      inLibrary: 0,
     })),
     projectRows,
     setRows: r.results.map((s) => ({
@@ -238,6 +277,7 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
         projects: g.projects.size,
         usedBy: [...g.sets].map(rel),
         candidates: g.choice.candidates.slice(0, 10),
+        libraryFile: g.choice.libraryFile,
       }
     }),
     changes: r.results.flatMap((s) =>

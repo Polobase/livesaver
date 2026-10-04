@@ -90,8 +90,8 @@ async function undo(run: Run): Promise<void> {
             {{ plural(history.undone.result.trashed, 'file') }}
             {{ TAKEN_OUT[engines.kind]
             }}<template v-if="history.undone.result.kept"
-              >, {{ plural(history.undone.result.kept, 'file') }} kept (used by a set by
-              now)</template
+              >, {{ plural(history.undone.result.kept, 'file') }} kept (used by a set that was
+              changed since)</template
             >.
           </template>
           <template

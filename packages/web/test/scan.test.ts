@@ -104,7 +104,15 @@ describe('a scan in the page', () => {
       },
     ])
     expect(result.foundSources).toEqual([
-      { kind: 'Folder', name: 'samples/Lib1', samples: 1, projects: 1, hint: '', advice: '' },
+      {
+        kind: 'Folder',
+        name: 'samples/Lib1',
+        samples: 1,
+        projects: 1,
+        hint: '',
+        advice: '',
+        inLibrary: 0,
+      },
     ])
     expect(result.setRows.map((s) => [s.path, s.live, s.changes])).toEqual([
       ['Brokenpath Project/Brokenpath.als', '12.4.6', 1],

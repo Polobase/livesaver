@@ -16,6 +16,7 @@ import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
 import TableToolbar from '../common/TableToolbar.vue'
 import FolderBrowser from '../library/FolderBrowser.vue'
+import LibraryFilesHint from './LibraryFilesHint.vue'
 
 const props = defineProps<{ scan: Scan }>()
 const emit = defineEmits<{ open: [row: MissingRow] }>()
@@ -113,7 +114,8 @@ function added(folder: FolderListing): void {
       <p v-else-if="groups.length === 0" class="p-6 text-center text-sm text-muted">
         Nothing matches.
       </p>
-      <ul v-else class="divide-y divide-default" data-testid="missing-groups">
+      <LibraryFilesHint :scan="scan" class="mx-4 mt-3 sm:mx-6" />
+      <ul v-if="groups.length" class="divide-y divide-default" data-testid="missing-groups">
         <li v-for="group in groups" :key="keyOf(group)" class="px-4 py-3 sm:px-6">
           <div class="flex flex-wrap items-start gap-x-4 gap-y-2">
             <button
@@ -141,6 +143,16 @@ function added(folder: FolderListing): void {
                 ·
                 {{ plural(group.source.projects, 'project') }}
               </span>
+              <UButton
+                v-if="adviceFor(group.source).accept"
+                size="xs"
+                color="neutral"
+                variant="subtle"
+                icon="i-lucide-library"
+                label="Take the installed files"
+                :disabled="scans.running"
+                @click="scans.acceptLibraryFiles()"
+              />
               <template v-if="adviceFor(group.source).addFolder">
                 <UButton
                   v-if="engines.capabilities.paths"

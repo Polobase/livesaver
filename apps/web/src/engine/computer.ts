@@ -83,6 +83,16 @@ const unwire = (request: WebRequest): ScanRequest => ({
 
 const scanOf = ({ scan, at }: Pick<WebLastScan, 'scan' | 'at'>): Scan => ({
   ...scan,
+  samples: {
+    ...scan.samples,
+    // (A livesaver from before it said what the rule for library files would repair.)
+    libraryFiles: scan.samples.libraryFiles ?? {
+      samples: 0,
+      references: 0,
+      sets: 0,
+      completeSets: 0,
+    },
+  },
   at,
   folders: [],
 })

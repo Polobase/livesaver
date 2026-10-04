@@ -13,13 +13,16 @@ import {
   writeSet,
 } from '@livesaver/test-kit'
 import {
+  buildReports,
   checkView,
   DEFAULT_PACK_LIMIT,
   type DoctorOptions,
   doctor,
   type EnvConfig,
   Environment,
+  hintOf,
   Probe,
+  summary,
 } from '../src/index.js'
 
 const ENV: EnvConfig = {
@@ -181,4 +184,81 @@ test('the plan says what a fix does without the uncertain matches, and such a fi
   expect(certain.missing.map((m) => [m.status, m.name, m.sets, m.candidates])).toEqual([
     ['mismatch', 'Shaker 1.wav', 2, [join(library, shaker)]],
   ])
+  // (Nothing is offered where only confirmed files count, or where the rule is on already.)
+  expect([certain.libraryFiles.samples, plan.libraryFiles.samples]).toEqual([0, 0])
+
+  // With the rule off, the scan says what the rule would repair: exactly what it then repairs.
+  const off = await view([library], { ...options, matchLibraryPath: false })
+  expect(off.libraryFiles).toEqual({ samples: 1, references: 2, sets: 2, completeSets: 2 })
+  expect(off.libraryFiles.references).toBe(plan.uncertain)
+  expect(off.libraryFiles.completeSets).toBe(plan.completeSets - off.completeSets)
+  expect(off.missing.map((m) => [m.status, m.name, m.libraryFile])).toEqual([
+    ['mismatch', 'Shaker 1.wav', join(library, shaker)],
+  ])
+  // The library is installed, in another version: it is not something to go and install.
+  expect(off.missingSources.map((s) => [s.name, s.samples, s.inLibrary, s.hint])).toEqual([
+    [
+      'Drum Library',
+      1,
+      1,
+      'Installed in another version (its vendor re-saved the files): --match-library-path takes them, as uncertain matches',
+    ],
+  ])
+})
+
+test('the command line and the report files say it too', async () => {
+  const shaker = join('Drum Library', 'Samples', 'Drums', 'Shaker', 'Shaker 1.wav')
+  const library = join(tmp.path, 'NI')
+  const old = new TextEncoder().encode(`RIFF${'shaker '.repeat(400)}tags 1.0`)
+  writeFile(
+    join(library, shaker),
+    new TextEncoder().encode(`RIFF${'shaker '.repeat(400)}tags 1.1!`),
+  )
+  writeSet(
+    join(makeProject(projects, 'Old'), 'Old.als'),
+    deviceSet(`/Volumes/Old Disk/Maschine Library/${shaker}`, old.length, liveCrc(old)).replaceAll(
+      'MxPatchRef',
+      'SampleRef',
+    ),
+  )
+  const host = createNodeHost()
+  const probe = new Probe(host.fs, host.hash)
+  const result = await doctor(host, {
+    targets: [join(projects, 'Old Project')],
+    searchRoots: [library],
+    env: { ...ENV, vendorLibraries: [library] },
+    probe,
+  })
+  const lines = summary(result.results, result.projects, false).split('\n')
+  const at = lines.findIndex((line) => line.startsWith('  different content'))
+  expect(lines.slice(at, at + 2)).toEqual([
+    '  different content ........ 1',
+    '    in an installed library  1  (--match-library-path takes them, as uncertain matches)',
+  ])
+  const reports = await buildReports(result.results, result.base, probe)
+  const installed =
+    'Installed in another version (its vendor re-saved the files): --match-library-path takes them, as uncertain matches'
+  expect(reports['overview.md']).toContain(
+    `1. **Drum Library** (NI expansions (Native Access)): 1 samples in 1 projects – ${installed}`,
+  )
+  expect(reports['overview.md']).toContain(`*What to do:* ${installed}`)
+  expect(reports['missing_sources.csv']).toContain(installed)
+  // With the rule on there is nothing left to say.
+  const on = await doctor(host, {
+    targets: [join(projects, 'Old Project')],
+    searchRoots: [library],
+    env: { ...ENV, vendorLibraries: [library] },
+    matchLibraryPath: true,
+  })
+  expect(summary(on.results, on.projects, false)).not.toContain('in an installed library')
+})
+
+test('a source that is installed only in part says both: what is there, and what to get', () => {
+  const lib = { kind: 'ni-expansion' as const, samples: 5, inLibrary: 2 }
+  expect(hintOf(lib)).toBe(
+    'Installed in another version (its vendor re-saved the files): --match-library-path takes 2 of them, as uncertain matches. The rest: Install it in Native Access if it is in your NI account',
+  )
+  expect(hintOf({ ...lib, inLibrary: 0 })).toBe(
+    'Install it in Native Access if it is in your NI account',
+  )
 })

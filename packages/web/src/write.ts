@@ -163,6 +163,7 @@ export class WebFsWrite implements FsWrite {
     }
   }
 
+  // (A page cannot set a file's time: what it writes carries the time of the write, always.)
   async replaceFile(path: string, data: Uint8Array): Promise<void> {
     const { dir, name } = await this.parent(path, false)
     // It has to be there: a set is replaced, not made.

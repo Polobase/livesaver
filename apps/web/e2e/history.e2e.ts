@@ -308,7 +308,7 @@ for (const [name, type] of ENGINES) {
         expect(await confirm.getByRole('heading', { level: 2 }).innerText()).toBe('Undo this run?')
         expect(await textsOf(confirm.getByTestId('undo-lines').locator('li'))).toEqual([
           '2 sets go back to what they were before the run, from the originals livesaver kept.',
-          '2 copied files are moved to the Trash, unless another set uses them by now.',
+          '2 copied files are moved to the Trash, unless a set that was changed since the run uses them.',
           'What was changed since the run is left alone, and reported.',
         ])
         expect(await barriers(page)).toEqual([])

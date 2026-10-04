@@ -1,8 +1,8 @@
 /**
  * Sets that were complete with nothing to do, so later runs can skip them while nothing changed.
  * An entry is trusted only while the set's size, mtime and ctime are unchanged (ctime catches
- * rewrites that restore the mtime, as livesaver's own writes do), the pack limit is the same, and
- * every file it used still exists.
+ * rewrites that put an old mtime back, as an undo does), the pack limit is the same, and every
+ * file it used still exists.
  */
 import type { FileStat } from '@livesaver/core'
 import type { Status } from './match.js'

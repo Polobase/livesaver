@@ -221,6 +221,8 @@ export async function runCollect(
                 kind: m.ref.kind,
                 status: m.choice.status,
                 candidates: m.choice.candidates,
+                // The file of an installed library that --match-library-path would take.
+                ...(m.choice.libraryFile ? { libraryFile: m.choice.libraryFile } : {}),
               })),
             })),
           },

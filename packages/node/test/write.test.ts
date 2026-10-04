@@ -47,16 +47,29 @@ describe('copyFile', () => {
 })
 
 describe('replaceFile', () => {
-  ;(mac ? test : test.skip)('keeps Finder tags, times and mode; leaves no temp file', async () => {
+  ;(mac ? test : test.skip)('keeps Finder tags and mode; leaves no temp file', async () => {
     const set = writeFile(join(tmp.path, 'Song.als'), 'old set')
     utimesSync(set, 1_600_000_000, 1_600_000_000.5)
     expect(spawnSync('xattr', ['-w', TAGS, 'tagged', set]).status).toBe(0)
-    const before = mtimeUs(set)
     await fsw.replaceFile(set, new TextEncoder().encode('new set, longer than before'))
     expect(readFileSync(set, 'utf8')).toBe('new set, longer than before')
     expect(spawnSync('xattr', ['-p', TAGS, set], { encoding: 'utf8' }).stdout.trim()).toBe('tagged')
-    expect(Math.abs(mtimeUs(set) - before)).toBeLessThanOrEqual(1)
     expect(readdirSync(tmp.path)).toEqual(['Song.als'])
+  })
+
+  test('the file carries the time of the write, or the time it is given', async () => {
+    const set = writeFile(join(tmp.path, 'Song.als'), 'old set')
+    utimesSync(set, 1_600_000_000, 1_600_000_000.5)
+    const old = mtimeUs(set)
+    const started = Date.now()
+    await fsw.replaceFile(set, new TextEncoder().encode('fixed'))
+    // Rewritten now, it says now: a set that was fixed is seen as changed in Finder.
+    expect(mtimeUs(set) / 1000).toBeGreaterThanOrEqual(started - 1000)
+    expect(mtimeUs(set)).toBeGreaterThan(old)
+    // An undo puts back the time of the original with its content.
+    await fsw.replaceFile(set, new TextEncoder().encode('old set'), BigInt(old) * 1000n)
+    expect(readFileSync(set, 'utf8')).toBe('old set')
+    expect(Math.abs(mtimeUs(set) - old)).toBeLessThanOrEqual(1)
   })
 
   test('writes through a symlink instead of replacing it', async () => {

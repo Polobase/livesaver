@@ -135,6 +135,12 @@ export interface Choice {
   /** Library file with another fingerprint, accepted by its name and place in the library. */
   readonly libraryPath: boolean
   readonly candidates: readonly string[]
+  /**
+   * Of a reference that stays missing because nothing confirms a file: the library file that
+   * `matchLibraryPath` would take ('' = none, or the rule is on). It is what a user is told
+   * who has the library installed in another version than the set remembers.
+   */
+  readonly libraryFile: string
 }
 
 function choice(status: Status, extra: Partial<Choice> = {}): Choice {
@@ -147,6 +153,7 @@ function choice(status: Status, extra: Partial<Choice> = {}): Choice {
     sizeOnly: false,
     libraryPath: false,
     candidates: [],
+    libraryFile: '',
     ...extra,
   }
 }
@@ -231,6 +238,8 @@ export async function choose(
   let sizeOnly = false
   let libraryPath = false
   let good: string[] = candidates
+  /** Vendor library files with the name and the place of the reference, whatever they hold. */
+  let inLibrary: string[] = []
   if (verified) {
     const prints = await Promise.all(
       candidates.map(async (c) => [c, await probe.fingerprint(c)] as const),
@@ -264,8 +273,8 @@ export async function choose(
       verified = false
       sizeOnly = true
     }
-    if (good.length === 0 && !device && options.matchLibraryPath) {
-      good = prints
+    if (good.length === 0 && !device) {
+      inLibrary = prints
         .filter(
           ([c, fp]) =>
             fp &&
@@ -274,28 +283,58 @@ export async function choose(
             suffixLength(wanted, c) >= LIBRARY_PATH_LEVELS,
         )
         .map(([c]) => c)
-      sizeOnly = false
-      libraryPath = true
+      if (options.matchLibraryPath) {
+        good = inLibrary
+        sizeOnly = false
+        libraryPath = true
+      }
     }
   } else if (device) {
     const hashes = new Set(await Promise.all(candidates.map((c) => probe.contentHash(c))))
     if (hashes.size > 1) return choice('ambiguous', { candidates })
   }
-  if (good.length === 0) return choice('mismatch', { candidates })
-  const scored = good.map((c) => [suffixLength(wanted, c), c] as const)
-  const best = Math.max(...scored.map(([score]) => score))
-  const top = scored.filter(([score]) => score === best).map(([, c]) => c)
-  const flags = { suffix: best, verified, vendorUpdate, sizeOnly, libraryPath }
-  if (top.length > 1) {
-    const hashes = new Set(await Promise.all(top.map((c) => probe.audioHash(c))))
-    if (hashes.size > 1) return choice('ambiguous', { candidates: top, ...flags })
+  /** The one file among `files` to take: the longest matching path end, then the nearest. */
+  const settle = async (
+    files: readonly string[],
+    how: Pick<Choice, 'verified' | 'vendorUpdate' | 'sizeOnly' | 'libraryPath'>,
+  ): Promise<Choice> => {
+    const scored = files.map((c) => [suffixLength(wanted, c), c] as const)
+    const best = Math.max(...scored.map(([score]) => score))
+    const top = scored.filter(([score]) => score === best).map(([, c]) => c)
+    const flags = { suffix: best, ...how }
+    if (top.length > 1) {
+      const hashes = new Set(await Promise.all(top.map((c) => probe.audioHash(c))))
+      if (hashes.size > 1) return choice('ambiguous', { candidates: top, ...flags })
+    }
+    const ranked = top
+      .map((c) => ({ c, key: priority(c, projectRoot, env) }))
+      .sort(
+        (a, b) =>
+          a.key[0] - b.key[0] || a.key[1] - b.key[1] || compareCodePoints(a.key[2], b.key[2]),
+      )
+    return choice('found', { path: (ranked[0] as { c: string }).c, ...flags })
   }
-  const ranked = top
-    .map((c) => ({ c, key: priority(c, projectRoot, env) }))
-    .sort(
-      (a, b) => a.key[0] - b.key[0] || a.key[1] - b.key[1] || compareCodePoints(a.key[2], b.key[2]),
-    )
-  const path = (ranked[0] as { c: string }).c
-  if (options.certainOnly && !verified) return choice('mismatch', { candidates: [path], ...flags })
-  return choice('found', { path, ...flags })
+  if (good.length === 0) {
+    // What the opt-in rule would take is said with the refusal. (Not where only confirmed
+    // files count: the rule's match would be left out there all the same.)
+    const offered =
+      inLibrary.length > 0 && !options.matchLibraryPath && !options.certainOnly
+        ? await settle(inLibrary, {
+            verified: false,
+            vendorUpdate: false,
+            sizeOnly: false,
+            libraryPath: true,
+          })
+        : undefined
+    return choice('mismatch', {
+      candidates,
+      ...(offered?.status === 'found' ? { libraryFile: offered.path } : {}),
+    })
+  }
+  const found = await settle(good, { verified, vendorUpdate, sizeOnly, libraryPath })
+  if (found.status !== 'found') return found
+  const { status: _status, candidates: _candidates, ...flags } = found
+  if (options.certainOnly && !verified)
+    return choice('mismatch', { ...flags, path: '', candidates: [found.path] })
+  return found
 }

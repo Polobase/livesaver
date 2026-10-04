@@ -148,7 +148,8 @@ what the command line reports.
 - **Safe by default.**
   - It only plans unless you pass `--apply`, and refuses to write while Live runs.
   - Backups follow Live's scheme (`Backup/<set> [date time].als`).
-  - Writes are atomic and keep Finder tags and mtime.
+  - Writes are atomic and keep Finder tags and comments. A rewritten set carries the date of the
+    fix, its backup the date it had; an undo puts the old date back.
   - Every run is journaled, and `undo` works even after Live has pruned its backups.
   - Nothing is ever deleted.
 - **Fast.** Reference search runs at ~10 GB/s, sets are parsed on all cores, complete sets are

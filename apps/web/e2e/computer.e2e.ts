@@ -4,7 +4,7 @@
  * all) and its undo really write: to copies of the fixtures in a temporary folder.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { copyFixtures, readSet, tempDir } from '@livesaver/test-kit'
 import { startWeb, type WebServer } from 'livesaver'
@@ -74,6 +74,8 @@ for (const [name, type] of ENGINES) {
     })
 
     const setOf = (project: string) => join(projects, project, 'Brokenpath.als')
+    /** When the set that is fixed first was last saved, before the fix. */
+    let dated = 0
     const fixedOnDisk = (project: string) => readSet(setOf(project)).includes('Samples/Imported')
     const onDisk = () =>
       ['Brokenpath Project', 'Other Project', 'Third Project'].map((project) =>
@@ -258,6 +260,7 @@ for (const [name, type] of ENGINES) {
       'one project is fixed alone: its set rewritten, its sample copied, a backup kept',
       async () => {
         const original = readFileSync(setOf('Other Project'))
+        dated = statSync(setOf('Other Project')).mtimeMs
         await page.getByRole('button', { name: 'Fix Other Project' }).click()
         const dialog = page.getByRole('dialog')
         await dialog.getByTestId('review-continue').click()
@@ -278,6 +281,14 @@ for (const [name, type] of ENGINES) {
             original,
           ),
         ).toBe(true)
+        // The set was saved by the fix and is dated so; its backup keeps the date it had.
+        expect(statSync(setOf('Other Project')).mtimeMs).toBeGreaterThan(dated)
+        expect(
+          Math.abs(
+            statSync(join(projects, 'Other Project', 'Backup', backups[0] as string)).mtimeMs -
+              dated,
+          ),
+        ).toBeLessThan(1)
         // The page scans again by itself: two projects are left to fix.
         const left = ['Fix Brokenpath Project', 'Fix Third Project']
         expect(await eventually(fixButtons, left)).toEqual(left)
@@ -302,6 +313,8 @@ for (const [name, type] of ENGINES) {
         expect(existsSync(join(projects, 'Other Project', 'Samples', 'Imported', '1.wav'))).toBe(
           false,
         )
+        // With its content, the set has its old date again.
+        expect(Math.abs(statSync(setOf('Other Project')).mtimeMs - dated)).toBeLessThan(1)
         await rescanned('3 sets in 3 projects')
       },
       60_000 * PATIENCE,

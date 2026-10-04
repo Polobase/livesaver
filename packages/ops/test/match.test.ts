@@ -234,6 +234,48 @@ describe('choice', () => {
       )
     })
 
+    test('while the rule is off, the refusal names the file the rule would take', async () => {
+      const path = file(`NI/Drum Library/${SHAKER}`, installed)
+      const off = await pick(await shaker(), ni())
+      expect([off.status, off.path, off.libraryFile, off.candidates]).toEqual([
+        'mismatch',
+        '',
+        path,
+        [path],
+      ])
+      // With the rule on the file is taken, and nothing is left to offer.
+      expect((await pick(await shaker(), ni(), tmp.path, on)).libraryFile).toBe('')
+      // Where only confirmed files count, the rule's match would be left out all the same.
+      expect((await pick(await shaker(), ni(), tmp.path, { certainOnly: true })).libraryFile).toBe(
+        '',
+      )
+      // A folder that is not marked as holding libraries offers nothing; nor does a Max device.
+      expect((await pick(await shaker(), env())).libraryFile).toBe('')
+      const device: FileRef = { ...(await shaker()), kind: 'device' }
+      expect((await pick(device, ni())).libraryFile).toBe('')
+    })
+
+    test('nothing is offered that the rule would not take: another size, another place, two sounds', async () => {
+      file(`NI/Drum Library/${SHAKER}`, wav(repeat('\x01\x02\x03', 406), 'library 1.1')) // 18 bytes more
+      expect((await pick(await shaker(), ni())).libraryFile).toBe('')
+      rmSync(join(tmp.path, 'NI'), { recursive: true })
+
+      file('NI/Drum Library/Samples/Other/Shaker/Shaker 1.wav', installed) // two levels match
+      expect((await pick(await shaker(), ni())).libraryFile).toBe('')
+      rmSync(join(tmp.path, 'NI'), { recursive: true })
+
+      // Two libraries hold it at the same place with different audio: the rule could not choose.
+      file(`NI/Drum Library 2/${SHAKER}`, installed)
+      file(`NI/Drum Selection/${SHAKER}`, wav(repeat('\x03\x02\x01', 400), 'library 1.1!'))
+      const two = await pick(await shaker(), ni())
+      expect([two.status, two.libraryFile, two.candidates.length]).toEqual(['mismatch', '', 2])
+      // With the same audio in both, it takes the one it would take.
+      const same = file(`NI/Drum Selection/${SHAKER}`, wav(audio, 'selection 1!'))
+      const one = await pick(await shaker(), ni())
+      expect(one.libraryFile).toBe((await pick(await shaker(), ni(), tmp.path, on)).path)
+      expect([same, join(tmp.path, `NI/Drum Library 2/${SHAKER}`)]).toContain(one.libraryFile)
+    })
+
     test('a library whose top folder was renamed still counts', async () => {
       file(`NI/Drum Library 2/${SHAKER}`, installed)
       const c = await pick(await shaker(), ni(), tmp.path, on)

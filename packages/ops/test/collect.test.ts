@@ -177,12 +177,14 @@ describe('Brokenpath', () => {
       new Set([String(Math.floor(statSync(copied).mtimeMs / 1000))]),
     )
     expect(stripSampleRefs(now)).toBe(stripSampleRefs(original))
-    expect(Math.abs(mtimeUs(setPath) - mtime)).toBeLessThanOrEqual(1)
+    // The set was saved by the fix, and says so; its backup keeps the date it had.
+    expect(mtimeUs(setPath)).toBeGreaterThan(mtime)
 
     const created = readdirSync(backupDir).filter((f) => !oldBackups.has(f))
     expect(created).toHaveLength(1)
     expect(created[0]).toMatch(/^Brokenpath \[\d{4}-\d\d-\d\d \d{6}\]\.als$/)
     expect(readSet(join(backupDir, created[0] as string))).toBe(original)
+    expect(Math.abs(mtimeUs(join(backupDir, created[0] as string)) - mtime)).toBeLessThanOrEqual(1)
     const [row] = csv(r.reports['projects.csv'] as string)
     expect([row?.Status, row?.repaired, row?.Changes]).toEqual(['complete', '1', '1'])
   })
@@ -259,7 +261,7 @@ describe('Max devices', () => {
     ])
     expect(ref?.lastMod).toBe(String(Math.floor(statSync(copied).mtimeMs / 1000)))
     expect(readFileSync(copied)).toEqual(readFileSync(source))
-    expect(Math.abs(mtimeUs(setPath) - mtime)).toBeLessThanOrEqual(1)
+    expect(mtimeUs(setPath)).toBeGreaterThanOrEqual(mtime)
     expect(existsSync(join(project, 'Samples'))).toBe(false)
     expect((await run([project], [library], { apply: true })).results[0]?.changes).toEqual([])
   })

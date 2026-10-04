@@ -28,7 +28,9 @@ It does not have to be the exact folder. A whole backup drive works too: livesav
 
 Vendors such as Native Instruments sometimes save their samples again when a library is updated: the same audio, a slightly larger file. In a folder marked **Contains installed libraries**, livesaver accepts such a file when the audio in it is the same. `/Users/Shared` is marked from the start.
 
-If a library was updated so that its files have other tags and another size, switch on **Also accept a library file with another fingerprint** in the settings. Such a match is [uncertain](samples.md#uncertain-matches), and listed as such.
+A library can also be installed in another version than your sets remember: its vendor gave the files other tags, and with them another fingerprint. Nothing confirms such a file, so it counts as missing, although it lies at the same place under the same name. The scan says when that is so: **“… of these are in your installed libraries”**, on the overview and above the list of missing samples, with **Take them too**. That switches on **Also accept a library file with another fingerprint** (also in the settings) and scans again. Such a match is [uncertain](samples.md#uncertain-matches), and listed as such: a fix can leave it out.
+
+Live itself lists these samples as missing, too: it looks for the file it remembers, not for one that sounds the same.
 
 ## Why a file that is there is not taken
 

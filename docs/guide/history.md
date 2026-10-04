@@ -21,8 +21,8 @@ Open a run to see it in full:
 
 An undo takes a run back:
 
-- Every set the run rewrote goes back to what it was, from the original livesaver kept.
-- Every file the run copied is moved to the Trash, unless another set uses it by now.
+- Every set the run rewrote goes back to what it was, from the original livesaver kept, with the date it had.
+- Every file the run copied is moved to the Trash, unless a set that was changed since the run uses it.
 - A set that was changed since the run, by you in Live or by anything else, is left alone and reported. Your newer work is never overwritten.
 
 Nothing is deleted: what an undo removes is in the Trash. Live has to be closed, as for a fix. An undo cannot itself be undone; to have the fix again, fix again.

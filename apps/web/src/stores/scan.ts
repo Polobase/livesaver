@@ -67,10 +67,30 @@ export const useScanStore = defineStore('scan', () => {
     }
   }
 
+  /**
+   * Takes the files of installed libraries that their vendors re-saved: switches the rule for
+   * them on and scans again. They then show as uncertain matches, which a review can leave out.
+   */
+  function acceptLibraryFiles(): Promise<boolean> {
+    library.options = { ...library.options, matchLibraryPath: true }
+    return run()
+  }
+
   /** The folders or options were changed after the scan. */
   const stale = computed(
     () => scanned.value !== undefined && requestKey(scanned.value) !== requestKey(library.request),
   )
 
-  return { running, progress, scan, scanned, problem, restore, run, idle, stale }
+  return {
+    running,
+    progress,
+    scan,
+    scanned,
+    problem,
+    restore,
+    run,
+    idle,
+    acceptLibraryFiles,
+    stale,
+  }
 })

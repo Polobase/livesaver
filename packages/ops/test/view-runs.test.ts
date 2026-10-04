@@ -67,11 +67,23 @@ describe('a run in a few numbers', () => {
   })
 
   test('undone, in part or as a whole', () => {
+    expect(runSummary(ID, FIX).standing).toEqual({ sets: 1, files: 1 })
     const restored: JournalEntry[] = [...FIX, { t: 'undo', id: 2, result: 'restored' }]
-    // The copy stays while another set uses it: an undo later on can still take it away.
-    expect(runSummary(ID, restored)).toMatchObject({ state: 'partly-undone', canUndo: true })
+    // The copy stays while a set that was changed since uses it: a later undo can take it away.
+    expect(runSummary(ID, restored)).toMatchObject({
+      state: 'partly-undone',
+      canUndo: true,
+      standing: { sets: 0, files: 1 },
+    })
     const all: JournalEntry[] = [...restored, { t: 'undo', id: 1, result: 'trashed' }]
-    expect(runSummary(ID, all)).toMatchObject({ state: 'undone', canUndo: false })
+    expect(runSummary(ID, all)).toMatchObject({
+      state: 'undone',
+      canUndo: false,
+      standing: { sets: 0, files: 0 },
+    })
+    // A copy that was gone already counts as taken back, too.
+    const gone: JournalEntry[] = [...restored, { t: 'undo', id: 1, result: 'gone' }]
+    expect(runSummary(ID, gone)).toMatchObject({ state: 'undone', canUndo: false })
     // A set someone changed since is left alone, and no later undo touches it either.
     const changed: JournalEntry[] = [
       ...FIX,

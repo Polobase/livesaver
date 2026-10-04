@@ -193,13 +193,40 @@ describe('advice for missing samples', () => {
     expect(adviceFor({ advice: 'folder', hint: 'pass it with --search' })).toEqual({
       text: 'Find this folder or drive and add it as a sample folder.',
       addFolder: true,
+      accept: false,
     })
     expect(adviceFor({ advice: 'pack', hint: '' }).addFolder).toBe(false)
     // A source without a known kind keeps the words it came with.
     expect(adviceFor({ advice: '', hint: 'as it came' })).toEqual({
       text: 'as it came',
       addFolder: false,
+      accept: false,
     })
+  })
+
+  test('a library that is installed in another version is not something to install', () => {
+    const expansion = { advice: 'ni-expansion' as const, hint: '' }
+    expect(adviceFor({ ...expansion, samples: 64, inLibrary: 0 })).toMatchObject({
+      text: 'Install it in Native Access if it is in your Native Instruments account, then scan again.',
+      accept: false,
+    })
+    expect(adviceFor({ ...expansion, samples: 64, inLibrary: 64 })).toEqual({
+      text: 'It is installed, in another version than your sets remember: its vendor re-saved these files, so their fingerprints differ.',
+      addFolder: false,
+      accept: true,
+    })
+    // In part: what is there is taken, and the rest is still to get.
+    expect(adviceFor({ ...expansion, samples: 64, inLibrary: 40 })).toEqual({
+      text: '40 of these are in the library as it is installed now, re-saved by its vendor. The rest: Install it in Native Access if it is in your Native Instruments account, then scan again.',
+      addFolder: false,
+      accept: true,
+    })
+    expect(adviceFor({ advice: 'folder', hint: '', samples: 3, inLibrary: 1 })).toMatchObject({
+      text: '1 of these is in the library as it is installed now, re-saved by its vendor. The rest: Find this folder or drive and add it as a sample folder.',
+      addFolder: true,
+    })
+    // A livesaver from before it said so says nothing of it.
+    expect(adviceFor(expansion).accept).toBe(false)
   })
 })
 

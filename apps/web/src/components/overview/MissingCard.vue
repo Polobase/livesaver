@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
 import { count, plural } from '../../lib/format'
 import { adviceFor } from '../../lib/words'
+import LibraryFilesHint from '../samples/LibraryFilesHint.vue'
 
 const props = defineProps<{ scan: Scan }>()
 const sources = computed(() => props.scan.samples.missingSources)
@@ -23,6 +24,7 @@ const top = computed(() => sources.value.slice(0, 3))
           from {{ plural(sources.length, 'source') }}
         </span>
       </p>
+      <LibraryFilesHint :scan="scan" class="mt-3" />
       <ul class="mt-3 space-y-3 text-sm">
         <li v-for="source in top" :key="`${source.kind}:${source.name}`">
           <div class="flex justify-between gap-4">

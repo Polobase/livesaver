@@ -126,7 +126,8 @@ const liveAdvice = computed(() =>
         {{ plural(fix.undone.trashed, 'file') }}
         {{ TAKEN_OUT[engines.kind]
         }}<template v-if="fix.undone.kept"
-          >, {{ plural(fix.undone.kept, 'file') }} kept (used by a set by now)</template
+          >, {{ plural(fix.undone.kept, 'file') }} kept (used by a set that was changed
+          since)</template
         >.
       </template>
       <template v-if="fix.undone.changedSince.length || fix.undone.problems.length" #description>

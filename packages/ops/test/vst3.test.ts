@@ -66,7 +66,7 @@ describe('VST3 runs', () => {
     ])
   })
 
-  test('apply writes a backup, keeps the mtime, and a second run changes nothing; undo restores', async () => {
+  test('apply writes a backup and dates the set anew; a second run changes nothing; undo restores set and date', async () => {
     const original = readFileSync(setPath)
     const mtime = statSync(setPath).mtimeMs
     const oldBackups = new Set(backups())
@@ -81,7 +81,7 @@ describe('VST3 runs', () => {
     })
     const [outcome] = r.results
     expect([outcome?.changed, outcome?.written, outcome?.error]).toEqual([true, true, ''])
-    expect(Math.abs(statSync(setPath).mtimeMs - mtime)).toBeLessThan(0.01)
+    expect(statSync(setPath).mtimeMs).toBeGreaterThan(mtime)
     const created = backups().filter((b) => !oldBackups.has(b))
     expect(created).toHaveLength(1)
     expect(outcome?.backup).toBe(join(project, 'Backup', created[0] as string))
@@ -102,5 +102,6 @@ describe('VST3 runs', () => {
     })
     expect(undo.restored).toEqual([setPath])
     expect(readFileSync(setPath)).toEqual(original)
+    expect(Math.abs(statSync(setPath).mtimeMs - mtime)).toBeLessThan(0.01)
   })
 })

@@ -3,14 +3,20 @@
  * advice in its own terms (`--search`); here it is said in the app's.
  */
 import type { SourceRow } from '@livesaver/ops'
+import { plural } from './format.js'
 
 export interface Advice {
   readonly text: string
   /** Whether adding a sample folder is what helps: the app then offers to do that. */
   readonly addFolder: boolean
+  /**
+   * The samples lie in an installed library with another fingerprint: the rule for library
+   * files takes them, and the app offers to switch it on.
+   */
+  readonly accept: boolean
 }
 
-const ADVICE: Readonly<Record<string, Advice>> = {
+const ADVICE: Readonly<Record<string, Omit<Advice, 'accept'>>> = {
   pack: {
     text: 'Install the pack in Live (under Packs), or download it from your account at ableton.com.',
     addFolder: false,
@@ -41,6 +47,25 @@ const ADVICE: Readonly<Record<string, Advice>> = {
   },
 }
 
-export function adviceFor(source: Pick<SourceRow, 'advice' | 'hint'>): Advice {
-  return ADVICE[source.advice] ?? { text: source.hint, addFolder: false }
+/**
+ * `inLibrary` of `samples`: so many of the source's samples are in the library as it is installed
+ * now. Such a source is not something to get: it is there, in another version.
+ */
+export function adviceFor(
+  source: Pick<SourceRow, 'advice' | 'hint'> & Partial<Pick<SourceRow, 'inLibrary' | 'samples'>>,
+): Advice {
+  const usual = ADVICE[source.advice] ?? { text: source.hint, addFolder: false }
+  const inLibrary = source.inLibrary ?? 0
+  if (inLibrary === 0) return { ...usual, accept: false }
+  if (source.samples === undefined || inLibrary >= source.samples)
+    return {
+      text: 'It is installed, in another version than your sets remember: its vendor re-saved these files, so their fingerprints differ.',
+      addFolder: false,
+      accept: true,
+    }
+  return {
+    text: `${plural(inLibrary, 'of these is', 'of these are')} in the library as it is installed now, re-saved by its vendor. The rest: ${usual.text}`,
+    addFolder: usual.addFolder,
+    accept: true,
+  }
 }

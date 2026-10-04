@@ -64,6 +64,20 @@ export const HINTS: Record<LibraryKind, string> = {
   folder: 'Find the folder or drive and pass it with --search',
 }
 
+/** The option that takes library files with another fingerprint, as the command line names it. */
+export const LIBRARY_RULE = '--match-library-path'
+
+/**
+ * What to do about the missing samples of a source. A library that is installed in another
+ * version is not to be installed: its files are there, and the opt-in rule takes them.
+ */
+export function hintOf(lib: Pick<Library, 'kind' | 'samples' | 'inLibrary'>): string {
+  if (lib.inLibrary === 0) return HINTS[lib.kind]
+  const these = lib.inLibrary === lib.samples ? 'them' : `${lib.inLibrary} of them`
+  const installed = `Installed in another version (its vendor re-saved the files): ${LIBRARY_RULE} takes ${these}, as uncertain matches`
+  return lib.inLibrary === lib.samples ? installed : `${installed}. The rest: ${HINTS[lib.kind]}`
+}
+
 export interface MissingGroup {
   readonly status: Status
   readonly name: string
@@ -150,6 +164,11 @@ export interface Library {
   readonly name: string
   samples: number
   notFound: number
+  /**
+   * Samples that lie in an installed library with another fingerprint: the library is there, in
+   * another version than the sets remember, and `matchLibraryPath` would take its files.
+   */
+  inLibrary: number
   readonly sets: Set<string>
   readonly projects: Set<string>
   readonly folders: Map<string, number>
@@ -169,6 +188,7 @@ export function libraryGroups(groups: readonly MissingGroup[]): Library[] {
         name,
         samples: 0,
         notFound: 0,
+        inLibrary: 0,
         sets: new Set(),
         projects: new Set(),
         folders: new Map(),
@@ -178,6 +198,7 @@ export function libraryGroups(groups: readonly MissingGroup[]): Library[] {
     }
     lib.samples++
     if (g.status === 'not-found') lib.notFound++
+    if (g.choice.libraryFile) lib.inLibrary++
     for (const s of g.sets) lib.sets.add(s)
     for (const p of g.projects) lib.projects.add(p)
     const folder = posix.dirname(g.path.replaceAll('\\', '/'))

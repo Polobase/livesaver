@@ -29,6 +29,7 @@ const run = (extra: Partial<Run> = {}): Run => ({
   ownFiles: 0,
   unfinished: 0,
   canUndo: true,
+  standing: { sets: extra.sets ?? 3, files: extra.files ?? 12 },
   reports: [],
   ...extra,
 })
@@ -173,13 +174,21 @@ describe('what an undo of a run does', () => {
   test('is said for what the run did, in the singular where there is one', () => {
     expect(undoLines(run())).toEqual([
       '3 sets go back to what they were before the run, from the originals livesaver kept.',
-      '12 copied files are moved to the Trash, unless another set uses them by now.',
+      '12 copied files are moved to the Trash, unless a set that was changed since the run uses them.',
       'What was changed since the run is left alone, and reported.',
     ])
     expect(undoLines(run({ sets: 1, files: 1 })).slice(0, 2)).toEqual([
       '1 set goes back to what it was before the run, from the originals livesaver kept.',
-      '1 copied file is moved to the Trash, unless another set uses it by now.',
+      '1 copied file is moved to the Trash, unless a set that was changed since the run uses it.',
     ])
+    // Of a run that was undone in part, what is left; a run told by an older livesaver, all.
+    const partly = run({ state: 'partly-undone', standing: { sets: 0, files: 2 } })
+    expect(undoLines(partly)).toEqual([
+      '2 copied files are moved to the Trash, unless a set that was changed since the run uses them.',
+      'What was changed since the run is left alone, and reported.',
+    ])
+    const { standing: _standing, ...older } = run({ sets: 1, files: 0 })
+    expect(undoLines(older as Run)[0]).toStartWith('1 set goes back')
     expect(
       undoLines(run({ command: 'status', sets: 0, files: 0, tags: 3, comments: 2, ownFiles: 1 })),
     ).toEqual([
@@ -194,12 +203,13 @@ describe('what an undo of a run does', () => {
 
   test('a page has no Trash: what its undo takes out goes to a hidden folder, and is said so', () => {
     expect(undoLines(run({ sets: 1, files: 1 }), 'browser')[1]).toBe(
-      '1 copied file is moved to the hidden folder “.livesaver-trash” of the project folder, unless another set uses it by now.',
+      '1 copied file is moved to the hidden folder “.livesaver-trash” of the project folder, unless a set that was changed since the run uses it.',
     )
     expect([undoneLabel('trashed'), undoneLabel('trashed', 'browser')]).toEqual([
       'moved to the Trash',
       'moved to the hidden folder “.livesaver-trash” of the project folder',
     ])
+    expect(undoneLabel('gone')).toBe('was gone already')
     expect([undoneLabel('restored', 'browser'), undoneLabel('something-new')]).toEqual([
       'restored',
       'something-new',

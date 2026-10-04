@@ -263,6 +263,7 @@ What a page cannot do, and says before the switch goes on:
 | Live is running | checked, and a fix refuses | cannot be seen: the user confirms it in every review |
 | Finder tags and comment of a rewritten set | kept (the file is replaced through a clone) | lost: the browser's write makes a new file |
 | time of a copied sample | that of its source | that of the copying (the set says the same) |
+| date of a rewritten set | that of the fix; an undo puts the old one back | that of the fix; an undo cannot put the old one back |
 | what an undo takes out | the Trash | a hidden folder in the project folder |
 | free space | checked | unknown |
 | names with `:`, or a space at an end | seen and written | hidden from the page, and a file cannot be made with such a name: the set is left alone, with the reason |

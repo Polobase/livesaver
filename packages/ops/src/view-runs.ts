@@ -47,6 +47,8 @@ export interface RunSummary {
   readonly unfinished: number
   /** `undo` has something left to take back. */
   readonly canUndo: boolean
+  /** What of it still stands: the sets and copies an undo would take back now. */
+  readonly standing: { readonly sets: number; readonly files: number }
   readonly record?: RunRecord
 }
 
@@ -60,7 +62,10 @@ export interface RunStep {
   readonly backup: string
   readonly at: string
   readonly finished: boolean
-  /** '' while it stands; else how it ended: `restored`, `trashed`, `renamed-back`, `changed-since`. */
+  /**
+   * '' while it stands; else how it ended: `restored`, `trashed`, `renamed-back`, `gone` (it was
+   * no longer there to take back), `changed-since` (left alone for good).
+   */
   readonly undone: string
 }
 
@@ -117,7 +122,8 @@ export function runSummary(
   const steps = runSteps(entries)
   const finished = steps.filter((step) => step.finished)
   const count = (op: RunStep['op']) => finished.filter((step) => step.op === op).length
-  const standing = finished.filter((step) => !step.undone).length
+  const still = finished.filter((step) => !step.undone)
+  const standing = still.length
   const state: RunState =
     entries.length === 0
       ? applied
@@ -147,6 +153,10 @@ export function runSummary(
     ownFiles: count('replace-file'),
     unfinished: steps.length - finished.length,
     canUndo: standing > 0,
+    standing: {
+      sets: still.filter((step) => step.op === 'write-set').length,
+      files: still.filter((step) => step.op === 'copy').length,
+    },
     ...(record ? { record } : {}),
   }
 }
