@@ -82,6 +82,31 @@ test('the scan runs in the worker with the files the page hands over, then the w
   expect(log.terminated).toBe(true)
 })
 
+test('the page says that it runs on Windows, and the worker goes by that', async () => {
+  // The fixtures' sets were saved on a Mac: on Windows none of their paths says where the
+  // project folder lies, so it gets a stand-in; on a Mac the sets place it.
+  const located = async (windows?: boolean) => {
+    const log = { toEngine: [] as ToEngine[], terminated: false }
+    const events: ScanEvent[] = []
+    const asked = { ...request(), ...(windows === undefined ? {} : { windows }) }
+    await scanInWorker(
+      () => fakeWorker(log),
+      asked,
+      (event) => events.push(event),
+    ).result
+    const sent = log.toEngine.find((message) => message.type === 'scan')
+    const folders = events.find((event) => event.type === 'located')
+    return {
+      sent: sent?.type === 'scan' ? sent.windows : 'none',
+      how: folders?.type === 'located' ? folders.folders[0]?.how : '',
+    }
+  }
+  expect(await located(true)).toEqual({ sent: true, how: 'unknown' })
+  expect(await located(false)).toEqual({ sent: false, how: 'found' })
+  // Not said, nothing travels: the engine asks the browser it runs in.
+  expect((await located()).sent).toBeUndefined()
+})
+
 test('a scan that fails or is stopped rejects with what to show', async () => {
   const log = { toEngine: [] as ToEngine[], terminated: false }
   const none = { ...request(), projects: [] }

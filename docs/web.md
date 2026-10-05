@@ -459,6 +459,31 @@ Without Live's own content, samples of the Core Library cannot be found and move
 recognised; the result says so. On a real library that made 55 of 460 complete sets look
 incomplete.
 
+## Windows
+Built from what Ableton documents and from sets saved on Windows; not tried on a Windows
+computer (see [the guide](guide/windows.md)).
+
+- **Which system it is.** `onWindows()` (`packages/web/src/platform.ts`) reads the browser's user
+  agent. The page asks it once and sends the answer with every request (`ScanRequest.windows`),
+  so the engine's worker need not be asked. With livesaver behind it, the page runs on the
+  computer livesaver runs on, so the same answer says how that computer names its folders.
+- **Paths.** Every path is handled with `/`, a drive is a root of its own (`C:/Users/…`), and a
+  typed path may be written with `\`. A folder is placed by the paths the sets store that fit
+  the system: paths with a drive on Windows, paths without one elsewhere (`locateFolder`,
+  `leadsTo` in `packages/web/src/locate.ts`).
+- **Ableton's folders.** Live's own content is the folder `Resources` of
+  `C:/ProgramData/Ableton/Live <n> <Edition>`; given that folder, the one above it, or the Core
+  Library alone, the page places it as there (`liveFolderPath`, `liveLandmark`). No handle is
+  asked for a dropped folder called `Resources` or `Live <n> …` on Windows: Chromium keeps the
+  folders of `ProgramData` from a page as it keeps an app's on a Mac (`folderOfAnApp`).
+- **Plug-ins.** Only Live's plug-in database is read (`installedIn(folders, true)`): its rows
+  count without a look at a file, since a plug-in on Windows lies where a page is not given a
+  folder and its file says nothing livesaver reads; no row is "Rosetta only"; no Audio Unit is
+  taken to be there.
+- **Words.** `apps/web/src/lib/platform.ts` holds what the page says differently: the folders'
+  places, File Explorer for Finder, the steps to add Live's content (`LiveGuideWindows.vue`),
+  and a note that Windows is only tested on macOS.
+
 ## Installed libraries
 Two rules only apply to files of installed libraries: a file that its vendor re-saved slightly
 larger is accepted when the audio is the same, and the opt-in rule that accepts a library file

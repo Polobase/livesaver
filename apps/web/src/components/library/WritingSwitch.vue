@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+import { GET_LIVESAVER } from '../../lib/links'
 /**
  * Fixing in the browser, for a page that has no livesaver behind it: an experiment its user
  * switches on, after reading what a page cannot do that livesaver on the computer can.
  */
-import { computed, ref } from 'vue'
-import { GET_LIVESAVER } from '../../lib/links'
+import { platform } from '../../lib/platform'
 import { browserFacts, waysOf } from '../../lib/ways'
 import { useLibraryStore } from '../../stores/library'
 import { useWritingStore } from '../../stores/writing'
@@ -23,17 +24,22 @@ const LIMITS = [
     title: 'It cannot see whether Ableton Live is running.',
     text: 'Quit Live before every fix and every undo: a set that is open in Live must not be rewritten under it.',
   },
-  {
-    title: 'A rewritten set loses its Finder tags and its Finder comment.',
-    text: 'To macOS, the set a browser writes is a new file.',
-  },
+  // (Finder keeps tags and comments with a file: there is no such thing to lose on Windows.)
+  ...(platform.finderTags
+    ? [
+        {
+          title: 'A rewritten set loses its Finder tags and its Finder comment.',
+          text: 'To macOS, the set a browser writes is a new file.',
+        },
+      ]
+    : []),
   {
     title: 'The undo is kept by this browser, for this site.',
     text: 'It is gone if you clear the site’s data, and another browser does not have it. The backup of every set in its project’s Backup folder stays.',
   },
   {
     title: 'Your browser hides files with some names from a page.',
-    text: 'A name with a “/” as Finder shows it, or with a space at its start or end. Drop your project folder instead of choosing it with “Add folder”, and this page sees such files all the same. It cannot make one: a sample that would be copied to such a name is left where it is.',
+    text: `A name with ${platform.hiddenNames}. Drop your project folder instead of choosing it with “Add folder”, and this page sees such files all the same. It cannot make one: a sample that would be copied to such a name is left where it is.`,
   },
   {
     title: 'A page has no Trash.',

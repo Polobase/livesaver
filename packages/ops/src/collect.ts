@@ -390,8 +390,11 @@ export async function refEdits(
   if (ref.format === 'new') {
     newBody = patchNew(body, relType, relParts.join('/'), nfc(dst), pack)
   } else {
+    // The hint names the folders of the path. On Windows it names them without the drive: so
+    // it is in every set that Live 9 and 10 saved there (2.4 million hints of one library).
     const absDirs = posix
       .dirname(dst)
+      .slice(posix.drive(dst).length)
       .split('/')
       .filter((p) => p)
       .map(nfc)

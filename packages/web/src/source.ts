@@ -12,6 +12,7 @@
  * and a few more; it also hands out no handle for a folder in `/Applications`. A check that must
  * see every sample therefore takes uploads and drops.
  */
+import { onWindows } from './platform.js'
 
 /** The part of a `FileSystemDirectoryHandle` livesaver reads. */
 export interface DirectoryHandleLike {
@@ -180,10 +181,14 @@ const HANDLE_PATIENCE = 1000
  * soon as a page asks for one. So none is asked for such a folder: it is read through its
  * entries all the same, and only cannot be kept for a later visit, which it could not be anyway.
  */
-export function folderOfAnApp(name: string): boolean {
+export function folderOfAnApp(name: string, windows = onWindows()): boolean {
+  const lower = name.toLowerCase()
   return (
     /\.app$/i.test(name) ||
-    ['contents', 'app-resources', 'core library'].includes(name.toLowerCase())
+    ['contents', 'app-resources', 'core library'].includes(lower) ||
+    // Windows keeps Live in `C:\ProgramData\Ableton\Live 12 Suite`, with its content in
+    // `Resources`: folders of the system to Chromium there, as an app's are on a Mac.
+    (windows && (lower === 'resources' || /^live \d/.test(lower)))
   )
 }
 

@@ -23,11 +23,11 @@ livesaver edits the files your music lives in. These are the rules it keeps, so 
 
 - **Every step is in a journal**, written before the step is taken. If a run is interrupted, the journal says how far it got, and an undo takes back what it did.
 - **Every run can be undone**: see [History and undo](history.md).
-- **Nothing is ever deleted.** What an undo removes is moved to the Trash.
+- **Nothing is ever deleted.** What an undo removes is moved to the Trash (on Windows: to a [trash folder of livesaver's own](windows.md#on-your-computer)).
 
 ## Your data
 
-- **Nothing leaves your computer.** livesaver has no account, no statistics, no network requests. The app asks nothing from any server but the livesaver on your own Mac.
+- **Nothing leaves your computer.** livesaver has no account, no statistics, no network requests. The app asks nothing from any server but the livesaver on your own computer.
 - **Only its own page may ask.** `livesaver web` listens on your computer only, and answers only the page it served itself: another site open in your browser can neither read nor change anything.
 
 ## How this is tested

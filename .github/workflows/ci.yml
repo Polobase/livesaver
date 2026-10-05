@@ -1,7 +1,8 @@
 name: CI
 
 # Build, lint, typecheck and test every package on macOS (where APFS clones, xattrs and Finder tags
-# matter) and Ubuntu; run the built CLI under Node 22 and 24; lint the published package shape.
+# matter) and Ubuntu; run the built CLI under Node 22 and 24, and on Windows; lint the published
+# package shape.
 
 on:
   push:
@@ -72,6 +73,25 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - name: Node smoke test (built CLI, worker threads, apply + undo)
+        run: bun run test:node
+
+  # The built command line on a disk with drive letters: a fix and its undo, its trash folder,
+  # and that nothing is written while a Live runs. (livesaver is made on a Mac; the unit tests
+  # and the browser tests run on macOS and Ubuntu.)
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Node smoke test (built CLI on Windows)
         run: bun run test:node
 
   package-lint:

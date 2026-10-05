@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { createNodeHost, createWorkerParser, loadInstalledPlugins } from '@livesaver/node'
 import { Journal, statusRun, statusSummary } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute, resolveConfig, resolveStatusConfig } from '../config.js'
+import { join } from '../paths.js'
 import { acquireLock, audioUnitsCachePath, endRun, newRun, sheetSnapshotPath } from '../state.js'
 
 export interface StatusFlags {

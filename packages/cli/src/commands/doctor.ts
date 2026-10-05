@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
 import { createNodeHost, createWorkerParser, liveIsRunning } from '@livesaver/node'
 import {
   applyWriter,
@@ -16,6 +15,7 @@ import {
 } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute, type ResolvedConfig, resolveConfig } from '../config.js'
+import { join, relative } from '../paths.js'
 import { acquireLock, cachePath, endRun, newRun, readText, writeStateFile } from '../state.js'
 
 export interface DoctorFlags {

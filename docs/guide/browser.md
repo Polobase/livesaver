@@ -6,7 +6,7 @@ The app also runs on its own, as a page in your browser. It reads the folders yo
 
 ## What a page can do
 
-| | In the browser | With livesaver on your Mac |
+| | In the browser | With livesaver on your computer |
 |---|---|---|
 | Scan samples: what is missing, what a fix would do | yes | yes |
 | Missing samples by where they came from, with advice | yes | yes |
@@ -20,7 +20,7 @@ What the page cannot do is said where you would look for it, with how to get it.
 
 ## Two ways to fix from the page
 
-A page fixes either through livesaver on your Mac, or on its own. What each way needs depends on your browser:
+A page fixes either through livesaver on your computer, or on its own. What each way needs depends on your browser:
 
 | Browser | [Connected to livesaver](#connect-the-page-to-livesaver) | [On its own](#fixing-in-the-page) |
 |---|---|---|
@@ -65,6 +65,8 @@ What your browser may ask or say:
 - **`Music/Ableton`** in your home folder: your User Library and the Factory Packs.
 - **The Ableton Live app**: it holds the Core Library, and Live's own list of content that moved between versions.
 - **`/Users/Shared`**, if you have libraries from Native Instruments.
+
+(On Windows these are `Documents\Ableton`, the `Resources` folder of Live in `C:\ProgramData\Ableton`, and `C:\Users\Public\Documents`. The page names them there, and its steps are those of Windows: see [livesaver on Windows](windows.md#in-the-browser).)
 
 Until Live's own content is there, the page says that samples of the Core Library cannot be found, and **Show me how** shows the steps in pictures:
 
@@ -146,7 +148,7 @@ Brave lets a page edit a folder only once you switch that on in Brave itself: op
 
 ### Why it is off
 
-livesaver on your Mac has none of these limits, and it sees every file. So fixing is livesaver's job first: see [Getting started](getting-started.md#install-livesaver-on-your-mac). The page's own fix is for a computer where you cannot install anything, and for trying livesaver on a copy.
+livesaver on your computer has none of these limits, and it sees every file. So fixing is livesaver's job first: see [Getting started](getting-started.md#install-livesaver). The page's own fix is for a computer where you cannot install anything, and for trying livesaver on a copy.
 
 ## Connect the page to livesaver
 

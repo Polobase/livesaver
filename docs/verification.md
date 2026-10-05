@@ -17,6 +17,11 @@ writes runs on temporary copies.
   back; an empty patch round-trips byte-identically.
 - `bun run test:node` runs the built CLI under Node.js (collect + undo, status + undo, the
   web server).
+- **Windows**, on a Mac: paths with a drive in the path helper; a fix and its undo on a made-up
+  disk with drive letters (`packages/ops/test/windows.test.ts`, `packages/web/test/windows.test.ts`),
+  with a set of Live 10 that stores its path in backslashes; Live's folders, its settings file
+  and the list of running programs as Windows has them (`packages/node/test/windows.test.ts`).
+  None of it was tried with Live on Windows.
 - **Output in a pipe**: `doctor --json` over 400 sets through a shell pipe must arrive whole.
   (Under Bun, `console.log` dropped what a pipe could not take at once, 64 KB, as soon as
   `process.stdout` had been looked at; the command line writes through the stream instead.)

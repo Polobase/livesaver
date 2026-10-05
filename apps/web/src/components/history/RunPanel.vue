@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import type { Run, RunDetail } from '../../engine/types'
 import { download, REPORT_TITLES } from '../../lib/download'
 import { count, moment, plural } from '../../lib/format'
+import { platform } from '../../lib/platform'
 import {
   commandOf,
   optionFacts,
@@ -264,7 +265,7 @@ async function reveal(path: string): Promise<void> {
                 color="neutral"
                 variant="link"
                 class="p-0 underline"
-                label="Show in Finder"
+                :label="`Show in ${platform.fileManager}`"
                 @click="reveal(step.path)"
               />
             </li>

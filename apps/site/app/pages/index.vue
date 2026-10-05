@@ -10,7 +10,7 @@ useSeoMeta({
     'livesaver finds the samples your Ableton Live sets have lost, collects them into their projects, and shows which plug-ins are missing: for your whole library at once, with a review before and an undo after.',
   ogTitle: 'livesaver: your Ableton Live projects, complete again',
   ogDescription:
-    'Find the samples your Live sets have lost, fix hundreds of projects at once, and undo any of it. Free and open source.',
+    'Find the samples your Live sets have lost, fix hundreds of projects at once, and undo any of it. Free and open source, for macOS and Windows.',
 })
 
 const steps = [
@@ -81,7 +81,7 @@ const plugins = [
     icon: 'i-lucide-cpu',
     title: 'Rosetta only',
     description:
-      'Which plug-ins still contain only Intel code, which sets depend on them, and whether a native version is installed in another format.',
+      'On a Mac: which plug-ins still contain only Intel code, which sets depend on them, and whether a native version is installed in another format.',
   },
   {
     icon: 'i-lucide-circle-arrow-up',
@@ -128,13 +128,14 @@ const careful = [
   {
     icon: 'i-lucide-trash-2',
     title: 'Nothing is deleted',
-    description: 'What an undo removes goes to the Trash. Nothing is ever removed for good.',
+    description:
+      'What an undo removes goes to the Trash (on Windows, to a trash folder of livesaver’s own). Nothing is ever removed for good.',
   },
   {
     icon: 'i-lucide-lock',
     title: 'Nothing leaves your computer',
     description:
-      'No account, no statistics, no requests to any server. The app talks only to the livesaver on your own Mac.',
+      'No account, no statistics, no requests to any server. The app talks only to the livesaver on your own computer.',
   },
   {
     icon: 'i-lucide-flask-conical',
@@ -173,7 +174,7 @@ const commands = [
     >
       <template #headline>
         <UBadge color="neutral" variant="subtle" size="lg" class="rounded-full">
-          Free and open source · for macOS
+          Free and open source · macOS and Windows
         </UBadge>
       </template>
       <AppShot
@@ -182,7 +183,12 @@ const commands = [
         eager
       />
       <p class="mt-6 text-center text-sm text-muted">
-        The app in your browser scans and shows everything. To fix, run livesaver on your Mac.
+        The app in your browser scans and shows everything, and fixes in Chrome and Edge. With
+        livesaver on your computer it fixes in every browser.
+      </p>
+      <p class="mt-2 text-center text-sm text-muted" data-testid="tested-on">
+        Made and tested on macOS. Windows is new and only tested on macOS so far:
+        <NuxtLink to="#windows" class="underline underline-offset-2">what that means</NuxtLink>.
       </p>
     </UPageHero>
 
@@ -317,15 +323,21 @@ const commands = [
           <ul class="mt-2 space-y-1.5 text-sm" aria-label="In your browser">
             <li class="flex gap-2">
               <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-(--status-fine)" />
-              Scans samples and plug-ins, with all tables and reports
+              Scans samples and plug-ins, with all tables and reports, in every browser
             </li>
             <li class="flex gap-2">
               <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-(--status-fine)" />
-              Chrome, Safari, Firefox
+              Fixes samples and upgrades plug-ins in Chrome and Edge, once you let the page edit
+              your project folder: with backups, and an undo in that browser
+            </li>
+            <li class="flex gap-2">
+              <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-(--status-fine)" />
+              Knows your installed plug-ins when you show it their folders
             </li>
             <li class="flex gap-2">
               <UIcon name="i-lucide-minus" class="mt-0.5 size-4 shrink-0 text-muted" />
-              Reads only: no fix, no undo, and it cannot see what is installed
+              Safari and Firefox only read. No browser lets a page see whether Live is running: you
+              quit Live before a fix
             </li>
           </ul>
           <template #footer>
@@ -334,22 +346,23 @@ const commands = [
         </UPageCard>
         <UPageCard
           icon="i-lucide-monitor"
-          title="On your Mac"
-          description="With livesaver behind it, the app reads your disk itself and can write. One command opens it."
+          title="On your computer"
+          description="With livesaver behind it, the app reads your disk itself and writes for you. One command opens it."
           variant="outline"
         >
-          <ul class="mt-2 space-y-1.5 text-sm" aria-label="On your Mac">
+          <ul class="mt-2 space-y-1.5 text-sm" aria-label="On your computer">
             <li class="flex gap-2">
               <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-(--status-fine)" />
-              Everything the browser does
+              Everything the browser does, in every browser, with no folder to hand over
             </li>
             <li class="flex gap-2">
               <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-(--status-fine)" />
-              Fixes all projects, a selection or one, with backups and undo
+              Fixes all projects, a selection or one, with backups and an undo that is kept on your
+              disk
             </li>
             <li class="flex gap-2">
               <UIcon name="i-lucide-check" class="mt-0.5 size-4 shrink-0 text-(--status-fine)" />
-              Knows your installed plug-ins, and upgrades VST2 to VST3
+              Checks that Live is not running, and finds your installed plug-ins by itself
             </li>
           </ul>
           <template #footer>
@@ -363,11 +376,36 @@ const commands = [
           </template>
         </UPageCard>
       </div>
+      <UAlert
+        id="windows"
+        class="mt-6 scroll-mt-24"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-flask-conical"
+        title="Windows: built, and only tested on macOS so far"
+        data-testid="windows-status"
+      >
+        <template #description>
+          <p>
+            livesaver is made and tested on a Mac. On Windows it reads and writes paths with drive
+            letters, knows where Ableton keeps its folders there, and writes nothing while Live
+            runs: that follows what Ableton documents and how sets saved on Windows store their
+            files. No one has tried it on a Windows computer with Live yet. Try a fix on a copy of a
+            project first, and
+            <NuxtLink
+              :to="`${REPOSITORY}/issues`"
+              target="_blank"
+              class="underline underline-offset-2"
+              >tell us how it went</NuxtLink
+            >.
+          </p>
+        </template>
+      </UAlert>
     </UPageSection>
 
     <UPageSection
       title="And a command line"
-      description="Everything the app does, the livesaver command does too, and more: project status as Finder tags, a catalog of your sets to search, and codemods that change many sets at once."
+      description="Everything the app does, the livesaver command does too, and more: project status as Finder tags (on a Mac), a catalog of your sets to search, and codemods that change many sets at once."
       orientation="horizontal"
       :links="[
         {

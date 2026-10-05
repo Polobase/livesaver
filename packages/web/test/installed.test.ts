@@ -115,6 +115,40 @@ describe('the plug-ins of folders a page was handed', () => {
     ])
   })
 
+  test('on Windows Live’s database is all there is to read: its rows count as they are', async () => {
+    // What Live scanned on Windows, at the paths plug-ins have there. No Rosetta: one row each.
+    const scanned: ScannedPlugin[] = [
+      {
+        path: 'C:\\Program Files\\Common Files\\VST3\\Serum.vst3',
+        processor: 1,
+        devIdentifier: SERUM_3,
+        name: 'Serum',
+      },
+      {
+        path: 'C:\\Program Files\\VSTPlugins\\Serum_x64.dll',
+        processor: 1,
+        devIdentifier: SERUM_2,
+        name: 'Serum',
+      },
+    ]
+    const local = join(tmp.path, 'AppData', 'Local')
+    livePluginDatabase(join(local, 'Ableton', 'Live Database'), scanned)
+    // The folder of the database, or one above it (AppData/Local is where it is reached from).
+    for (const given of [join(local, 'Ableton', 'Live Database'), local]) {
+      const installed = await installedIn([folder('database', uploadedFolder(given))], true)
+      expect([installed.roots, installed.database]).toEqual([[], true])
+      // Installed without a look at a file, and none "Rosetta only": Windows has no such thing.
+      expect(states(installed)).toEqual(['installed', 'installed', 'missing', 'missing'])
+      expect(installed.inventory.status(SERUM_VST2).found.map((found) => found.path)).toEqual([
+        'C:/Program Files/VSTPlugins/Serum_x64.dll',
+      ])
+      expect([...installed.catalog.values()].map((entry) => entry.name)).toEqual(['Serum'])
+    }
+    // The same folder on a Mac says nothing without the bundles: no row's file is there.
+    const onMac = await installedIn([folder('database', uploadedFolder(local))])
+    expect(states(onMac)).toEqual(['missing', 'missing', 'missing', 'missing'])
+  })
+
   test('folders above them will do: the Library with its Audio folder, Application Support', async () => {
     livePluginDatabase(database, install())
     for (const source of [uploadedFolder, pickedFolder]) {

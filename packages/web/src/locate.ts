@@ -24,6 +24,21 @@ export interface Located {
 const nameKey = (name: string) => casefold(nfc(name))
 
 /**
+ * The parts of a stored path, if it is one of the kind of computer the page runs on: with a
+ * drive on Windows, without one elsewhere. A set that came from the other kind of computer
+ * says nothing about where a folder lies on this one.
+ */
+function partsOf(stored: string, windows: boolean): string[] | undefined {
+  const path = posix.slashed(stored)
+  if (!posix.isAbs(path) || (posix.drive(path) !== '') !== windows) return undefined
+  return posix.splitPath(path)
+}
+
+/** The path its parts make (the first part of a path of Windows is its drive). */
+const pathOf = (parts: readonly string[], windows: boolean) =>
+  windows ? parts.join('/') : `/${parts.join('/')}`
+
+/**
  * The most likely absolute path of the folder called `name`, or `undefined` if no anchor's path
  * has a folder of that name (it was renamed or moved since the sets were saved).
  *
@@ -31,20 +46,24 @@ const nameKey = (name: string) => casefold(nfc(name))
  * decides, not the path below it. Only when the name occurs twice in a path, the project's depth
  * picks the occurrence.
  */
-export function locateFolder(name: string, anchors: Iterable<ProjectAnchor>): Located | undefined {
+export function locateFolder(
+  name: string,
+  anchors: Iterable<ProjectAnchor>,
+  windows = false,
+): Located | undefined {
   const wanted = nameKey(name)
   const votes = new Map<string, { count: number; weight: number }>()
   let fitting = 0
   const vote = (parts: readonly string[], index: number, weight: number) => {
-    const path = `/${parts.slice(0, index + 1).join('/')}`
+    const path = pathOf(parts.slice(0, index + 1), windows)
     const v = votes.get(path) ?? { count: 0, weight: 0 }
     v.count++
     v.weight += weight
     votes.set(path, v)
   }
   for (const { savedAt, inside } of anchors) {
-    if (!posix.isAbs(savedAt) || posix.isWindowsPath(savedAt)) continue
-    const parts = posix.splitPath(savedAt)
+    const parts = partsOf(savedAt, windows)
+    if (!parts) continue
     const found = parts.flatMap((part, i) => (nameKey(part) === wanted ? [i] : []))
     if (found.length === 0) continue
     fitting++
@@ -60,28 +79,50 @@ export function locateFolder(name: string, anchors: Iterable<ProjectAnchor>): Lo
 
 // --------------------------------------------------------------------------- Ableton's own folders
 
-/** Which folder of the Live app a given folder is. */
+/**
+ * Which folder of Live's own a given folder is. On a Mac they are the Live app, its `Contents`,
+ * its `App-Resources`, and the Core Library in there. Windows has no app that is a folder:
+ * Live's own lies in `C:/ProgramData/Ableton/Live 12 Suite` (here `contents`, and `app` too),
+ * with `Resources` in it, and the Core Library in there. (The folders of Windows are as Ableton
+ * documents them, and as sets that were saved on Windows name them; no Windows was at hand.)
+ */
 export type LiveLevel = 'app' | 'contents' | 'resources' | 'core'
 
-/** The folders from the Live app down to each of them. */
-const LIVE_BELOW: Readonly<Record<LiveLevel, readonly string[]>> = {
-  app: [],
-  contents: ['Contents'],
-  resources: ['Contents', 'App-Resources'],
-  core: ['Contents', 'App-Resources', 'Core Library'],
+/** The folders from Live's own folder down to each of them. */
+const LIVE_BELOW: Readonly<
+  Record<'mac' | 'windows', Readonly<Record<LiveLevel, readonly string[]>>>
+> = {
+  mac: {
+    app: [],
+    contents: ['Contents'],
+    resources: ['Contents', 'App-Resources'],
+    core: ['Contents', 'App-Resources', 'Core Library'],
+  },
+  windows: {
+    app: [],
+    contents: [],
+    resources: ['Resources'],
+    core: ['Resources', 'Core Library'],
+  },
 }
+const below = (windows: boolean) => LIVE_BELOW[windows ? 'windows' : 'mac']
 
 /**
- * The path of a folder of the Live app, from a path that was typed for it. Any path into the
- * app will do (the app, its `Contents`, `App-Resources` or the Core Library), whichever of them
- * the folder is: someone who is asked where "Contents" lies pastes the path of the app. A path
- * that leads into no app is taken as it is.
+ * The path of a folder of Live's own, from a path that was typed for it. Any path into the app
+ * will do (the app, its `Contents`, `App-Resources` or the Core Library), whichever of them the
+ * folder is: someone who is asked where "Contents" lies pastes the path of the app. On Windows
+ * it is any path into Live's folder in `ProgramData/Ableton`. A path that leads into neither is
+ * taken as it is.
  */
-export function liveFolderPath(typed: string, level: LiveLevel): string {
+export function liveFolderPath(typed: string, level: LiveLevel, windows = false): string {
   const parts = posix.splitPath(typed)
-  const app = parts.findIndex((part) => part.toLowerCase().endsWith('.app'))
-  if (app < 0) return typed
-  return `/${[...parts.slice(0, app + 1), ...LIVE_BELOW[level]].join('/')}`
+  const root = windows
+    ? parts.findIndex(
+        (part, i) => /^live \d/i.test(part) && parts[i - 1]?.toLowerCase() === 'ableton',
+      )
+    : parts.findIndex((part) => part.toLowerCase().endsWith('.app'))
+  if (root < 0) return typed
+  return pathOf([...parts.slice(0, root + 1), ...below(windows)[level]], windows)
 }
 
 /**
@@ -94,11 +135,12 @@ export interface Landmark {
   readonly own: number
 }
 
-/** The landmark of a folder of the Live app. */
-export function liveLandmark(level: LiveLevel): Landmark {
+/** The landmark of a folder of Live's own. */
+export function liveLandmark(level: LiveLevel, windows = false): Landmark {
+  const folders = below(windows)
   return {
-    names: level === 'core' ? LIVE_BELOW.core : LIVE_BELOW.resources,
-    own: LIVE_BELOW[level].length,
+    names: level === 'core' ? folders.core : folders.resources,
+    own: folders[level].length,
   }
 }
 
@@ -133,22 +175,24 @@ export function leadsTo(
   name: string,
   landmarks: readonly Landmark[],
   stored: Iterable<StoredPath>,
+  windows = false,
 ): Lead[] {
   const wanted = nameKey(name)
   const leads: Lead[] = []
   const seen = new Set<string>()
   for (const { path, version } of stored) {
-    if (!posix.isAbs(path) || posix.isWindowsPath(path)) continue
-    const parts = posix.splitPath(path)
+    const parts = partsOf(path, windows)
+    if (!parts) continue
     const keys = parts.map(nameKey)
     for (const { names, own } of landmarks) {
       const at = keys.findIndex((_, i) => names.every((part, k) => keys[i + k] === nameKey(part)))
       const end = at + own
-      // The folder is none of the root, and the path names a file below the landmark.
-      if (at < 0 || end === 0 || at + names.length >= parts.length) continue
+      // The folder is none of the root (nor a drive), and the path names a file below the
+      // landmark.
+      if (at < 0 || end <= (windows ? 1 : 0) || at + names.length >= parts.length) continue
       if (keys[end - 1] !== wanted) continue
       const lead = {
-        path: `/${parts.slice(0, end).join('/')}`,
+        path: pathOf(parts.slice(0, end), windows),
         inside: parts.slice(end).join('/'),
         version,
       }

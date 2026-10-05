@@ -4,16 +4,19 @@ livesaver finds the samples your Ableton Live sets have lost, collects them into
 
 ## Two ways to use it
 
-| | In your browser | On your Mac, with `livesaver web` |
+| | In your browser | On your computer, with `livesaver web` |
 |---|---|---|
-| Scan samples and plug-ins | yes | yes |
-| Fix missing samples | no | yes, with backups and undo |
-| See which plug-ins are installed | no | yes |
-| Upgrade VST2 plug-ins to VST3 | no | yes, with undo |
-| History and undo | no | yes |
+| Scan samples and plug-ins | yes, in every browser | yes |
+| Fix missing samples | in Chrome and Edge, once you let the page edit your project folder | yes, with backups and undo |
+| See which plug-ins are installed | once you show the page their folders | yes |
+| Upgrade VST2 plug-ins to VST3 | in Chrome and Edge, as for a fix | yes, with undo |
+| History and undo | of what that browser fixed | yes |
+| Checks that Live is not running | no: you quit Live before a fix | yes |
 | Install something | nothing | livesaver |
 
-Both are the same app. In a browser it can only read the folders you hand it; with livesaver behind it, it reads your disk itself and can write.
+Both are the same app. In a browser it reads the folders you hand it, and writes only into a project folder you let it edit; with livesaver behind it, it reads your disk itself and writes for you. See [In the browser](browser.md) for what a page can and cannot do.
+
+livesaver is made and tested on macOS. It also runs on Windows, which is new and not yet tried by a person: see [livesaver on Windows](windows.md).
 
 ## Try it in your browser
 
@@ -23,13 +26,15 @@ Both are the same app. In a browser it can only read the folders you hand it; wi
    - `Music/Ableton` in your home folder (your User Library and the Factory Packs),
    - the Ableton Live app itself, dropped on the page (it holds Live's Core Library),
    - `/Users/Shared`, if you have libraries from Native Instruments.
+
+   On Windows these folders have other places: the page names them, and so does [livesaver on Windows](windows.md#where-things-are).
 4. Press **Scan**.
 
-Nothing is uploaded: the page reads the files where they are, and asks no server for anything. See [In the browser](browser.md) for what a page can and cannot do.
+Nothing is uploaded: the page reads the files where they are, and asks no server for anything.
 
-## Install livesaver on your Mac
+## Install livesaver
 
-livesaver needs macOS and either [Bun](https://bun.sh) 1.3 or newer, or [Node.js](https://nodejs.org) 22.13 or newer.
+livesaver needs macOS or Windows (see [what is tested there](windows.md)), and either [Bun](https://bun.sh) 1.3 or newer, or [Node.js](https://nodejs.org) 22.13 or newer.
 
 livesaver 0.1 is in preparation and not on npm yet. Until it is, run it from its source:
 

@@ -1,7 +1,8 @@
 /**
- * Write port for Node/Bun on macOS (and other POSIX systems). Every operation either creates a new
- * file under a temporary name and links it into place, or replaces a set atomically after cloning
- * it (so Finder tags, comments, ACLs and mode survive). Nothing is ever overwritten or deleted.
+ * Write port for Node/Bun on macOS (and other POSIX systems, and Windows). Every operation either
+ * creates a new file under a temporary name and links it into place, or replaces a set atomically
+ * after cloning it (so Finder tags, comments, ACLs and mode survive). Nothing is ever overwritten
+ * or deleted.
  */
 import { spawn } from 'node:child_process'
 import { constants, existsSync } from 'node:fs'
@@ -28,8 +29,17 @@ import type { FsWrite } from '@livesaver/core'
 
 const bun = Boolean((globalThis as { Bun?: unknown }).Bun)
 const darwin = process.platform === 'darwin'
+const windows = process.platform === 'win32'
 /** Under Node, larger files are cloned with `cp -c` (libuv's copyfile never clones on macOS). */
 const CLONE_WITH_CP_FROM = 8 * 1024 * 1024
+/**
+ * Where a file goes on Windows that livesaver takes out of a project: a folder of its own, not
+ * the Recycle Bin. Told to recycle without a question, Windows deletes for good what its
+ * Recycle Bin cannot take: a file on a USB stick, or one larger than the bin (so its
+ * documentation of file operations says; not tried). Nothing livesaver removes may end like that.
+ */
+const windowsTrash = () =>
+  join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'livesaver', 'Trash')
 
 function run(command: string, args: readonly string[]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -63,6 +73,21 @@ async function copyData(source: string, target: string, size: number): Promise<v
 
 async function setTimes(path: string, atimeNs: bigint, mtimeNs: bigint): Promise<void> {
   await utimes(path, Number(atimeNs) / 1e9, Number(mtimeNs) / 1e9)
+}
+
+/**
+ * Moves a file to another drive: copied, and taken away only once the copy is whole. (A folder
+ * is not moved that way: it stays, and whoever asked is told.)
+ */
+async function moveToOtherDrive(path: string, target: string): Promise<void> {
+  const source = await lstat(path)
+  if (!source.isFile()) throw new Error(`${path} cannot be moved to another drive: it is no file`)
+  await copyFile(path, target, constants.COPYFILE_EXCL)
+  if ((await stat(target)).size !== source.size) {
+    await rm(target, { force: true })
+    throw new Error(`${path} could not be copied to ${target}`)
+  }
+  await unlink(path)
 }
 
 export interface NodeFsWriteOptions {
@@ -217,12 +242,22 @@ export class NodeFsWrite implements FsWrite {
     }
     const trashDir =
       this.trashDir ??
-      (darwin ? join(homedir(), '.Trash') : join(homedir(), '.local', 'share', 'Trash', 'files'))
+      (darwin
+        ? join(homedir(), '.Trash')
+        : windows
+          ? windowsTrash()
+          : join(homedir(), '.local', 'share', 'Trash', 'files'))
     await mkdir(trashDir, { recursive: true })
     const ext = extname(path)
     const stem = basename(path, ext)
     let target = join(trashDir, basename(path))
     for (let n = 2; existsSync(target); n++) target = join(trashDir, `${stem} ${n}${ext}`)
-    await rename(path, target)
+    try {
+      await rename(path, target)
+    } catch (error) {
+      // Windows: the trash folder lies on the system's drive, the file perhaps on another.
+      if (!windows || (error as NodeJS.ErrnoException).code !== 'EXDEV') throw error
+      await moveToOtherDrive(path, target)
+    }
   }
 }

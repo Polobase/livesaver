@@ -14,6 +14,10 @@ library, all without Live running. Fast, byte-exact, and safe by default.
 guide, and the app to try in your browser. New here? Start with the
 [guide](docs/guide/getting-started.md): from the first scan to an undo.
 
+**macOS and Windows.** livesaver is made and tested on macOS. Windows is new and only tested on
+macOS so far (paths with drives, Ableton's folders there): no one has tried it
+with Live on a Windows computer yet. See [livesaver on Windows](docs/guide/windows.md).
+
 ## Quick start
 ```sh
 livesaver env                          # what livesaver found: Live, User Library, packs, search roots
@@ -168,7 +172,7 @@ what the command line reports.
 | [`@livesaver/ops`](packages/ops) | Operations: doctor, collect, status, reorg, move, journal and undo, reports |
 | [`@livesaver/plugins`](packages/plugins) | Plug-in identity and inventory (installed, native or Rosetta), byte-exact VST2→VST3 conversion |
 | [`@livesaver/catalog`](packages/catalog) | Catalog of sets, plug-ins and samples in SQLite (FTS5), incremental indexing, the `find` language |
-| [`@livesaver/node`](packages/node) | Node.js/Bun host: file system, gzip, worker threads, Finder tags and comments, Live setup discovery |
+| [`@livesaver/node`](packages/node) | Node.js/Bun host: file system, gzip, worker threads, Finder tags and comments, Live setup discovery (macOS, and Windows as documented) |
 | [`@livesaver/web`](packages/web) | Browser host: uploaded, dropped or picked folders as a file system, worker-based parsing, a scan of samples and plug-ins in the page (with what is installed, from folders it is shown), and a fix and a plug-in upgrade through folder handles |
 | [`livesaver`](packages/cli) | The command-line tool |
 | [`apps/web`](apps/web) | The web app: Vite, Vue, Nuxt UI (not published) |

@@ -149,8 +149,15 @@ async function placeOf(fs: WebFs, root: string, paths: readonly string[]): Promi
   return best
 }
 
-/** The plug-ins the given folders show, and what Live's database says of them. */
-export async function installedIn(folders: readonly FolderInput[]): Promise<Installed> {
+/**
+ * The plug-ins the given folders show, and what Live's database says of them. `windows`: there
+ * the database is all there is to read. Its rows count as they are: a plug-in is a file whose
+ * place the page is not given, and there is one kind of processor.
+ */
+export async function installedIn(
+  folders: readonly FolderInput[],
+  windows = false,
+): Promise<Installed> {
   const standIn = (i: number) => `/.given/${i}`
   const looked = new WebFs(
     folders.map((folder, i) => ({ path: standIn(i), source: folder.source })),
@@ -167,7 +174,29 @@ export async function installedIn(folders: readonly FolderInput[]): Promise<Inst
     }
     given.push({ folder, at: standIn(i), plugins })
   }
-  const database = await databaseOf(looked, given)
+  const read = await databaseOf(looked, given)
+  // (Windows writes the paths with `\`.)
+  const slash = <T extends { readonly path: string | null }>(row: T): T =>
+    windows && row.path ? { ...row, path: posix.slashed(row.path) } : row
+  const database = {
+    found: read.found,
+    plugins: read.plugins.map(slash),
+    modules: read.modules.map(slash),
+  }
+  if (windows) {
+    return {
+      inventory: await loadInventory(new WebFs([]), {
+        database: { plugins: database.plugins, modules: database.modules },
+        pluginRoots: [],
+        systemComponents: '',
+        oneProcessor: true,
+        unseenFiles: true,
+      }),
+      catalog: catalogOf(database.plugins),
+      roots: [],
+      database: database.found,
+    }
+  }
   const named = [...database.modules, ...database.plugins].flatMap((row) =>
     row.path ? [row.path] : [],
   )
@@ -198,18 +227,15 @@ export async function installedIn(folders: readonly FolderInput[]): Promise<Inst
     // (The Audio Units of macOS itself lie where a page is not given a folder: see below.)
     systemComponents: '',
   })
-  return {
-    inventory,
-    catalog: addCatalogRows(
-      new Map(),
-      database.plugins.map((row) => ({
-        devIdentifier: row.devIdentifier ?? '',
-        name: row.name ?? '',
-      })),
-    ),
-    roots,
-    database: database.found,
-  }
+  return { inventory, catalog: catalogOf(database.plugins), roots, database: database.found }
+}
+
+/** The VST3 plug-ins among the database's rows, by class id. */
+function catalogOf(plugins: readonly DbPlugin[]): Catalog {
+  return addCatalogRows(
+    new Map(),
+    plugins.map((row) => ({ devIdentifier: row.devIdentifier ?? '', name: row.name ?? '' })),
+  )
 }
 
 /**

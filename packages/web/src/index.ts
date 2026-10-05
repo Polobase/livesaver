@@ -83,6 +83,7 @@ export {
   serveParser,
   type WorkerParserOptions,
 } from './parser.js'
+export { onWindows } from './platform.js'
 export {
   type DirectoryHandleLike,
   editable,

@@ -4,8 +4,6 @@
  * backups, journal and undo as on the command line.
  */
 import { existsSync, readdirSync, rmSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
 import { posix } from '@livesaver/core'
 import { createNodeHost, liveIsRunning } from '@livesaver/node'
 import { checkView, type DoctorEvent, isInside, undoRun } from '@livesaver/ops'
@@ -18,6 +16,7 @@ import {
   resolveConfig,
   resolveStatusConfig,
 } from '../config.js'
+import { basename, dirname, home, join, windowsFolder } from '../paths.js'
 import { acquireLock, cachePath, readText, runsDir, stateDir, writeStateFile } from '../state.js'
 import type {
   WebEvent,
@@ -112,24 +111,37 @@ function checkedBefore(): string[] {
     const paths = Object.keys(sets ?? {})
     if (paths.length === 0) return []
     const common = posix.commonpath(paths.map((path) => dirname(path)))
-    const deep = posix.splitPath(common).length > posix.splitPath(homedir()).length
+    const deep = posix.splitPath(common).length > posix.splitPath(home()).length
     return deep && isFolder(common) ? [common] : []
   } catch {
     return []
   }
 }
 
+const windows = process.platform === 'win32'
+
+/** The drives of Windows, each a root of its own (a Mac shows its volumes in one folder). */
+function drives(): WebPlace[] {
+  return [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ']
+    .map((letter) => ({ name: `${letter}:`, path: `${letter}:/` }))
+    .filter((drive) => isFolder(drive.path))
+}
+
 function places(): WebPlace[] {
-  const home = homedir()
+  const folder = home()
   const fixed = [
-    { name: 'Home', path: home },
-    ...['Documents', 'Music', 'Desktop'].map((name) => ({ name, path: join(home, name) })),
-    { name: 'Shared', path: '/Users/Shared' },
+    { name: 'Home', path: folder },
+    ...['Documents', 'Music', 'Desktop'].map((name) => ({ name, path: join(folder, name) })),
+    windows
+      ? { name: 'Public', path: windowsFolder('PUBLIC', 'C:/Users/Public') }
+      : { name: 'Shared', path: '/Users/Shared' },
   ]
   let volumes: WebPlace[] = []
-  try {
-    volumes = readdirSync('/Volumes').map((name) => ({ name, path: join('/Volumes', name) }))
-  } catch {}
+  if (windows) volumes = drives()
+  else
+    try {
+      volumes = readdirSync('/Volumes').map((name) => ({ name, path: join('/Volumes', name) }))
+    } catch {}
   return [...fixed, ...volumes].filter((place) => isFolder(place.path))
 }
 
@@ -159,8 +171,9 @@ export async function webInfo(settings: WebSettings = {}): Promise<WebInfo> {
       coreLibrary: there(appResources ? join(appResources, 'Core Library') : ''),
       remembered: last !== undefined,
     },
-    home: homedir(),
+    home: home(),
     places: places(),
+    // (On Windows the folder is called like its Live, without "Ableton".)
     live: config.install ? basename(config.install.app, '.app') : '',
     projects: (last?.projects ?? fromSettings).filter(isFolder),
     suggested: last || fromSettings.length ? [] : checkedBefore(),
@@ -180,8 +193,11 @@ export async function webInfo(settings: WebSettings = {}): Promise<WebInfo> {
   }
 }
 
-/** Where Live's App-Resources folder may lie in a folder: it is it, the app's Contents, or the app. */
-const APP_RESOURCES_IN = ['', 'App-Resources', join('Contents', 'App-Resources')]
+/**
+ * Where Live's App-Resources folder may lie in a folder: it is it, the app's Contents, or the
+ * app; on Windows it is the folder `Resources` of Live's folder.
+ */
+const APP_RESOURCES_IN = ['', 'App-Resources', 'Contents/App-Resources', 'Resources']
 
 /** The Core Library of the Live app `path` is (or is a folder of), else ''. */
 function coreLibraryIn(path: string): string {
@@ -198,13 +214,19 @@ function coreLibraryIn(path: string): string {
  */
 function searchFolder(path: string): string {
   const name = basename(path).toLowerCase()
-  const ofLive = name.endsWith('.app') || name === 'contents' || name === 'app-resources'
+  const ofLive =
+    name.endsWith('.app') ||
+    name === 'contents' ||
+    name === 'app-resources' ||
+    // Windows: Live's folder (`Live 12 Suite`) and its `Resources`.
+    name === 'resources' ||
+    /^live \d/.test(name)
   return (ofLive && coreLibraryIn(path)) || path
 }
 
 /** The folders in `path` ('' = the home folder), hidden ones left out. */
 export function webFolders(path: string): WebFolders {
-  const folder = absolute(path || homedir())
+  const folder = absolute(path || home())
   const names = readdirSync(folder, { withFileTypes: true })
     .filter((entry) => !entry.name.startsWith('.'))
     // A link to a folder is a folder to choose, too.

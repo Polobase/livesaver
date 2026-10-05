@@ -3,6 +3,7 @@
 import { computed, ref } from 'vue'
 import { plural } from '../../lib/format'
 import { absentWords, PLUGIN_DATABASE, PLUGIN_FOLDER } from '../../lib/library'
+import { platform } from '../../lib/platform'
 import { liveGuideOpen } from '../../shell/guide'
 import { useEngineStore } from '../../stores/engine'
 import { useLibraryStore } from '../../stores/library'
@@ -45,12 +46,26 @@ const absent = computed(() =>
     library.projects.some((folder) => folder.waits === 'folder'),
   ),
 )
+/** A Mac's plug-ins say what they are in their bundles; on Windows Live's database does. */
+const wantsPluginFolder = computed(
+  () => !platform.windows && !library.installedHolds.has(PLUGIN_FOLDER),
+)
 </script>
 
 <template>
   <div class="space-y-4">
     <!-- Before a folder is handed over: what that means, and that nothing leaves the computer. -->
     <FolderAccessInfo v-if="!onComputer" :compact="compact" />
+    <!-- Said where a Windows user starts: what was tried, and what was only read up on. -->
+    <UAlert
+      v-if="platform.windows && !compact"
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-flask-conical"
+      title="Windows: only tested on macOS so far"
+      description="livesaver is made and tested on a Mac. On Windows it works from what Ableton documents and from sets that were saved on Windows. A fix keeps a backup of every set it rewrites and can be undone; all the same, try it on a copy of a project first."
+      data-testid="windows-note"
+    />
     <UAlert
       v-if="library.asleep.length"
       color="neutral"
@@ -134,8 +149,8 @@ const absent = computed(() =>
           <ul class="mt-1 list-disc space-y-1 ps-5">
             <li v-if="library.wanted.libraries">
               your User Library and Factory Packs: the folder
-              <code class="text-xs">Music/Ableton</code>
-              in your home folder;
+              <code class="text-xs">{{ platform.libraries.folder }}</code>
+              {{ platform.libraries.where }};
             </li>
             <li v-if="library.wanted.live">
               <template v-if="onComputer">
@@ -143,7 +158,7 @@ const absent = computed(() =>
                 <code class="text-xs">Contents/App-Resources/Core Library</code>).
               </template>
               <template v-else>
-                Live's own content: drag the Ableton Live app here from your Applications folder.
+                Live's own content: {{ platform.liveContent }}
                 <!-- (On the grey of this box the usual grey of a link is too faint.) -->
                 <UButton
                   class="p-0 text-default underline"
@@ -164,32 +179,39 @@ const absent = computed(() =>
       v-if="plugins && !onComputer"
       kind="installed"
       title="Installed plug-ins"
-      hint="Optional. A page cannot see what is installed on your computer, but you can show it: with these folders, the scan says which plug-ins of your sets are missing or run only under Rosetta."
+      :hint="`Optional. A page cannot see what is installed on your computer, but you can show it: with ${platform.windows ? 'this folder' : 'these folders'}, the scan says which plug-ins of your sets are missing${platform.windows ? '' : ' or run only under Rosetta'}.`"
       :disabled="scans.running"
     >
       <div
-        v-if="!library.installedHolds.has(PLUGIN_FOLDER) || !library.installedHolds.has(PLUGIN_DATABASE)"
+        v-if="wantsPluginFolder || !library.installedHolds.has(PLUGIN_DATABASE)"
         class="mx-4 mb-4 rounded-md bg-elevated/60 p-3 text-sm"
         data-testid="wanted-installed"
       >
         <p class="text-muted">Not added yet:</p>
         <ul class="mt-1 list-disc space-y-1 ps-5">
-          <li v-if="!library.installedHolds.has(PLUGIN_FOLDER)">
+          <li v-if="wantsPluginFolder">
             your plug-ins: the folder <code class="text-xs">/Library/Audio/Plug-Ins</code> (and
             <code class="text-xs">Library/Audio/Plug-Ins</code>
             in your home folder, if you have plug-ins there);
           </li>
           <li v-if="!library.installedHolds.has(PLUGIN_DATABASE)">
             Live's plug-in database: the folder
-            <code class="text-xs">Library/Application Support/Ableton/Live Database</code>
-            in your home folder. It knows the VST plug-ins by their ids; without it most of them
-            cannot be recognised.
+            <code class="text-xs">{{ platform.database.folder }}</code>
+            {{ platform.database.where }}. It knows the VST plug-ins by their ids; without it most
+            of them cannot be recognised.
           </li>
         </ul>
         <p class="mt-2 text-muted">
-          The Library of your home folder is hidden: in the folder dialog, press
-          <UKbd value="meta" /> <UKbd value="shift" /> <UKbd value="G" /> and type the path,
-          starting with <code class="text-xs">~/Library</code>.
+          <template v-if="platform.windows">
+            AppData is a hidden folder: in the folder dialog, {{ platform.hiddenInDialog }}. (What a
+            plug-in's own file says of it is read on a Mac only: on Windows the page knows the
+            plug-ins that Live has scanned.)
+          </template>
+          <template v-else>
+            The Library of your home folder is hidden: in the folder dialog, press
+            <UKbd value="meta" /> <UKbd value="shift" /> <UKbd value="G" /> and type the path,
+            starting with <code class="text-xs">~/Library</code>.
+          </template>
         </p>
       </div>
     </FolderList>

@@ -3,8 +3,6 @@
  * discovery of the local Live setup, ~/.config/livesaver/config.json, and CLI flags.
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
 import { EMPTY_REMAP } from '@livesaver/core'
 import {
   findLiveInstalls,
@@ -22,6 +20,7 @@ import {
   type TagKey,
   type Thresholds,
 } from '@livesaver/ops'
+import { dirname, home, join, resolve, windowsFolder } from './paths.js'
 
 /**
  * `status`, `reorg` and the rating sheet (all optional). Names replace those of the default
@@ -54,15 +53,30 @@ export interface FileConfig {
   readonly packLimitMB?: number
 }
 
-export const CONFIG_PATH = join(homedir(), '.config', 'livesaver', 'config.json')
+export const CONFIG_PATH = join(home(), '.config', 'livesaver', 'config.json')
 
 export function expandHome(path: string): string {
-  return path === '~' ? homedir() : path.startsWith('~/') ? join(homedir(), path.slice(2)) : path
+  // (On Windows a path may be typed with `\`.)
+  return path === '~' ? home() : /^~[/\\]/.test(path) ? join(home(), path.slice(2)) : path
 }
 
+/** A path as it was typed, as livesaver handles paths (see `paths.ts`). */
 export function absolute(path: string): string {
   return resolve(expandHome(path))
 }
+
+const windows = process.platform === 'win32'
+/**
+ * Where Live keeps the User Library and the Factory Packs unless its settings say otherwise,
+ * and where vendors install their libraries (Native Instruments). On Windows as Ableton and
+ * Native Instruments document it.
+ */
+const ABLETON_FOLDER = windows
+  ? join(home(), 'Documents', 'Ableton')
+  : join(home(), 'Music', 'Ableton')
+const VENDOR_FOLDER = windows
+  ? join(windowsFolder('PUBLIC', 'C:/Users/Public'), 'Documents')
+  : '/Users/Shared'
 
 export function readFileConfig(path = CONFIG_PATH): FileConfig {
   if (!existsSync(path)) return {}
@@ -100,10 +114,10 @@ export async function resolveConfig(overrides: CliOverrides = {}): Promise<Resol
 
   // Discovered defaults: Library.cfg for the User Library and pack folder.
   const library = await readLibraryConfig(install?.version)
-  const musicAbleton = join(homedir(), 'Music', 'Ableton')
+  const musicAbleton = ABLETON_FOLDER
   const discoveredLibrary = library?.userLibrary ?? join(musicAbleton, 'User Library')
   const packDirs = (library?.packs ?? []).map((p) => dirname(p.path)).filter((p) => p !== '.')
-  const vendor = existsSync('/Users/Shared') ? ['/Users/Shared'] : []
+  const vendor = existsSync(VENDOR_FOLDER) ? [VENDOR_FOLDER] : []
   const base: Required<Omit<FileConfig, 'status'>> = {
     userLibrary: discoveredLibrary,
     factoryPacks: mostCommon(packDirs) ?? join(musicAbleton, 'Factory Packs'),

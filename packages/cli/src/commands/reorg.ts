@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
 import { posix } from '@livesaver/core'
 import { createNodeHost, createWorkerParser, liveIsRunning } from '@livesaver/node'
 import {
@@ -21,6 +20,7 @@ import {
 } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute, resolveConfig, resolveStatusConfig } from '../config.js'
+import { join, relative } from '../paths.js'
 import {
   acquireLock,
   cachePath,

@@ -5,11 +5,11 @@
  * which a scan that is repeated after every fix should not wait for. And the upgrade itself,
  * like `livesaver plugins upgrade --apply`.
  */
-import { basename } from 'node:path'
 import { auditSets, pluginsView, type SetUpgrade, upgradeView } from '@livesaver/ops'
 import { derivedTarget, KNOWN } from '@livesaver/plugins'
 import { collectRun } from '../commands/doctor.js'
 import { loadPluginSources, upgradablePlugins, upgradeRun } from '../commands/plugins.js'
+import { basename } from '../paths.js'
 import { acquireLock } from '../state.js'
 import {
   LIVE_RUNNING,

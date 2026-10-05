@@ -7,11 +7,17 @@
 import type { FolderSource } from '../source.js'
 
 /**
- * Where `App-Resources` may lie in a given folder: the folder is it, or is the `Contents` folder
- * of the Live app, or is the Live app itself. An app is a folder to a drop, while a folder dialog
- * does not open it.
+ * Where Live's resources may lie in a given folder: the folder is `App-Resources`, or is the
+ * `Contents` folder of the Live app, or is the Live app itself (an app is a folder to a drop,
+ * while a folder dialog does not open it). On Windows the folder is `Resources`, or Live's
+ * folder in `ProgramData/Ableton` that holds it.
  */
-export const APP_RESOURCES_IN = ['', 'App-Resources', 'Contents/App-Resources'] as const
+export const APP_RESOURCES_IN = [
+  '',
+  'App-Resources',
+  'Contents/App-Resources',
+  'Resources',
+] as const
 
 export interface Holds {
   readonly userLibrary: boolean

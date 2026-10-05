@@ -1,6 +1,6 @@
-# Live installation and library locations (macOS)
+# Live installation and library locations
 
-Where Live keeps its app resources, its library folders and its own databases on a Mac, and how livesaver finds them without being told.
+Where Live keeps its app resources, its library folders and its own databases, and how livesaver finds them without being told. Everything below was read on a Mac; [Windows](#windows) is at the end, from Ableton's documentation.
 
 ## App
 - `/Applications/Ableton Live <n> <Edition>.app`
@@ -70,3 +70,22 @@ livesaver reads these two values with simple patterns and falls back to the fold
 - `~/Music/Ableton/User Library` and `~/Music/Ableton/Factory Packs`: Live's defaults (livesaver reads the real ones from `Library.cfg`)
 - `/Users/Shared`: Native Instruments content from Native Access (a vendor library: files re-saved by the vendor match by size and CRC as described in fingerprints.md)
 - preferred roots for tie-breaks (configurable, e.g. your own sample folder first)
+
+## Windows
+Not seen on a Windows computer: these places are the ones Ableton documents, and livesaver looks there (`packages/node/src/live.ts`, `live-plugins.ts`).
+
+| | macOS | Windows |
+|---|---|---|
+| Live | `/Applications/Ableton Live <n> <Edition>.app` | `%ProgramData%\Ableton\Live <n> <Edition>` |
+| Its resources (Core Library, `Builtin`, `Database`) | `Contents/App-Resources` | `Resources` |
+| Preferences | `~/Library/Preferences/Ableton/Live <x.y.z>` | `%APPDATA%\Ableton\Live <x.y.z>\Preferences` |
+| Live's databases | `~/Library/Application Support/Ableton/Live Database` | `%LOCALAPPDATA%\Ableton\Live Database` |
+| User Library, Factory Packs (default) | `~/Music/Ableton` | `Documents\Ableton` in the user folder |
+| Vendor libraries (Native Instruments) | `/Users/Shared` | `%PUBLIC%\Documents` |
+| The running program | process `Live` | `Ableton Live <n> <Edition>.exe` |
+
+- **Version:** Windows has no `Info.plist`; livesaver takes the number in the folder's name (`12`).
+- **`Library.cfg`:** its paths are slashed when read (`C:\Users\…` becomes `C:/Users/…`).
+- **Plug-ins:** only the plug-in database is read. Its `processor` column is ignored there (one kind of processor, no Rosetta), and so is the plug-in's own file.
+- **What livesaver removes** goes to `%LOCALAPPDATA%\livesaver\Trash`, not to the Recycle Bin: asked to recycle without a question, Windows deletes for good what the bin cannot take (so its documentation of file operations says; `packages/node/src/write.ts`).
+- **Whether Live runs:** `tasklist /FO CSV /NH`, a line that starts with `"Ableton Live `. (`Ableton Index.exe` is not Live.)

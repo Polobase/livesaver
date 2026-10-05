@@ -109,6 +109,49 @@ describe('posix paths (Python posixpath semantics)', () => {
     expect(posix.commonpath(['/a/b/c', '/a/b/d', '/a/bx'])).toBe('/a')
   })
 
+  test('a path of Windows is written with slashes, and its drive is a root of its own', () => {
+    // As a set of Live 9 stores it, and as Live 11 writes it (and livesaver handles it).
+    expect(posix.slashed('E:\\Music\\Song Project\\Samples\\1.wav')).toBe(
+      'E:/Music/Song Project/Samples/1.wav',
+    )
+    expect(posix.slashed('/Users/me/1.wav')).toBe('/Users/me/1.wav')
+    expect(['C:/Users', 'c:\\Users', 'C:', '/Users', 'Users/C:/x', ''].map(posix.drive)).toEqual([
+      'C:',
+      'c:',
+      'C:',
+      '',
+      '',
+      '',
+    ])
+    expect(['C:/Users', '/Users', 'C:Users', 'Users', 'C:'].map(posix.isAbs)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ])
+    expect(posix.normpath('c:/a/b/../c/./d/')).toBe('C:/a/c/d')
+    expect(posix.normpath('C:/a/../..')).toBe('C:/')
+    expect(posix.normpath('C:')).toBe('C:/')
+    expect(posix.join('C:/Music', 'Song', 'D:/Other/1.wav')).toBe('D:/Other/1.wav')
+    expect(posix.join('C:/Music', 'Song Project', 'Samples')).toBe('C:/Music/Song Project/Samples')
+    expect([
+      posix.dirname('C:/Music/Song'),
+      posix.dirname('C:/Music'),
+      posix.dirname('C:/'),
+    ]).toEqual(['C:/Music', 'C:/', 'C:/'])
+    expect(posix.basename('C:/Music/Song.als')).toBe('Song.als')
+    expect(posix.relpath('C:/p/Samples/Imported/1.wav', 'C:/p')).toBe('Samples/Imported/1.wav')
+    expect(posix.relpath('c:/a/x/1.wav', 'C:/a/b/c')).toBe('../../x/1.wav')
+    // No way leads from one drive to another, nor from a drive to a POSIX path.
+    expect(posix.relpath('D:/Samples/1.wav', 'C:/Music')).toBe('D:/Samples/1.wav')
+    expect(posix.relpath('C:/Samples/1.wav', '/Users/me')).toBe('C:/Samples/1.wav')
+    expect(posix.commonpath(['C:/a/b/c', 'C:/a/b/d', 'c:/a/bx'])).toBe('C:/a')
+    expect(posix.commonpath(['C:/a', 'C:/b'])).toBe('C:/')
+    expect(posix.commonpath(['C:/a', 'D:/a'])).toBe('')
+    expect(posix.commonpath(['C:/a', '/a'])).toBe('')
+  })
+
   test('splitPath handles Windows paths', () => {
     expect(posix.splitPath('E:\\Samples\\Lib1\\Kick\\1.wav')).toEqual([
       'E:',

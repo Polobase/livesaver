@@ -24,6 +24,7 @@ export const SECTIONS: readonly DocSection[] = [
       ['/docs/guide/history'],
       ['/docs/guide/browser'],
       ['/docs/guide/command-line'],
+      ['/docs/guide/windows', 'On Windows'],
       ['/docs/guide/safety', 'Safety'],
       ['/docs/guide/questions'],
     ],

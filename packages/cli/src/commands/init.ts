@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
 import pc from 'picocolors'
 import { CONFIG_PATH, type FileConfig, resolveConfig } from '../config.js'
+import { dirname } from '../paths.js'
 
 export interface InitFlags {
   readonly force?: boolean

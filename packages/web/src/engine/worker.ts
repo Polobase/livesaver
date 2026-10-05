@@ -58,6 +58,7 @@ export function serveEngine(scope: EngineScope, options: EngineWorkerOptions): v
     search: wire.search.map(folder),
     ...(wire.installed ? { installed: wire.installed.map(folder) } : {}),
     options: wire.options,
+    ...(wire.windows === undefined ? {} : { windows: wire.windows }),
   })
   const emit = (event: FromEngine) => scope.postMessage(event)
 

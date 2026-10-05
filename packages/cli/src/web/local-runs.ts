@@ -4,9 +4,9 @@
  */
 import { execFile } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
 import { createNodeHost } from '@livesaver/node'
 import { readJournal, runSteps, runSummary } from '@livesaver/ops'
+import { isAbsolute, join } from '../paths.js'
 import { listRuns, readRun, runsDir } from '../state.js'
 import type { WebSettings } from './local.js'
 import type { WebRun, WebRunDetail } from './protocol.js'
@@ -59,6 +59,8 @@ export function webReport(id: string, name: string): string {
 const FILE_MANAGER: Readonly<Record<string, (path: string) => [string, string[]]>> = {
   // Finder opens the folder and selects the file.
   darwin: (path) => ['open', ['-R', path]],
+  // So does File Explorer, which takes the path as Windows writes it.
+  win32: (path) => ['explorer.exe', [`/select,${path.replaceAll('/', '\\')}`]],
 }
 
 /** Free space on the volume a folder lies on: a fix copies samples into the projects. */
@@ -78,7 +80,10 @@ export async function webReveal(path: string, settings: WebSettings = {}): Promi
   const command = FILE_MANAGER[process.platform]?.(path)
   if (!command) throw new Error('Showing a file is not supported on this system.')
   await new Promise<void>((resolve, reject) => {
-    // No shell: the path is one argument, whatever characters it has.
-    execFile(command[0], command[1], (error) => (error ? reject(error) : resolve()))
+    // No shell: the path is one argument, whatever characters it has. (File Explorer ends with
+    // an error code also when it showed the file.)
+    execFile(command[0], command[1], (error) =>
+      error && process.platform !== 'win32' ? reject(error) : resolve(),
+    )
   })
 }

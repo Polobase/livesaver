@@ -20,6 +20,7 @@ import {
   holdsOf,
   installedHoldsOf,
   lostBehindHandle,
+  onWindows,
   planUpgradeInWorker,
   type ScanEvent,
   type StateFolder,
@@ -317,6 +318,8 @@ export class BrowserEngine implements Engine {
         ? { installed: request.installed.map((folder) => this.input(folder)) }
         : {}),
       options: { ...request.options },
+      // The page knows its browser; the worker need not be asked.
+      windows: onWindows(),
     }
   }
 

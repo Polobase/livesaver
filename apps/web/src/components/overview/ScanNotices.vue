@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
 import { bytes, count, plural, when } from '../../lib/format'
+import { platform } from '../../lib/platform'
 import { TAKEN_OUT } from '../../lib/runs'
 import { liveGuideOpen } from '../../shell/guide'
 import { useEngineStore } from '../../stores/engine'
@@ -37,7 +38,9 @@ const earlier = computed(() => (fix.fixed ? undefined : fix.last))
 const liveAdvice = computed(() =>
   engines.capabilities.paths
     ? 'Add the Core Library of your Live app to the sample folders (in the app: Contents/App-Resources/Core Library), and scan again.'
-    : 'Drag the Ableton Live app from your Applications folder onto the sample folders, and scan again.',
+    : platform.windows
+      ? 'Add the folder “Resources” of Live (in C:\\ProgramData\\Ableton\\Live 12 Suite) to the sample folders, and scan again.'
+      : 'Drag the Ableton Live app from your Applications folder onto the sample folders, and scan again.',
 )
 </script>
 

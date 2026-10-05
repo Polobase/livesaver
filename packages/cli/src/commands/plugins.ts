@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import type { SetParser } from '@livesaver/core'
 import {
   createNodeHost,
@@ -30,6 +29,7 @@ import {
 import { type Catalog, type Inventory, KNOWN } from '@livesaver/plugins'
 import pc from 'picocolors'
 import { absolute } from '../config.js'
+import { join } from '../paths.js'
 import { acquireLock, audioUnitsCachePath, endRun, newRun } from '../state.js'
 
 /** What is installed on this computer, and the VST3 plug-ins Live knows. */

@@ -78,8 +78,10 @@ export async function runWeb(flags: WebFlags, version: string): Promise<number> 
     for (const line of pairingHint(server.url)) console.log(pc.dim(line))
   }
   console.log(pc.dim('It runs until you stop it with Ctrl-C.'))
-  if (flags.open !== false && process.platform === 'darwin')
-    spawn('open', [link ?? server.url], { stdio: 'ignore', detached: true }).unref()
+  // (On Windows, File Explorer hands an address to the browser.)
+  const opener = { darwin: 'open', win32: 'explorer.exe' }[process.platform as string]
+  if (flags.open !== false && opener)
+    spawn(opener, [link ?? server.url], { stdio: 'ignore', detached: true }).unref()
   await new Promise<void>((resolve) => {
     process.once('SIGINT', resolve)
     process.once('SIGTERM', resolve)

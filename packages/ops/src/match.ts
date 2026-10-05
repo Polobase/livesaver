@@ -51,7 +51,12 @@ export interface ChooseOptions {
   readonly certainOnly?: boolean
 }
 
-const APP_RESOURCES_RE = /^\/Applications\/Ableton Live [^/]*\.app\/Contents\/App-Resources\/(.+)$/
+/**
+ * A file in the resources of a Live that may no longer be installed: of the app on a Mac, or of
+ * the program's folder on Windows (as Ableton documents it; not seen in a set).
+ */
+const APP_RESOURCES_RE =
+  /^(?:\/Applications\/Ableton Live [^/]*\.app\/Contents\/App-Resources|[A-Za-z]:\/ProgramData\/Ableton\/Live [^/]*\/Resources)\/(.+)$/
 
 /** What `resolveExisting` reads of a reference (a stored copy is enough, no parsed set needed). */
 export type RefLocation = Pick<
@@ -91,10 +96,18 @@ export function expectedPlaces(
         break
     }
   }
-  for (const path of storedPaths(ref)) {
-    if (posix.isWindowsPath(path)) continue
+  // A path of Windows is a path of this computer where the project itself lies on a drive.
+  // Elsewhere no such file can be opened, and the path is one of a computer of long ago.
+  const onWindows = posix.drive(projectRoot) !== ''
+  for (const stored of storedPaths(ref)) {
+    if (posix.isWindowsPath(stored) && !onWindows) continue
+    // (A set of Live 9 or 10 stores it with backslashes, Live 11 and later with slashes.)
+    const path = posix.slashed(stored)
     if (posix.isAbs(path)) {
-      tries.push(path)
+      // A path of a Mac is no file on Windows either, though Windows would open `/Users/me/x.wav`
+      // as a file of its current drive: Live does not find it there. What such a path says of
+      // Live's own content still holds.
+      if (posix.drive(path) !== '' || !onWindows) tries.push(path)
       const m = APP_RESOURCES_RE.exec(path) // file of an older, uninstalled Live version
       if (m) tries.push(joinIf(env.appResources, m[1] as string))
     } else {

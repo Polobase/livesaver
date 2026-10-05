@@ -1,6 +1,4 @@
 import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import { Catalog, type FoundSet, indexSets, QueryError, searchCatalog } from '@livesaver/catalog'
 import {
   createNodeHost,
@@ -11,6 +9,7 @@ import {
 import { duration } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute, resolveConfig } from '../config.js'
+import { home, join } from '../paths.js'
 import { audioUnitsCachePath, stateDir } from '../state.js'
 
 export function catalogPath(): string {
@@ -98,8 +97,8 @@ export interface FindFlags {
   readonly paths?: boolean
 }
 
-const home = homedir()
-const short = (p: string) => (p.startsWith(`${home}/`) ? `~${p.slice(home.length)}` : p)
+const homeFolder = home()
+const short = (p: string) => (p.startsWith(`${homeFolder}/`) ? `~${p.slice(homeFolder.length)}` : p)
 
 function describe(s: FoundSet): string {
   const facts = [

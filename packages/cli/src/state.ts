@@ -10,15 +10,16 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
 import type { RunContext, RunRecord } from '@livesaver/ops'
+import { dirname, home, join, slashed, windowsFolder } from './paths.js'
 
 export function stateDir(): string {
-  if (process.env.LIVESAVER_HOME) return process.env.LIVESAVER_HOME
+  if (process.env.LIVESAVER_HOME) return slashed(process.env.LIVESAVER_HOME)
   if (process.platform === 'darwin')
-    return join(homedir(), 'Library', 'Application Support', 'livesaver')
-  return join(process.env.XDG_STATE_HOME ?? join(homedir(), '.local', 'state'), 'livesaver')
+    return join(home(), 'Library', 'Application Support', 'livesaver')
+  if (process.platform === 'win32')
+    return join(windowsFolder('LOCALAPPDATA', join(home(), 'AppData', 'Local')), 'livesaver')
+  return join(process.env.XDG_STATE_HOME ?? join(home(), '.local', 'state'), 'livesaver')
 }
 
 export function runsDir(): string {

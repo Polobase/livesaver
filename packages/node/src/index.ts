@@ -15,14 +15,19 @@ export {
   nodeCodec,
   nodeHash,
   nodeSearch,
+  refusedByWindows,
+  WindowsFs,
 } from './host.js'
 export {
   compareVersions,
   findLiveInstalls,
+  installRoot,
   type LibraryConfig,
   type LiveInstall,
+  liveInTaskList,
   liveIsRunning,
   type PackSlice,
+  preferencesRoot,
   readLibraryConfig,
   readRemapTable,
   readTextLenient,
@@ -41,6 +46,8 @@ export {
   SYSTEM_COMPONENTS,
   withLiveDatabase,
 } from './live-plugins.js'
+/** `node:path` as livesaver handles paths: `/` between the parts, on Windows too. */
+export * as nodePath from './paths.js'
 export { openDatabase, openReadonly, type ReadonlyDb } from './sqlite.js'
 export {
   createWorkerParser,

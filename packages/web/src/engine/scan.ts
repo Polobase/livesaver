@@ -25,6 +25,7 @@ import { Inventory } from '@livesaver/plugins'
 import type { Mount, WebFs } from '../fs.js'
 import { createWebHost, type WebHost } from '../host.js'
 import { createWorkerParser, defaultWorkerCount, type ParseWorker } from '../parser.js'
+import { onWindows } from '../platform.js'
 import type { WritableMount } from '../write.js'
 import { APP_RESOURCES_IN } from './ableton.js'
 import { installedIn, withAppleUnits } from './installed.js'
@@ -69,7 +70,7 @@ async function ableton(
       appResources = dir
       // Only a folder of the Live app is narrowed to its Core Library when searching, not a
       // folder of the user's that happens to have a "Core Library" in it.
-      if (inside || is(path, 'app-resources')) liveFolder = path
+      if (inside || is(path, 'app-resources') || is(path, 'resources')) liveFolder = path
       break
     }
   }
@@ -99,6 +100,11 @@ export interface ScanEngineOptions {
   /** Starts a parse worker; left out where workers cannot start workers. */
   readonly spawn?: () => ParseWorker
   readonly cores: number
+  /**
+   * The page runs on Windows, where paths have drives (left out: what the browser says). It
+   * decides which of the paths that sets store say where a folder lies on this computer.
+   */
+  readonly windows?: boolean
 }
 
 /** The folders of a request as livesaver works on them: placed, mounted, and Ableton's found. */
@@ -115,6 +121,11 @@ export interface Prepared {
   readonly parser: SetParser
 }
 
+/** Whether a request is one of a page on Windows: as it says, else as the engine is told. */
+export function onWindowsFor(request: ScanRequest, options: ScanEngineOptions): boolean {
+  return request.windows ?? options.windows ?? onWindows()
+}
+
 /**
  * Places and mounts the folders of a request. `writable`: more mounts (the page's own storage),
  * and which of the folders the page may write to; without it the host is read-only.
@@ -129,7 +140,8 @@ export async function prepare(
   onLocated: (folders: readonly LocatedFolder[]) => void = () => {},
 ): Promise<Prepared> {
   const inputs = [...request.projects, ...request.search]
-  const folders = await locate(request)
+  const windows = onWindowsFor(request, options)
+  const folders = await locate(request, windows)
   onLocated(folders)
   const mounts = inputs.map((f, i) => ({
     path: (folders[i] as LocatedFolder).path,
@@ -237,17 +249,20 @@ export async function scanFolders(
     let installed: Awaited<ReturnType<typeof installedIn>> | undefined
     if (given.length) {
       enter('plugins')
-      installed = await installedIn(given)
+      installed = await installedIn(given, onWindowsFor(request, options))
     }
     enter('reporting')
     const env = result.projects[0]?.env ?? new Environment(config, probe)
     const reports = await buildReports(result.results, result.base, probe)
-    const inventory = installed
-      ? withAppleUnits(
-          installed.inventory,
-          result.results.flatMap((set) => (set.plugins ?? []).map((use) => use.ref)),
-        )
-      : undefined
+    // (Apple's Audio Units come with macOS: on Windows there is none.)
+    const inventory = !installed
+      ? undefined
+      : onWindowsFor(request, options)
+        ? installed.inventory
+        : withAppleUnits(
+            installed.inventory,
+            result.results.flatMap((set) => (set.plugins ?? []).map((use) => use.ref)),
+          )
     const audit = auditSets(
       result.results.map(({ setPath, projectRoot, plugins }) => ({
         setPath,

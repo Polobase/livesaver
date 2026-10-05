@@ -2,11 +2,13 @@
  * Live's plug-in database (`~/Library/Application Support/Ableton/Live Database/Live-plugins-*.db`)
  * and the system's Audio Units. Live keeps the database open in WAL mode, so it is never opened in
  * place: the `.db` and its `-wal`/`-shm` files are copied to a temp folder and the copy is read.
+ *
+ * On Windows the database lies in `AppData/Local/Ableton/Live Database`, and it is all that is
+ * read there: a plug-in's own file says what a Mac's bundle says in another way, which
+ * livesaver does not read.
  */
 import { execFile } from 'node:child_process'
 import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
 import type { FsRead } from '@livesaver/core'
 import {
   type AuComponent,
@@ -20,25 +22,28 @@ import {
   parseAuval,
 } from '@livesaver/plugins'
 import { NodeFs } from './host.js'
+import { home, join, slashed, temp, windowsFolder } from './paths.js'
 import { openReadonly, type ReadonlyDb } from './sqlite.js'
 import { NodeFsWrite } from './write.js'
 
-export const LIVE_DATABASE = join(
-  homedir(),
-  'Library',
-  'Application Support',
-  'Ableton',
-  'Live Database',
-)
-export const PLUGIN_ROOTS: readonly string[] = [
-  '/Library/Audio/Plug-Ins',
-  join(homedir(), 'Library', 'Audio', 'Plug-Ins'),
-]
-export const SYSTEM_COMPONENTS = '/System/Library/Components'
+const windows = process.platform === 'win32'
+
+export const LIVE_DATABASE = windows
+  ? join(
+      windowsFolder('LOCALAPPDATA', join(home(), 'AppData', 'Local')),
+      'Ableton',
+      'Live Database',
+    )
+  : join(home(), 'Library', 'Application Support', 'Ableton', 'Live Database')
+/** The folders with plug-in bundles (a Mac's; on Windows Live's database says what there is). */
+export const PLUGIN_ROOTS: readonly string[] = windows
+  ? []
+  : ['/Library/Audio/Plug-Ins', join(home(), 'Library', 'Audio', 'Plug-Ins')]
+export const SYSTEM_COMPONENTS = windows ? '' : '/System/Library/Components'
 
 /** Run `fn` on a private copy of a Live database file (with its WAL). */
 export async function withLiveDatabase<T>(path: string, fn: (db: ReadonlyDb) => T): Promise<T> {
-  const dir = mkdtempSync(join(tmpdir(), 'livesaver-db-'))
+  const dir = mkdtempSync(join(temp(), 'livesaver-db-'))
   try {
     const copy = join(dir, 'live.db')
     copyFileSync(path, copy)
@@ -94,6 +99,11 @@ export async function readPluginCatalog(folder = LIVE_DATABASE): Promise<Catalog
 }
 
 const str = (v: unknown) => (v === null || v === undefined ? null : String(v))
+/** A path the database names, as livesaver handles paths. */
+const pathOf = (v: unknown) => {
+  const path = str(v)
+  return path === null ? null : slashed(path)
+}
 const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'bigint' ? Number(v) : null)
 
 /** All plug-in and module rows of Live's plug-in databases. */
@@ -114,13 +124,13 @@ export async function readLivePluginDatabase(
           ...p.map((r) => ({
             devIdentifier: str(r.dev_identifier),
             name: str(r.name),
-            path: str(r.path),
+            path: pathOf(r.path),
             processor: num(r.processor),
           })),
         )
         modules.push(
           ...m.map((r) => ({
-            path: str(r.path),
+            path: pathOf(r.path),
             processor: num(r.processor),
             scanstate: num(r.scanstate),
           })),
@@ -187,7 +197,10 @@ export interface InstalledPluginsOptions {
   readonly auvalCache?: string
 }
 
-/** The plug-ins installed on this Mac (Live's database, Audio Units, unscanned bundles). */
+/**
+ * The plug-ins installed on this computer: on a Mac from Live's database, the Audio Units and
+ * the bundles Live has not scanned; on Windows from Live's database.
+ */
 export async function loadInstalledPlugins(
   options: InstalledPluginsOptions = {},
 ): Promise<Inventory> {
@@ -197,7 +210,8 @@ export async function loadInstalledPlugins(
     database,
     pluginRoots: options.pluginRoots ?? PLUGIN_ROOTS,
     systemComponents: options.systemComponents ?? SYSTEM_COMPONENTS,
-    ...(options.auval === false
+    ...(windows ? { oneProcessor: true } : {}),
+    ...(options.auval === false || windows
       ? {}
       : {
           registeredAudioUnits: (components: readonly string[]) =>

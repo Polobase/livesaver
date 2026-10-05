@@ -22,7 +22,7 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 | `@livesaver/plugins` | plug-in identity and inventory, VST2→VST3 conversion | anywhere |
 | `@livesaver/ops` | resolve/match, doctor, collect, status, reorg, move, audit, codemods, journal/undo, reports | anywhere |
 | `@livesaver/catalog` | SQLite catalog of sets, incremental index, the `find` language | anywhere |
-| `@livesaver/node` | Node/Bun host: fs, gzip, workers, xattr, Finder comments, SQLite, Live setup and plug-in database | Node/Bun |
+| `@livesaver/node` | Node/Bun host: fs, gzip, workers, xattr, Finder comments, SQLite, Live setup and plug-in database; `nodePath` (paths with `/` on Windows too) | Node/Bun |
 | `@livesaver/web` | browser host: uploaded/dropped/picked folders as a file system (a write port over folder handles), gzip, hash, worker-based parsing; the scan (samples and plug-ins, with what is installed from folders it is shown), the fix and the plug-in upgrade that run in a page | browser |
 | `livesaver` (packages/cli) | the CLI; `livesaver web` serves the web app and checks, fixes and undoes for it (`src/web/`) | Node/Bun |
 | `livesaver-web` (apps/web) | the web app: Vite, Vue, Nuxt UI; with livesaver behind it it scans and fixes, on its own it scans in workers, read-only unless its user switches fixing on (Chrome, Edge) (private). `.vue` files are type-checked by `vue-tsc` under Node.js (TypeScript 6 in this workspace) | browser |
@@ -42,6 +42,12 @@ livesaver is a TypeScript toolkit for Ableton Live *files*: it parses and patche
 7. **Byte-exactness:** untouched bytes of a Live file must never change. Every edit goes through `@livesaver/xml`'s patcher.
 8. **Style:** Biome (2 spaces, width 100, single quotes, no semicolons); files under 500 lines; comments explain *why*.
 9. **English only**, everywhere: code, comments, docs, CLI output, reports, default tag names, file names and test data. No second language and no `--lang` option; users rename tags, decisions and stars in their config file.
+
+## Windows
+livesaver is made and tested on macOS; Windows is built from Ableton's documentation and from sets saved on Windows, and nobody has tried it there with Live (`docs/guide/windows.md` says what is known).
+- Every path is handled with `/`, and a drive is a root of its own (`C:/Users/me`). In the CLI and the Node host take `join`, `resolve`, `dirname` and the home folder from `nodePath` (`packages/cli/src/paths.ts`), never from `node:path`, for a path that goes to the pipeline.
+- A Windows fact that was not seen on Windows is said to be one, in the code and in the docs.
+- CI runs the built command line on a Windows machine (`bun run test:node`).
 
 ## Where knowledge lives
 - `docs/guide/`: the user guides: plain Markdown that reads well on GitHub and that the site shows; their pictures (`docs/guide/images`) are taken by `apps/site/screenshots.ts` from a made-up library

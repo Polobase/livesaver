@@ -27,7 +27,6 @@ import {
   type PluginRef,
   parsePlist,
   posix,
-  pyStrip,
 } from '@livesaver/core'
 import { type ModuleInfo, parseModuleInfo } from './moduleinfo.js'
 
@@ -70,6 +69,9 @@ export type AuComponent = readonly [
 
 export const PROCESSOR_INTEL = 1
 export const PROCESSOR_ARM = 2
+/** Whether a row of the database runs natively, by its processor (`undefined`: it does not say). */
+const nativeBy = (processor: number | null): boolean | undefined =>
+  processor === PROCESSOR_ARM ? true : processor === PROCESSOR_INTEL ? false : undefined
 export const SCAN_OK = 1
 
 const key = (format: string, ident: string) => `${format}\u0000${ident}`
@@ -157,27 +159,6 @@ export class Inventory {
     }
     return ''
   }
-}
-
-// biome-ignore lint/suspicious/noControlCharactersInRegex: the separators of Python's str.splitlines()
-const LINE_BREAKS = /\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/
-
-/** Lines of `auval -a`: "aufx dely appl  -  Apple: AUDelay" → [type, subtype, manufacturer, name]. */
-export function parseAuval(output: string): AuComponent[] {
-  const found: AuComponent[] = []
-  for (const line of output.split(LINE_BREAKS)) {
-    const c = Array.from(line)
-    if (c.length > 19 && c[4] === ' ' && c[9] === ' ' && c.slice(14, 19).join('') === '  -  ') {
-      const name = pyStrip(
-        c
-          .slice(19)
-          .join('')
-          .replace(/\s{2,}Cannot open component.*$/, ''),
-      )
-      found.push([c.slice(0, 4).join(''), c.slice(5, 9).join(''), c.slice(10, 14).join(''), name])
-    }
-  }
-  return found
 }
 
 const DEV_ID_RE = /^device:(vst|vst3|au):[\p{L}\p{N}_]+:([^?]+)/u
@@ -368,6 +349,10 @@ export interface InventorySources {
   readonly systemComponents?: string
   /** All registered Audio Units (`auval -a`); leave out to skip. */
   readonly registeredAudioUnits?: (components: readonly string[]) => Promise<readonly AuComponent[]>
+  /** One kind of processor (Windows has no Rosetta): no row says "Intel only". */
+  readonly oneProcessor?: boolean
+  /** The files the rows name cannot be looked at (a page on Windows): a row counts as it is. */
+  readonly unseenFiles?: boolean
 }
 
 /** The installed plug-ins. */
@@ -379,11 +364,10 @@ export async function loadInventory(fs: FsRead, sources: InventorySources): Prom
   for (const row of sources.database.plugins) {
     const ident = identOf(row.devIdentifier ?? '')
     const path = row.path ?? ''
-    if (!ident || (path && !(await exists(path)))) continue
+    if (!ident || (path && !sources.unseenFiles && !(await exists(path)))) continue
     knownPaths.add(norm(path))
-    let native: boolean | undefined =
-      row.processor === PROCESSOR_ARM ? true : row.processor === PROCESSOR_INTEL ? false : undefined
-    if (native === undefined && path) native = await bundles.native(path)
+    let native = sources.oneProcessor ? undefined : nativeBy(row.processor)
+    if (native === undefined && path && !sources.oneProcessor) native = await bundles.native(path)
     entries.push({ ...ident, name: row.name ?? '', path, native, scanned: true })
   }
   const scans = new Map<string, Set<boolean>>()
@@ -398,7 +382,7 @@ export async function loadInventory(fs: FsRead, sources: InventorySources): Prom
     const path = m.path
     if (!path || knownPaths.has(norm(path))) continue
     if ([...(scans.get(norm(path)) ?? [])].some(Boolean)) continue
-    if (await exists(path)) failedSet.add(path)
+    if (sources.unseenFiles || (await exists(path))) failedSet.add(path)
   }
   const failed = [...failedSet].sort(compareCodePoints)
 

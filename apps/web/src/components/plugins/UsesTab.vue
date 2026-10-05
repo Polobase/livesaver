@@ -4,6 +4,7 @@ import type { PluginUseRow } from '@livesaver/ops'
 import { computed, ref } from 'vue'
 import type { Scan } from '../../engine/types'
 import { count } from '../../lib/format'
+import { platform } from '../../lib/platform'
 import { canUpgrade, PLUGIN_STATES, useText } from '../../lib/plugins'
 import { type Filter, narrow } from '../../lib/search'
 import DataTable, { type Column } from '../common/DataTable.vue'
@@ -67,18 +68,30 @@ function note(use: PluginUseRow): string {
       data-testid="no-inventory"
     >
       These are the plug-ins your sets use. Whether they are installed, a page in a browser cannot
-      see by itself: add your plug-in folder and Live's database folder in the
+      see by itself: add
+      {{ platform.windows ? '' : 'your plug-in folder and' }}
+      Live's database folder in the
       <RouterLink to="/settings" class="underline underline-offset-2">Settings</RouterLink>, or open
       the app with <code class="text-xs">livesaver web</code> to compare them with what is on this
       computer.
     </p>
+    <!-- (On Windows Live's database is all that says so: no plug-in folder is asked for.) -->
     <p
-      v-else-if="scan.installed && (!scan.installed.database || !scan.installed.roots.length)"
+      v-else-if="
+        scan.installed &&
+        (!scan.installed.database || (!scan.installed.roots.length && !platform.windows))
+      "
       class="border-b border-default px-4 py-2.5 text-sm text-muted sm:px-6"
       role="note"
       data-testid="partial-inventory"
     >
-      <template v-if="!scan.installed.roots.length">
+      <template v-if="platform.windows">
+        Live's plug-in database was not among the folders that say what is installed, so every
+        plug-in counts as not installed. Add the folder
+        <code class="text-xs">{{ platform.database.folder }}</code>
+        in the Settings.
+      </template>
+      <template v-else-if="!scan.installed.roots.length">
         No plug-in folder was among the folders that say what is installed, so every plug-in counts
         as not installed. Add <code class="text-xs">/Library/Audio/Plug-Ins</code> in the Settings.
       </template>

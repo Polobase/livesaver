@@ -1,4 +1,5 @@
 export { type Alternative, alternativesOf, type Link } from './alternatives.js'
+export { parseAuval } from './auval.js'
 export {
   type Blocker,
   CHUNK_PRESET,
@@ -44,7 +45,6 @@ export {
   loadInventory,
   PROCESSOR_ARM,
   PROCESSOR_INTEL,
-  parseAuval,
   SCAN_OK,
   simpleName,
 } from './inventory.js'

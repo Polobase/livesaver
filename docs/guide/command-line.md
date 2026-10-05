@@ -90,6 +90,8 @@ livesaver sql "SELECT name, tempo FROM sets ORDER BY seconds DESC LIMIT 5"
 
 ## Project status in Finder
 
+(On a Mac. On Windows `status` measures and reports the same, and marks nothing: see [livesaver on Windows](windows.md#what-windows-does-not-have).)
+
 ```sh
 # progress and completeness as Finder tags and comments
 livesaver status ~/Music/Projects [--apply]

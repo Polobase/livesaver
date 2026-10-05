@@ -1,19 +1,19 @@
 <script setup lang="ts">
 /**
- * Shows a file or folder in Finder, where livesaver can do that (a page on its own cannot): a
+ * Shows a file or folder in Finder (File Explorer on Windows), where livesaver can do that (a page on its own cannot): a
  * link beside a path, or a button of its own.
  */
 import { computed } from 'vue'
 import { splitPath } from '../../lib/format'
+import { platform } from '../../lib/platform'
 import { useEngineStore } from '../../stores/engine'
 
-const props = withDefaults(defineProps<{ path: string; label?: string; button?: boolean }>(), {
-  label: 'Show in Finder',
-})
+const props = defineProps<{ path: string; label?: string; button?: boolean }>()
 const engines = useEngineStore()
 const toast = useToast()
+const label = computed(() => props.label ?? `Show in ${platform.fileManager}`)
 /** Several of these stand in one list: each says what it shows. */
-const name = computed(() => `${props.label}: ${splitPath(props.path).name || props.path}`)
+const name = computed(() => `${label.value}: ${splitPath(props.path).name || props.path}`)
 
 async function reveal(): Promise<void> {
   try {

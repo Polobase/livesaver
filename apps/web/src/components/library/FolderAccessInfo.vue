@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import { keepsDroppedFolders } from '../../engine/storage'
 /**
  * How a page comes by the folders it reads, said where the folders are added. A browser calls
  * handing a folder to a page an "upload", and asks about it in words that sound like more than
  * they mean: this box says first that nothing leaves the computer, then how it works for those
  * who want to know, and what the browser's questions mean.
  */
-import { ref } from 'vue'
-import { keepsDroppedFolders } from '../../engine/storage'
+import { platform } from '../../lib/platform'
 import { useWritingStore } from '../../stores/writing'
 
 /**
@@ -84,8 +85,8 @@ const open = ref(false)
               the page asks your browser for the right to save into your project folder. Your
               browser names the folder, and you can take the right back in its settings for this
               site. Drop the project folder rather than choosing it in the dialog: through a handle
-              alone your browser hides files with some names (a “/” as Finder shows it, or a space
-              at the start or end), and a drop shows the page every file.
+              alone your browser hides files with some names ({{ platform.hiddenNames }}), and a
+              drop shows the page every file.
             </li>
           </ul>
         </div>

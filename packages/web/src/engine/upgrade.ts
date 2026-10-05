@@ -21,11 +21,11 @@ import { alone, prepareToWrite, targetsOf, type WriteEngineOptions } from './fix
 import { installedIn } from './installed.js'
 import type { UpgradeEvent, UpgradeRequest } from './protocol.js'
 import { endRun, newRun } from './runs.js'
-import { prepare, type ScanEngineOptions } from './scan.js'
+import { onWindowsFor, prepare, type ScanEngineOptions } from './scan.js'
 
 /** The VST3 plug-ins Live knows, from its database among the folders of the request. */
-async function catalogOf(request: UpgradeRequest): Promise<Catalog> {
-  const installed = await installedIn(request.installed ?? [])
+async function catalogOf(request: UpgradeRequest, options: ScanEngineOptions): Promise<Catalog> {
+  const installed = await installedIn(request.installed ?? [], onWindowsFor(request, options))
   if (!installed.database)
     throw new Error(
       'To know which VST3 plug-ins Live has, this page needs Live’s plug-in database: add the folder “Live Database” to the plug-in folders, and scan again.',
@@ -47,7 +47,7 @@ export async function planUpgradeFolders(
   let close = async () => {}
   try {
     emit({ type: 'phase', phase: 'plugins' })
-    const catalog = await catalogOf(request)
+    const catalog = await catalogOf(request, options)
     const prepared = await prepare(request, options)
     close = () => prepared.parser.close()
     const planned = await upgradePlugins(prepared.host, {
@@ -78,7 +78,7 @@ export async function upgradeFolders(
   try {
     await alone(options, async () => {
       emit({ type: 'phase', phase: 'plugins' })
-      const catalog = await catalogOf(request)
+      const catalog = await catalogOf(request, options)
       const prepared = await prepareToWrite(request, options)
       host = prepared.host
       close = () => prepared.parser.close()

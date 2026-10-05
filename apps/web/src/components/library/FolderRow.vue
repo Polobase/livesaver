@@ -5,6 +5,7 @@ import { keepsDroppedFolders } from '../../engine/storage'
 import type { KnownFolder, LocatedFolder } from '../../engine/types'
 import { count, plural } from '../../lib/format'
 import { LIVE_CONTENT } from '../../lib/library'
+import { platform } from '../../lib/platform'
 import { useEngineStore } from '../../stores/engine'
 import { type FolderKind, useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
@@ -201,8 +202,8 @@ const keptIfDropped = computed(() => keepsDroppedFolders() && !isLive.value)
         class="w-full"
         :placeholder="
           isLive
-            ? 'Any path into the Live app, e.g. /Applications/Ableton Live 12 Suite.app'
-            : 'Where the folder lies on disk, e.g. /Users/you/Music'
+            ? `Any path into ${platform.windows ? 'Live’s folder' : 'the Live app'}, e.g. ${platform.livePath}`
+            : `Where the folder lies on disk, e.g. ${platform.folderPath}`
         "
         :aria-label="`Path of ${folder.name} on disk`"
         autocomplete="off"

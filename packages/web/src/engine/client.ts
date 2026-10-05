@@ -49,6 +49,7 @@ const wireRequest = (request: ScanRequest): WireRequest => ({
   search: request.search.map(wireFolder),
   ...(request.installed ? { installed: request.installed.map(wireFolder) } : {}),
   options: request.options,
+  ...(request.windows === undefined ? {} : { windows: request.windows }),
 })
 
 /** A run that failed. `run`: it wrote something before it failed, which can be undone. */

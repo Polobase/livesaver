@@ -101,7 +101,7 @@ test(
     const web = 'https://polobase.github.io/livesaver/'
     expect(addresses.slice(0, 3)).toEqual([web, `${web}docs/`, `${web}docs/codemods/`])
     expect(addresses.at(-1)).toBe(`${web}app/`)
-    expect(addresses).toHaveLength(23)
+    expect(addresses).toHaveLength(24)
     for (const address of addresses) {
       const here = await fetch(address.replace(web, site.url), { redirect: 'manual' })
       expect([address, here.status]).toEqual([address, 200])
@@ -144,6 +144,18 @@ for (const [name, type] of ENGINES) {
         const width = () =>
           hero.evaluate((image: HTMLImageElement) => (image.complete ? image.naturalWidth : 0))
         expect(await eventually(width, 2560)).toBe(2560)
+
+        // What the page in a browser can do by now, and where livesaver stands on Windows.
+        const inBrowser = page.getByRole('list', { name: 'In your browser' })
+        expect(await textOf(inBrowser)).toContain('Fixes samples and upgrades plug-ins in Chrome')
+        expect(await page.getByText('Reads only').count()).toBe(0)
+        expect(await page.getByText('macOS and Windows').first().isVisible()).toBe(true)
+        expect(await textOf(page.getByTestId('tested-on'))).toContain('only tested on macOS')
+        await page.getByRole('link', { name: 'what that means' }).click()
+        const windows = page.getByTestId('windows-status')
+        await windows.waitFor()
+        expect(await textOf(windows)).toContain('No one has tried it on a Windows computer')
+        await page.waitForURL(`${site.url}#windows`)
 
         await page.getByRole('link', { name: 'Get livesaver' }).first().click()
         await page.getByRole('heading', { level: 1, name: 'Getting started' }).waitFor()

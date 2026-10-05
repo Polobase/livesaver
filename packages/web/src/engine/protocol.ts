@@ -33,6 +33,11 @@ export interface ScanRequest {
    */
   readonly installed?: readonly FolderInput[]
   readonly options: ScanOptions
+  /**
+   * The page runs on Windows, where a path has a drive and Ableton keeps its folders elsewhere.
+   * Left out, the engine asks the browser it runs in (see `onWindows`).
+   */
+  readonly windows?: boolean
 }
 
 /**
@@ -61,6 +66,8 @@ export interface WireRequest {
   readonly search: readonly WireFolder[]
   readonly installed?: readonly WireFolder[]
   readonly options: ScanOptions
+  /** See `ScanRequest.windows`. */
+  readonly windows?: boolean
 }
 
 export interface WireUpgrade extends WireRequest {

@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { createNodeHost, liveIsRunning } from '@livesaver/node'
 import { type RunSummary, readJournal, runSummary, runText, undoRun } from '@livesaver/ops'
 import pc from 'picocolors'
 import { resolveConfig } from '../config.js'
+import { join } from '../paths.js'
 import { acquireLock, listRuns, readRun, runsDir } from '../state.js'
 
 /** Every run folder as a summary, oldest first. */

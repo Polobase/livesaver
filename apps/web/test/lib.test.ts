@@ -7,6 +7,7 @@ import { bytes, count, percent, plural, seconds, splitPath, when } from '../src/
 import { projectHealth, setHealth, tally, whyLabel, whyText } from '../src/lib/health.js'
 import { absentWords, LEAVE_OUT, leftOutWords, requestKey, wantedOf } from '../src/lib/library.js'
 import { FREE_SPACE_MARGIN, fits, planOf } from '../src/lib/plan.js'
+import { platformOf } from '../src/lib/platform.js'
 import { advance, starting } from '../src/lib/progress.js'
 import { isReady, pageReadiness } from '../src/lib/ready.js'
 import { adviceFor } from '../src/lib/words.js'
@@ -410,5 +411,32 @@ describe('what a fix in a browser needs before it starts', () => {
       'Projects',
       'Old Projects',
     ])
+  })
+})
+
+describe('what the page says by the computer it runs on', () => {
+  test('on Windows: File Explorer, and the folders where Ableton keeps them there', () => {
+    const windows = platformOf(true)
+    expect([windows.fileManager, windows.libraries.folder, windows.vendorFolder]).toEqual([
+      'File Explorer',
+      'Documents\\Ableton',
+      'C:\\Users\\Public\\Documents',
+    ])
+    expect(windows.liveContent).toContain('C:\\ProgramData\\Ableton\\Live 12 Suite')
+    expect(windows.database.folder).toBe('AppData\\Local\\Ableton\\Live Database')
+    // Finder's tags are a thing of the Mac: nothing of the kind is lost on Windows.
+    expect([windows.finderTags, platformOf(false).finderTags]).toEqual([false, true])
+  })
+
+  test('on a Mac: Finder, and the app in the Applications folder', () => {
+    const mac = platformOf(false)
+    expect([mac.fileManager, mac.libraries.folder, mac.vendorFolder]).toEqual([
+      'Finder',
+      'Music/Ableton',
+      '/Users/Shared',
+    ])
+    expect(mac.liveContent).toBe('drag the Ableton Live app here from your Applications folder.')
+    expect(mac.hiddenNames).toContain('as Finder shows it')
+    expect(platformOf(true).hiddenNames).not.toContain('Finder')
   })
 })

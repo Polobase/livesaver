@@ -233,12 +233,20 @@ test('no handle is asked for the folder of an app: a browser answers that with a
   // The Live app, dragged from the Applications folder, or its Contents folder.
   expect(
     ['Ableton Live 12 Suite.app', 'Contents', 'App-Resources', 'Core Library', 'Some.APP'].map(
-      folderOfAnApp,
+      (name) => folderOfAnApp(name, false),
     ),
   ).toEqual([true, true, true, true, true])
   expect(
-    ['Music', 'Ableton', 'Shared', 'My app notes', 'contents of 2019'].map(folderOfAnApp),
-  ).toEqual([false, false, false, false, false])
+    ['Music', 'Ableton', 'Shared', 'My app notes', 'contents of 2019', 'Resources'].map((name) =>
+      folderOfAnApp(name, false),
+    ),
+  ).toEqual([false, false, false, false, false, false])
+  // On Windows Live has no bundle: its folder in ProgramData, and the `Resources` in it.
+  expect(
+    ['Resources', 'Live 12 Suite', 'Live 11 Standard', 'Live sets', 'Music'].map((name) =>
+      folderOfAnApp(name, true),
+    ),
+  ).toEqual([true, true, true, false, false])
   const contents = join(tmp.path, 'Ableton Live 12 Suite.app', 'Contents')
   writeFile(join(contents, 'App-Resources', 'Core Library', 'Samples', 'x.wav'), 'RIFF')
   let asked = 0

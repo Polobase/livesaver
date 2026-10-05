@@ -1,0 +1,4 @@
+# The same bytes on every system: fixtures and sets are compared byte for byte, and Windows'
+# git would otherwise check text files out with other line endings.
+* text=auto eol=lf
+fixtures/** -text

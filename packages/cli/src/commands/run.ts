@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { formatCsv } from '@livesaver/core'
 import { createNodeHost, liveIsRunning } from '@livesaver/node'
@@ -13,6 +12,7 @@ import {
 } from '@livesaver/ops'
 import pc from 'picocolors'
 import { absolute } from '../config.js'
+import { join } from '../paths.js'
 import { acquireLock, endRun, newRun } from '../state.js'
 
 export interface RunFlags {

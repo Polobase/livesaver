@@ -95,6 +95,34 @@ export class NodeFs implements FsRead {
   }
 }
 
+/**
+ * A name Windows does not make: with one of its reserved signs, a control character, a space or
+ * a dot at its end (which it drops without a word, so the file would get another name than the
+ * set says), or the name of a device.
+ */
+export function refusedByWindows(name: string): boolean {
+  return (
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are the point
+    /[<>:"|?*\u0000-\u001f]/.test(name) ||
+    /[ .]$/.test(name) ||
+    /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(name)
+  )
+}
+
+/**
+ * Windows' file system: a file whose name Windows does not make is not planned (a set saved on
+ * a Mac may name one), as in a page that is handed a folder to edit.
+ */
+export class WindowsFs extends NodeFs {
+  refuses(path: string): boolean {
+    // (The drive is the one part with a ":" that is as it should be.)
+    return path
+      .replace(/^[A-Za-z]:/, '')
+      .split('/')
+      .some((name) => name !== '' && name !== '.' && name !== '..' && refusedByWindows(name))
+  }
+}
+
 export const nodeCodec: Codec = {
   async gunzip(data) {
     if (bun) return bun.gunzipSync(data)
@@ -151,7 +179,7 @@ export function createNodeHost(options: NodeHostOptions = {}): Host {
       ? undefined
       : (options.finder ?? (process.platform === 'darwin' ? new FinderScriptComments() : undefined))
   const host: Host = {
-    fs: new NodeFs(),
+    fs: process.platform === 'win32' ? new WindowsFs() : new NodeFs(),
     codec: nodeCodec,
     hash: nodeHash,
     search: nodeSearch,

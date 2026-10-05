@@ -11,7 +11,7 @@ No. It reads and writes Live's files itself. Live has to be closed while livesav
 Sets, racks, presets and clips (`.als`, `.adg`, `.adv`, `.alc`, `.agr`) from Live 8.2 to Live 12.
 
 **Does it run on Windows?**
-Not yet. livesaver is built and tested for macOS. It reads sets that were saved on Windows.
+It is built to, and that is new: livesaver is made and tested on macOS, and no one has tried it on a Windows computer with Live yet. It handles Windows paths and knows where Ableton keeps its folders there. Try a fix on a copy first; [livesaver on Windows](windows.md) says what differs and what is not known. On a Mac it has always read sets that were saved on Windows.
 
 **What does it cost?**
 Nothing. It is open source under the MIT license, and not affiliated with Ableton.

@@ -22,6 +22,7 @@ import {
   type StoredPath,
   versionNumber,
 } from '../locate.js'
+import { onWindows } from '../platform.js'
 import { type FolderSource, hiddenByHandle } from '../source.js'
 import type { FolderInput, LocatedFolder, ScanRequest } from './protocol.js'
 
@@ -68,13 +69,15 @@ class SetSample {
     if (!parsed.ok) return []
     const version = versionNumber(parsed.doc.creator)
     this.newest = Math.max(this.newest, version)
+    // (A set of Live 9 or 10 that was saved on Windows stores the path with backslashes.)
     const ref = parsed.refs.find(
-      (r) => r.relType === REL_PROJECT && r.relPath && r.path.endsWith(`/${r.relPath}`),
+      (r) =>
+        r.relType === REL_PROJECT && r.relPath && posix.slashed(r.path).endsWith(`/${r.relPath}`),
     )
     if (ref) {
       const inside = posix.relpath(await projectRootOf(set, this.probe), this.mount)
       this.anchors.push({
-        savedAt: ref.path.slice(0, -(ref.relPath.length + 1)),
+        savedAt: posix.slashed(ref.path).slice(0, -(ref.relPath.length + 1)),
         inside: inside === '.' ? '' : inside,
       })
     }
@@ -107,26 +110,37 @@ class SetSample {
   }
 }
 
-/** What a folder is among Ableton's own, by its name and what lies in it. */
+/**
+ * What a folder is among Ableton's own, by its name and what lies in it. `windows`: Live's own
+ * folder is laid out as on Windows (`Resources` in the program's folder), which the folder
+ * itself says where it can, and the computer of the page where it cannot.
+ */
 async function abletonFolder(
   source: FolderSource,
-): Promise<{ live?: LiveLevel; landmarks: Landmark[] }> {
+  pageOnWindows: boolean,
+): Promise<{ live?: LiveLevel; windows: boolean; landmarks: Landmark[] }> {
   const fs = new WebFs([{ path: '/folder', source }])
   const name = source.name.toLowerCase()
   const has = async (inside: string) =>
     (await fs.kind(posix.join('/folder', inside))) === 'directory'
   const landmarks: Landmark[] = []
   let live: LiveLevel | undefined
+  let windows = pageOnWindows
   if (name === 'core library') live = 'core'
-  else if (await has('Contents/App-Resources/Core Library')) live = 'app'
-  else if (await has('App-Resources/Core Library')) live = 'contents'
-  else if (await has('Core Library')) live = 'resources'
-  if (live) landmarks.push(liveLandmark(live))
+  else if (await has('Contents/App-Resources/Core Library')) [live, windows] = ['app', false]
+  else if (await has('App-Resources/Core Library')) [live, windows] = ['contents', false]
+  else if (await has('Resources/Core Library')) [live, windows] = ['contents', true]
+  else if (await has('Core Library')) {
+    live = 'resources'
+    if (name === 'resources') windows = true
+    else if (name === 'app-resources') windows = false
+  }
+  if (live) landmarks.push(liveLandmark(live, windows))
   for (const library of ['User Library', 'Factory Packs']) {
     if (name === library.toLowerCase()) landmarks.push({ names: [library], own: 1 })
     else if (await has(library)) landmarks.push({ names: [library], own: 0 })
   }
-  return { ...(live ? { live } : {}), landmarks }
+  return { ...(live ? { live } : {}), windows, landmarks }
 }
 
 /**
@@ -138,12 +152,13 @@ async function placedBySets(
   folder: FolderInput,
   landmarks: readonly Landmark[],
   samples: readonly SetSample[],
+  windows: boolean,
 ): Promise<string> {
   const fs = new WebFs([{ path: '/folder', source: folder.source }])
   const confirmed: Lead[] = []
   const checked = new Map<string, boolean>()
   const take = async (stored: readonly StoredPath[]) => {
-    for (const lead of leadsTo(folder.source.name, landmarks, stored)) {
+    for (const lead of leadsTo(folder.source.name, landmarks, stored, windows)) {
       let there = checked.get(lead.inside)
       if (there === undefined) {
         there = (await fs.kind(posix.join('/folder', lead.inside))) !== undefined
@@ -205,11 +220,19 @@ async function placedBy(
   return ''
 }
 
-export async function locate(request: ScanRequest): Promise<LocatedFolder[]> {
+/**
+ * `windows`: the page runs on Windows, where a path has a drive. The paths that sets store are
+ * read accordingly: a set that came from the other kind of computer says nothing here.
+ */
+export async function locate(
+  request: ScanRequest,
+  windows: boolean = onWindows(),
+): Promise<LocatedFolder[]> {
   const inputs = [...request.projects, ...request.search]
   const typedPath = (f: FolderInput) => {
-    const typed = f.path.trim().replace(/(?<=.)\/+$/, '')
-    return typed.startsWith('/') ? posix.normpath(typed) : ''
+    // (Typed as Windows shows it, `C:\Music`, or as Live writes it, `C:/Music`.)
+    const typed = posix.slashed(f.path.trim()).replace(/(?<=.)\/+$/, '')
+    return posix.isAbs(typed) ? posix.normpath(typed) : ''
   }
   const samples = request.projects.map((project) => new SetSample(project.source))
   const taken = new Set<string>()
@@ -222,17 +245,18 @@ export async function locate(request: ScanRequest): Promise<LocatedFolder[]> {
       if (!path) {
         how = 'found'
         await sample.first()
-        path = locateFolder(folder.source.name, sample.anchors)?.path ?? ''
+        path = locateFolder(folder.source.name, sample.anchors, windows)?.path ?? ''
       }
     } else {
-      const own = await abletonFolder(folder.source)
+      const own = await abletonFolder(folder.source, windows)
       if (path) {
         // Asked where "Contents" lies, one pastes the path of the app: any path into it will do.
-        if (own.live) path = liveFolderPath(path, own.live)
+        if (own.live) path = liveFolderPath(path, own.live, own.windows)
       } else {
         how = 'found'
         path = await placedBy(folder, request.projects, located)
-        if (!path && own.landmarks.length) path = await placedBySets(folder, own.landmarks, samples)
+        if (!path && own.landmarks.length)
+          path = await placedBySets(folder, own.landmarks, samples, windows)
       }
     }
     // A project folder that was chosen for editing, given once more as an upload or a drop:

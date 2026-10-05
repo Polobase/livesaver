@@ -86,7 +86,19 @@ Source: Mattijs Kneppers (maxdevtools author) on the Cycling '74 forum, confirme
 
 Counts in one real library (917 sets): 3 = 296,399; 1 = 289,371; 5 = 262,209; 0 = 56,934; 6 = 17,519; 2 = 398; 7 = 385.
 
-`FileRef/Type` is 1 in every Windows-saved ref and 2 in every macOS-saved ref seen so far. That suggests it records the saving OS, but this is unverified.
+`FileRef/Type` is 1 in every reference whose `Data` holds a path of Windows and 2 in every one whose `Data` is a Mac alias (see [Windows](#windows) for the counts). That suggests it records the system the set was saved on, but this is unverified. livesaver leaves it as it is, on either system.
+
+## Windows
+What references with a path of Windows store, counted read-only in one real library on a Mac (3,806 sets and backups):
+- **Old format (Live 9 and 10 on Windows):** 2,938,985 references in 2,103 sets hold a path of Windows in `Data`, with backslashes (`E:\Samples\Kick\1.wav`). Every one has `Type` 1. Where there is a `PathHint` (2,464,731 of them), it holds the folders of that path **without the drive**: its first element is never `E:`. (The 468,425 references whose `Data` is a Mac alias all have `Type` 2.)
+- **New format:** 22 references hold a drive in `Path`, written with forward slashes (`C:/Samples/Kick/1.wav`). All have `RelativePathType` 0, the file's name alone as `RelativePath`, and `Type` 2: by that they were written on a Mac, when a newer Live saved a set that came from Windows. So Live writes a path with a drive into the new format with forward slashes; what a Live on Windows writes beside it (`Type`, `RelativePath`) was not seen.
+
+livesaver handles every path with `/` between its parts, and takes a drive as a root of its own (`C:/Users/…`): `posix.slashed`, `posix.drive` and the drive-aware `normpath`, `relpath` and `commonpath` of `@livesaver/core`.
+- A stored path of Windows is tried as a file only where the project itself lies on a drive, and a stored path of a Mac only where it does not: Windows would open `/Users/you/x.wav` as a file of its current drive, which is not the file the set means.
+- What a path says of Live's own content holds on both: `/Applications/Ableton Live 9 Suite.app/Contents/App-Resources/<rest>` and `C:/ProgramData/Ableton/Live 9 Suite/Resources/<rest>` are tried as `<rest>` in the content of the Live at hand (the second where the project lies on a drive; that folder is as Ableton documents it, no set of the library names it).
+- Written on Windows: `Path` with the drive and forward slashes, and in the old format the `PathHint` without the drive. `Type` stays.
+
+None of this was tried in Live on Windows (see [the guide](../guide/windows.md)).
 
 ## Patching
 - **Rewrite type:** a target inside the project gets type 3, relative to the root; inside a pack, type 5 with the pack's name and id; otherwise type 1, relative to the set folder.

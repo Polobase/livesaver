@@ -7,7 +7,7 @@ const SITE = 'https://polobase.github.io/livesaver'
 export const GUIDE = {
   start: `${SITE}/docs/guide/getting-started/`,
   /** How to get livesaver on one's own computer: what a page in a browser cannot do needs it. */
-  install: `${SITE}/docs/guide/getting-started/#install-livesaver-on-your-mac`,
+  install: `${SITE}/docs/guide/getting-started/#install-livesaver`,
 } as const
 
 /** What a link to the guide looks like wherever the app says that something needs livesaver. */

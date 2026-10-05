@@ -4,6 +4,7 @@
  * are left out for the Live that saved them.
  */
 import { LEAVE_OUT } from '../../lib/library'
+import { platform } from '../../lib/platform'
 import { useLibraryStore } from '../../stores/library'
 
 defineProps<{ disabled?: boolean }>()
@@ -34,7 +35,7 @@ function leaveOut(minLive: number): void {
       >
         None of your sample folders is marked "Contains installed libraries", so this only applies
         to Ableton's packs. Tick it on the folder that holds your libraries (Native Instruments
-        installs them in <code class="text-xs">/Users/Shared</code>).
+        installs them in <code class="text-xs">{{ platform.vendorFolder }}</code>).
       </p>
     </div>
     <UFormField
