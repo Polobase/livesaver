@@ -3,6 +3,7 @@ import type { CommandPaletteGroup, CommandPaletteItem, NavigationMenuItem } from
 import { computed, onBeforeUnmount, onErrorCaptured, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ReviewSheet from '../components/fix/ReviewSheet.vue'
+import AddLiveGuide from '../components/library/AddLiveGuide.vue'
 import UpgradeSheet from '../components/plugins/UpgradeSheet.vue'
 import { bytes, plural } from '../lib/format'
 import { GUIDE } from '../lib/links'
@@ -39,6 +40,17 @@ onMounted(async () => {
   plugins.restore(engine.start.last?.upgrade)
   await history.refresh()
 })
+
+/**
+ * A scan that is started in the Settings is watched where its result is read: the page goes to
+ * the Overview, instead of staying where nothing tells what the scan found.
+ */
+watch(
+  () => scans.running,
+  (running) => {
+    if (running && route.path === '/settings') void router.push('/')
+  },
+)
 
 /**
  * What a fix or an undo did is said on the Overview. Fixed from another page (one project, from
@@ -303,5 +315,6 @@ defineShortcuts({
     <UpgradeSheet />
     <ShortcutsHelp />
     <WhereDialog v-model:open="whereOpen" />
+    <AddLiveGuide />
   </UDashboardGroup>
 </template>

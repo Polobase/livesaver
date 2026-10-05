@@ -272,6 +272,8 @@ export function prepare(request: WebFixRequest, settings: WebSettings): Prepared
       packLimit: String(Math.max(0, Number(request.options.packLimitMB) || 0)),
       matchLibraryPath: Boolean(request.options.matchLibraryPath),
       certainOnly: Boolean(request.certainOnly),
+      // (A whole number of a version, whatever the page sent.)
+      minLive: String(Math.max(0, Math.trunc(Number(request.options.minLive) || 0))),
       ...(settings.config ? { config: settings.config } : {}),
     },
     vendorLibraries: request.search

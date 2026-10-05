@@ -1,9 +1,19 @@
 <script setup lang="ts">
-/** How a scan matches: the opt-in rule for library files, and what stays in its pack. */
+/**
+ * How a scan matches: the opt-in rule for library files, what stays in its pack, and which sets
+ * are left out for the Live that saved them.
+ */
+import { LEAVE_OUT } from '../../lib/library'
 import { useLibraryStore } from '../../stores/library'
 
 defineProps<{ disabled?: boolean }>()
 const library = useLibraryStore()
+
+/** Every set is the same as no such option: two scans of every set are then the same scan. */
+function leaveOut(minLive: number): void {
+  const { minLive: _before, ...rest } = library.options
+  library.options = minLive > 0 ? { ...rest, minLive } : rest
+}
 </script>
 
 <template>
@@ -45,6 +55,20 @@ const library = useLibraryStore()
         />
         <span class="text-sm text-muted">MB</span>
       </div>
+    </UFormField>
+    <UFormField
+      label="Leave out sets of older Live versions"
+      description="A set that was last saved with such a Live is not checked, not listed and not fixed. For old saves you keep as they were, beside newer ones of the same song."
+    >
+      <USelect
+        :model-value="library.options.minLive ?? 0"
+        :items="LEAVE_OUT"
+        :disabled="disabled"
+        class="w-64"
+        aria-label="Leave out sets of older Live versions"
+        data-testid="min-live"
+        @update:model-value="leaveOut(Number($event))"
+      />
     </UFormField>
   </div>
 </template>

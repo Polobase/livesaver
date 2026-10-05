@@ -1,5 +1,12 @@
 /** Run the whole pipeline over folders of sets (without writing the report files). */
-import { type Host, inProcessParser, type ParsedSet, posix, type SetParser } from '@livesaver/core'
+import {
+  type Host,
+  inProcessParser,
+  liveMajor,
+  type ParsedSet,
+  posix,
+  type SetParser,
+} from '@livesaver/core'
 import type { CompleteSets } from './cache.js'
 import {
   type CollectOptions,
@@ -32,6 +39,12 @@ export interface DoctorOptions {
   readonly matchLibraryPath?: boolean
   /** Leave uncertain matches out: their references stay missing (see `ChooseOptions`). */
   readonly certainOnly?: boolean
+  /**
+   * Sets that were last saved by a Live older than this major version are left out: not
+   * checked, not listed, not fixed (0 or absent: every set). For old saves that are kept as
+   * they were beside newer ones of the same song.
+   */
+  readonly minLive?: number
   readonly writer?: Writer
   readonly keepXml?: boolean
   /** Dry runs skip the strict scan of patched sets (see `ProcessOptions`). */
@@ -64,6 +77,8 @@ export interface DoctorResult {
   /** Common folder of the targets (report paths are shown relative to it). */
   readonly base: string
   readonly ms: number
+  /** Sets that were left out for the Live that saved them (see `DoctorOptions.minLive`). */
+  readonly leftOut: number
 }
 
 export async function doctor(host: Host, options: DoctorOptions): Promise<DoctorResult> {
@@ -102,15 +117,29 @@ export async function doctor(host: Host, options: DoctorOptions): Promise<Doctor
 
   const projects = new Map<string, Project>()
   const results: SetResult[] = []
+  const minLive = options.minLive ?? 0
+  /** Saved by a Live older than asked for (a set that does not say which is not). */
+  const tooOld = (creator: string) => {
+    const major = liveMajor(creator)
+    return major > 0 && major < minLive
+  }
+  let leftOut = 0
   for (const [i, setPath] of sets.entries()) {
     for (let k = i; k < i + lookahead; k++) request(k)
+    const hit = cached[i]
+    // Read like the others, so that the Live that saved it is known; then left alone.
+    const parsed = hit ? undefined : await (pending.get(i) as Promise<ParsedSet>)
+    pending.delete(i)
+    if (tooOld(hit ? hit.creator : parsed?.ok ? parsed.doc.creator : '')) {
+      leftOut++
+      continue
+    }
     const root = await projectRootOf(setPath, probe)
     let project = projects.get(root)
     if (!project) {
       project = new Project(root, index, env, probe, collect, writer)
       projects.set(root, project)
     }
-    const hit = cached[i]
     if (hit) {
       const result: SetResult = {
         setPath,
@@ -131,8 +160,7 @@ export async function doctor(host: Host, options: DoctorOptions): Promise<Doctor
       options.onEvent?.({ type: 'set', index: i + 1, total: sets.length, result })
       continue
     }
-    const parsed = await (pending.get(i) as Promise<ParsedSet>)
-    pending.delete(i)
+    if (!parsed) continue
     const result = await processSet(setPath, project, host, {
       keepXml: options.keepXml ?? false,
       quickPlan: options.quickPlan ?? false,
@@ -149,5 +177,12 @@ export async function doctor(host: Host, options: DoctorOptions): Promise<Doctor
     options.onEvent?.({ type: 'set', index: i + 1, total: sets.length, result })
   }
   if (!options.parser) await parser.close()
-  return { results, projects: [...projects.values()], index, base, ms: performance.now() - started }
+  return {
+    results,
+    projects: [...projects.values()],
+    index,
+    base,
+    ms: performance.now() - started,
+    leftOut,
+  }
 }

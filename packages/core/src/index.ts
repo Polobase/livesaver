@@ -39,6 +39,7 @@ export {
   encodeDocument,
   type LiveDoc,
   LiveFormatError,
+  liveMajor,
   looksLikeXml,
   type OpenOptions,
   openDocument,

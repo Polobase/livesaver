@@ -76,3 +76,11 @@ livesaver collect ~/Music/Projects --apply
 ```
 
 `--certain-only` leaves the uncertain matches out, and `--match-library-path` accepts library files by their name and place. See [The command line](command-line.md).
+
+## Old saves of a song
+
+A project often keeps the first save of a song beside the newer ones: `Song.als` from Live 9, and `Song 2.als`, `Song 3.als` from the Live of today. If the old save misses a sample, the project counts as incomplete, although the song you work on is fine.
+
+**Leave out sets of older Live versions**, among the options of the library, takes such sets out of a scan: a set that was last saved with Live 9 or older (or 10, or 11) is not checked, not listed and not fixed. The overview says how many sets were left out. On the command line it is `--min-live 10`.
+
+A set that is left out is not touched by a fix either, so it stays as it was saved.

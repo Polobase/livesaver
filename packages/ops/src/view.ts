@@ -138,6 +138,8 @@ export interface CheckView {
   readonly completeProjects: number
   readonly sets: number
   readonly completeSets: number
+  /** Sets that were left out for the Live that saved them (they are in no count and no row). */
+  readonly leftOut: number
   readonly counts: Readonly<Record<Status, number>>
   readonly uncertain: number
   readonly copyFiles: number
@@ -218,6 +220,7 @@ export function checkView(r: DoctorResult, env: Environment): CheckView {
     completeProjects: projectRows.filter((p) => p.completeSets === p.sets).length,
     sets: r.results.length,
     completeSets: r.results.filter(isComplete).length,
+    leftOut: r.leftOut,
     counts: totalCounts(r.results),
     // As the summary of the command line counts them: over every planned change.
     uncertain: r.results.reduce((n, s) => n + s.changes.filter((c) => !c.certain).length, 0),

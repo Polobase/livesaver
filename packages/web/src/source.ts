@@ -173,6 +173,20 @@ export function foldersFromFiles(files: Iterable<File>): FolderSource[] {
 /** How long a browser gets to hand out the handle of a dropped folder, once it is listed. */
 const HANDLE_PATIENCE = 1000
 
+/**
+ * A folder of an app, by its name: the app itself, or a folder of its bundle as the Live app
+ * has them. Chromium hands a page no handle for a folder in `/Applications`, and says so to its
+ * user in a dialog of its own ("can't open this folder because it contains system files") as
+ * soon as a page asks for one. So none is asked for such a folder: it is read through its
+ * entries all the same, and only cannot be kept for a later visit, which it could not be anyway.
+ */
+export function folderOfAnApp(name: string): boolean {
+  return (
+    /\.app$/i.test(name) ||
+    ['contents', 'app-resources', 'core library'].includes(name.toLowerCase())
+  )
+}
+
 /** Entries are read 100 at a time (Chromium), and a reader is done when it returns none. */
 async function readEntries(dir: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> {
   const reader = dir.createReader()
@@ -231,13 +245,14 @@ export function foldersFromDrop(
     const handed = item as DataTransferItem & {
       getAsFileSystemHandle?: () => Promise<{ kind?: string } | null>
     }
-    const handle = handed.getAsFileSystemHandle
-      ? handed
-          .getAsFileSystemHandle()
-          .then((got) => (got?.kind === 'directory' ? (got as DirectoryHandleLike) : undefined))
-          // (No handle for this folder: one of the system's, or the browser hands out none.)
-          .catch(() => undefined)
-      : Promise.resolve(undefined)
+    const handle =
+      handed.getAsFileSystemHandle && !folderOfAnApp(entry.name)
+        ? handed
+            .getAsFileSystemHandle()
+            .then((got) => (got?.kind === 'directory' ? (got as DirectoryHandleLike) : undefined))
+            // (No handle for this folder: one of the system's, or the browser hands out none.)
+            .catch(() => undefined)
+        : Promise.resolve(undefined)
     dropped.push({ entry: entry as FileSystemDirectoryEntry, handle })
   }
   return (async () => {

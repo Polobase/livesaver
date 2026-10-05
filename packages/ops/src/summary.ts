@@ -32,6 +32,8 @@ export function summary(
   results: readonly SetResult[],
   projects: readonly Project[],
   apply: boolean,
+  /** Sets that were left out for the Live that saved them, and the version that was asked. */
+  leftOut?: { readonly sets: number; readonly minLive: number },
 ): string {
   const c = totalCounts(results)
   const errors = results.filter((r) => r.error)
@@ -49,6 +51,8 @@ export function summary(
       (errors.length ? `   errors: ${errors.length}` : ''),
   )
   if (skipped) lines.push(`  skipped (unchanged and complete; --full checks all): ${skipped}`)
+  if (leftOut?.sets)
+    lines.push(`  left out (saved with a Live older than ${leftOut.minLive}): ${leftOut.sets}`)
   lines.push(
     `Sample references (counted per set): ${refs}`,
     `  ok in project ............ ${c.ok}`,

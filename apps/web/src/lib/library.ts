@@ -47,10 +47,28 @@ export function absentWords(
       ? `This scan did not read ${folders} from your last visit`
       : `${folders} from your last visit ${n === 1 ? 'has' : 'have'} to be added again`,
     text: scanned
-      ? `${listed}. Samples that lie in ${them} count as not found here${sets}. In the Settings, let the page read ${them} again (${n === 1 ? 'its row says' : 'their rows say'} how), then scan again.`
+      ? `${listed}. Samples that lie in ${them} count as not found here${sets}. Let the page read ${them} again (${n === 1 ? 'its row says' : 'their rows say'} how), then scan again.`
       : `${listed}. A browser hands a page such a folder for one visit. Add ${them} again, by the dialog or a drop: several folders can be dropped at once. Until then a scan does not read ${them}: a sample that lies there counts as not found${sets}.`,
     line: `${folders} from your last visit ${n === 1 ? 'was' : 'were'} not read by this scan: a sample that lies in ${them} counts as not found.`,
   }
+}
+
+/**
+ * Which sets a scan can leave out for the Live that saved them: the option is the oldest major
+ * version that is still checked (0: every set).
+ */
+export const LEAVE_OUT: { label: string; value: number }[] = [
+  { label: 'Check every set', value: 0 },
+  { label: 'Leave out Live 9 and older', value: 10 },
+  { label: 'Leave out Live 10 and older', value: 11 },
+  { label: 'Leave out Live 11 and older', value: 12 },
+]
+
+/** What a scan says of the sets it left out for their Live ('' = it left none out). */
+export function leftOutWords(sets: number, minLive: number | undefined): string {
+  if (!sets) return ''
+  const which = minLive ? `Live ${minLive - 1} or older` : 'an older Live'
+  return `${sets === 1 ? '1 set' : `${sets.toLocaleString('en-US')} sets`} saved with ${which} ${sets === 1 ? 'is' : 'are'} left out, as you set.`
 }
 
 /** The request of a scan as one text: two requests are the same scan if these are equal. */

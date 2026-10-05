@@ -38,6 +38,10 @@ export function program(): Command {
         '--certain-only',
         'leave uncertain matches out: only a file whose fingerprint (size and CRC) confirms it is taken, the rest stays missing',
       )
+      .option(
+        '--min-live <version>',
+        'leave out sets that were last saved with a Live older than this major version (e.g. 10): they are not checked, listed or fixed',
+      )
       .option('--config <file>', 'config file (default ~/.config/livesaver/config.json)')
       .option('--report-dir <dir>', 'write the report files (CSV, Markdown) to this folder')
       .option('--json', 'print the full result as JSON')

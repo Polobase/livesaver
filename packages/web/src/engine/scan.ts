@@ -208,6 +208,7 @@ export async function scanFolders(
       env: config,
       packCopyLimit: Math.trunc(request.options.packLimitMB * 1_000_000),
       matchLibraryPath: request.options.matchLibraryPath,
+      minLive: request.options.minLive ?? 0,
       // Nothing is written here, and the strict scan of each patched set would run on this one
       // thread: a third of the whole run.
       quickPlan: true,

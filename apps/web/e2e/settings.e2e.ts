@@ -146,11 +146,14 @@ for (const [name, type] of ENGINES) {
         await packLimit().fill('20')
         await packLimit().press('Enter')
         await page.getByTestId('scan').click()
+        // A scan that is started in the settings is watched on the overview.
+        await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
         await page
           .getByTestId('scanned-at')
           .getByText(/^Scanned/)
           .waitFor({ timeout: 30_000 * PATIENCE })
         await page.reload()
+        await page.getByRole('link', { name: 'Settings', exact: true }).click()
         await page.getByTestId('found').waitFor()
         expect(await folderNames()).toEqual(['projects'])
         expect(await packLimit().inputValue()).toBe('20')

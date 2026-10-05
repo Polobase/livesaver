@@ -145,7 +145,8 @@ what the command line reports.
   Live's CRC-16 over the first 16 KB. The name alone is never enough. Vendor re-saves and Ableton's
   in-place pack updates are handled explicitly. `--match-library-path` also accepts a library file
   with other tags by its name and place in the library, and reports it as uncertain;
-  `--certain-only` takes no file that the fingerprint does not confirm.
+  `--certain-only` takes no file that the fingerprint does not confirm. `--min-live 10` leaves
+  out the sets an older Live saved: old saves that are kept beside newer ones of the same song.
 - **Every format.** Reads `.als`, `.adg`, `.adv`, `.alc` and `.agr` from Live 8.2 to 12, including
   old (Live 9/10) and new FileRef formats, macOS aliases and Windows paths.
 - **Safe by default.**

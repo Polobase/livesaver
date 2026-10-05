@@ -5,7 +5,7 @@
  */
 import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
-import { projectDetail } from '../../lib/detail'
+import { olderSaves, projectDetail } from '../../lib/detail'
 import { bytes, count, plural } from '../../lib/format'
 import {
   ACTION_LABEL,
@@ -39,6 +39,16 @@ const notRead = computed(() =>
         true,
       ).line
     : '',
+)
+
+/**
+ * Old saves of the project that are not complete, while a newer Live saved it since: a scan
+ * can leave such sets out, which is said where they stand in the way.
+ */
+const older = computed(() =>
+  detail.value && !detail.value.set && !library.options.minLive
+    ? olderSaves(detail.value.sets)
+    : undefined,
 )
 
 /** Changes and missing samples listed here; the tabs list them all. */
@@ -158,6 +168,21 @@ function fixIt(): void {
               <StatusPill :health="setHealth(set)" class="shrink-0" />
             </li>
           </ul>
+          <p v-if="older" class="mt-2 text-sm text-muted" data-testid="older-saves">
+            {{
+              older.sets === 1
+                ? 'One of them is an older save'
+                : `${count(older.sets)} of them are older saves`
+            }}
+            (Live {{ older.live }}) of a project that Live {{ older.newest }} saved since. If you
+            keep {{ older.sets === 1 ? 'it' : 'them' }} only as
+            {{ older.sets === 1 ? 'it was' : 'they were' }}, a scan can leave such sets out:
+            <RouterLink
+              :to="{ path: '/', query: { folders: 'open' } }"
+              class="text-default underline underline-offset-2"
+              >“Leave out sets of older Live versions”</RouterLink
+            >, in the folders and options.
+          </p>
         </section>
         <p v-else-if="detail.set.error" class="text-sm">
           This set could not be read: {{ detail.set.error }}

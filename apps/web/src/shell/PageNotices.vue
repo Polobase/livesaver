@@ -107,7 +107,14 @@ const actions = computed(() => [
       :description="notRead.text"
       role="status"
       data-testid="not-read"
-      :actions="[{ label: 'To the folders', color: 'neutral', variant: 'subtle', to: '/settings' }]"
+      :actions="[
+        {
+          label: 'To the folders',
+          color: 'neutral',
+          variant: 'subtle',
+          to: { path: '/', query: { folders: 'open' } },
+        },
+      ]"
     />
     <!-- A page of a site reaches this computer only if the browser lets it, and some ask first. -->
     <UAlert

@@ -203,7 +203,13 @@ export function browserMemory(): FolderMemory | undefined {
       try {
         const read = JSON.parse(kept.getItem(OPTIONS) ?? 'null') as Partial<ScanOptions> | null
         return typeof read?.packLimitMB === 'number' && typeof read.matchLibraryPath === 'boolean'
-          ? { packLimitMB: read.packLimitMB, matchLibraryPath: read.matchLibraryPath }
+          ? {
+              packLimitMB: read.packLimitMB,
+              matchLibraryPath: read.matchLibraryPath,
+              ...(typeof read.minLive === 'number' && read.minLive > 0
+                ? { minLive: read.minLive }
+                : {}),
+            }
           : undefined
       } catch {
         return undefined

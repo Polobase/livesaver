@@ -9,6 +9,11 @@ export interface WebOptions {
   /** Pack files larger than this stay in the pack (megabytes; 0 = never copy). */
   readonly packLimitMB: number
   readonly matchLibraryPath: boolean
+  /**
+   * Sets last saved by a Live older than this major version are left out: not checked, listed
+   * or fixed (0 or absent: every set).
+   */
+  readonly minLive?: number
 }
 
 /** A folder to search for samples. */

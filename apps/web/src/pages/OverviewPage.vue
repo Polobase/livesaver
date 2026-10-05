@@ -4,6 +4,7 @@ import { nextTick, useTemplateRef, watch } from 'vue'
 import LibrarySetup from '../components/library/LibrarySetup.vue'
 import FixCard from '../components/overview/FixCard.vue'
 import HealthHeadline from '../components/overview/HealthHeadline.vue'
+import LibrarySection from '../components/overview/LibrarySection.vue'
 import MissingCard from '../components/overview/MissingCard.vue'
 import PluginsCard from '../components/overview/PluginsCard.vue'
 import RecentRuns from '../components/overview/RecentRuns.vue'
@@ -53,6 +54,7 @@ watch(
 
       <template v-if="scans.scan">
         <ScanNotices :scan="scans.scan" />
+        <LibrarySection />
         <HealthHeadline :scan="scans.scan" />
         <div v-if="scans.scan.samples.sets > 0" class="grid gap-4 lg:grid-cols-2">
           <FixCard :scan="scans.scan" />

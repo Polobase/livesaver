@@ -7,6 +7,7 @@ import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
 import { bytes, count, plural, when } from '../../lib/format'
 import { TAKEN_OUT } from '../../lib/runs'
+import { liveGuideOpen } from '../../shell/guide'
 import { useEngineStore } from '../../stores/engine'
 import { useFixStore } from '../../stores/fix'
 import { useScanStore } from '../../stores/scan'
@@ -24,6 +25,8 @@ const hidden = computed(() => props.scan.samples.missing.filter((row) => row.bli
 const ending = (path: string) => path.split(/[\\/]/).slice(-2).join('/')
 
 const busy = computed(() => scans.running || fix.running || fix.undoing)
+/** The folders of the library, on the overview itself. */
+const FOLDERS = { path: '/', query: { folders: 'open' } }
 const some = (items: readonly string[], limit = 5) =>
   items.length > limit
     ? [...items.slice(0, limit), `and ${count(items.length - limit)} more`]
@@ -185,6 +188,21 @@ const liveAdvice = computed(() =>
       :description="`Samples of Live's Core Library cannot be found, and content that Live moved between versions is not recognised. ${liveAdvice}`"
       role="note"
       data-testid="no-live-content"
+      :actions="
+        engines.capabilities.paths
+          ? []
+          : [
+              {
+                label: 'Show me how',
+                color: 'neutral',
+                variant: 'subtle',
+                onClick: () => {
+                  liveGuideOpen = true
+                },
+              },
+              { label: 'To the folders', color: 'neutral', variant: 'ghost', to: FOLDERS },
+            ]
+      "
     />
 
     <UAlert
@@ -196,7 +214,7 @@ const liveAdvice = computed(() =>
       :description="`For example “${ending(hidden[0]?.path ?? '')}”. In a project folder that was chosen for editing, a browser shows a page no file or folder with a “/” in its name (as Finder shows it) or with a space at its start or end. ${hidden.length === 1 ? 'This sample' : 'These samples'} may well be where the sets expect ${hidden.length === 1 ? 'it' : 'them'}, so the page takes no other file for ${hidden.length === 1 ? 'it' : 'them'}. To let the page see every name, drop your project folder onto the sample folders as well, and scan again.`"
       role="note"
       data-testid="hidden-names"
-      :actions="[{ label: 'To the folders', color: 'neutral', variant: 'subtle', to: '/settings' }]"
+      :actions="[{ label: 'To the folders', color: 'neutral', variant: 'subtle', to: FOLDERS }]"
     />
 
     <UAlert

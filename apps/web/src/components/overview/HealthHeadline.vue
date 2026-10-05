@@ -4,9 +4,16 @@ import { computed } from 'vue'
 import type { Scan } from '../../engine/types'
 import { count, plural } from '../../lib/format'
 import { setHealth, tally } from '../../lib/health'
+import { leftOutWords } from '../../lib/library'
+import { useScanStore } from '../../stores/scan'
 import HealthBar from './HealthBar.vue'
 
 const props = defineProps<{ scan: Scan }>()
+const scans = useScanStore()
+/** Sets the scan left out for the Live that saved them: they are in no number here. */
+const leftOut = computed(() =>
+  leftOutWords(props.scan.samples.leftOut, scans.scanned?.options.minLive),
+)
 const totals = computed(() => tally(props.scan.samples.setRows, setHealth))
 const sets = computed(() => props.scan.samples.sets)
 const rest = computed(() => {
@@ -42,6 +49,7 @@ const rest = computed(() => {
       <template v-else-if="rest.length">{{ rest.join(' · ') }}.</template>
       <template v-else>Every sample is where its set expects it.</template>
     </p>
+    <p v-if="leftOut" class="mt-1 text-sm text-muted" data-testid="left-out">{{ leftOut }}</p>
     <HealthBar v-if="sets > 0" class="mt-5" :totals="totals" unit="sets" />
   </section>
 </template>

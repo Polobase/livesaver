@@ -91,6 +91,7 @@ export {
   type FolderFile,
   type FolderSource,
   folderFromHandle,
+  folderOfAnApp,
   foldersFromDrop,
   foldersFromFiles,
   type HiddenFiles,

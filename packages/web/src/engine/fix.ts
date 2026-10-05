@@ -153,6 +153,7 @@ export async function fixFolders(
           packLimit: request.options.packLimitMB,
           matchLibraryPath: request.options.matchLibraryPath,
           certainOnly: Boolean(request.certainOnly),
+          ...(request.options.minLive ? { minLive: request.options.minLive } : {}),
           vendorLibraries: config.vendorLibraries,
         },
       })
@@ -166,6 +167,7 @@ export async function fixFolders(
         packCopyLimit: Math.trunc(request.options.packLimitMB * 1_000_000),
         matchLibraryPath: request.options.matchLibraryPath,
         certainOnly: Boolean(request.certainOnly),
+        minLive: request.options.minLive ?? 0,
         parser,
         probe,
         writer: applyWriter(host, run, probe),

@@ -199,7 +199,7 @@ describe('folders behind a handle are read again (Chromium, in a profile that is
       await page.getByTestId('projects-folders').getByRole('button', { name: 'Add folder' }).click()
       await rowsOf(page, 'projects-folders').first().waitFor()
       expect(await textOf(page.getByTestId('kept-note'))).toContain(
-        'A folder you dropped here, or chose for editing, is read again then; a sample folder you chose with “Add folder” has to be added again.',
+        'A folder you dropped is read again then, once you allow it; one you chose with “Add folder” has to be added again. So drop the folders you want kept.',
       )
       // (The browser's database takes a moment to take the handle.)
       await page.waitForTimeout(300)
@@ -252,7 +252,7 @@ describe('folders behind a handle are read again (Chromium, in a profile that is
       await page.locator('#headline').waitFor({ timeout: 30_000 * PATIENCE })
       const notice = page.getByTestId('not-read')
       expect(await textOf(notice)).toBe(
-        'This scan did not read 1 folder from your last visit “samples”. Samples that lie in it count as not found here. In the Settings, let the page read it again (its row says how), then scan again. To the folders',
+        'This scan did not read 1 folder from your last visit “samples”. Samples that lie in it count as not found here. Let the page read it again (its row says how), then scan again. To the folders',
       )
       expect(await barriers(page)).toEqual([])
       // The sample that lies in it is "not found": its panel says why that may be.
@@ -267,19 +267,30 @@ describe('folders behind a handle are read again (Chromium, in a profile that is
       await page.keyboard.press('Escape')
       await panel.waitFor({ state: 'hidden' })
 
-      // The notice leads to the folders; added again, the folder is read and the notice gone.
+      // The notice leads to the folders, which are on the overview: its section is open (it
+      // says there what waits). Added again, the folder is read and the notice gone.
       await notice.getByRole('link', { name: 'To the folders' }).click()
-      await page.getByTestId('absent').waitFor()
-      expect(await page.getByTestId('not-read').count()).toBe(0)
+      await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
+      const folders = page.getByTestId('library-section')
+      await folders.getByTestId('absent').waitFor()
+      expect(await textOf(folders.getByTestId('library-summary'))).toBe(
+        '1 project folder · 0 sample folders · 1 not read yet',
+      )
       await giveFolder(page, 'search-input', samples)
       expect(await page.getByTestId('absent').count()).toBe(0)
-      await page.getByTestId('scan').click()
-      await page.getByRole('link', { name: 'Overview', exact: true }).click()
+      expect(await textOf(folders.getByTestId('library-summary'))).toBe(
+        '1 project folder · 1 sample folder · changed since the scan',
+      )
+      // Scanned again right there.
+      await folders.getByTestId('scan-folders').click()
       await page
         .getByTestId('missing-card')
         .getByText('Nothing')
         .waitFor({ timeout: 30_000 * PATIENCE })
       expect(await page.getByTestId('not-read').count()).toBe(0)
+      expect(await textOf(folders.getByTestId('library-summary'))).toBe(
+        '1 project folder · 1 sample folder',
+      )
       // (For the tests that follow: without the folder that is handed over for one visit.)
       await page.getByRole('link', { name: 'Settings', exact: true }).click()
       await rowsOf(page, 'search-folders')

@@ -37,15 +37,46 @@ On the overview, **How this page can fix** says the same for the browser you are
 
 ## Giving it folders
 
-Choose a folder with **Add folder**, or drop it on the page. Your browser may ask whether to “upload” the folder: that is its word for letting a page read it. Nothing is uploaded; the files stay where they are and are read there.
+Choose a folder with **Add folder**, or drop it on the page. Your browser may ask whether to “upload” the folder: that is its word for letting a page read it. Nothing is uploaded; the files stay where they are and are read there. The page says so where the folders are added, and **How it works** in that box says the rest.
 
-Worth adding as sample folders:
+![Where folders are added, the page says what that means: nothing is uploaded](images/folders-light.webp)
+
+The folders are on the overview: before the first scan in **Your library**, afterwards in the line of the same name, which opens into them. A folder is added and the library scanned again there, where the result is read. (The Settings have them too; a scan started there takes you to the overview.)
+
+### How a page reads a folder
+
+A page cannot look at your disk. It gets a folder only when you hand it one, through what browsers offer a page for that:
+
+| You | The page gets | On your next visit |
+|---|---|---|
+| drop a folder | every file of it, to read (the File and Directory Entries API); in Chrome, Edge and Brave also a handle to the folder (the File System Access API) | Chrome, Edge, Brave: the folder is read again, once you allow it. Safari, Firefox: add it again. |
+| choose it with **Add folder** | every file of it, to read (the folder upload) | add it again |
+| allow editing, with fixing in the page switched on | the right to save into your project folder, through its handle | the same folder, once you allow it |
+
+What your browser may ask or say:
+
+- **“Upload … files to this site?”**: let this page read them. Nothing leaves your computer.
+- **“Let site view files?”**: let the page read a folder again that you handed it before.
+- **“Let site edit files?”** or **“Save changes?”**: let the page write a fix into your project folder.
+- **“Can't open this folder because it contains system files”**: said of a folder of the system or of an app. Press Cancel: the page reads the folder all the same, it only cannot keep it for your next visit. (For the Live app the page no longer asks your browser what makes it say this.)
+
+### Worth adding as sample folders
 
 - **`Music/Ableton`** in your home folder: your User Library and the Factory Packs.
-- **The Ableton Live app**, dropped on the page from your Applications folder. To a drop, an app is a folder; it holds the Core Library, and Live's own list of content that moved between versions. The folder dialog cannot open an app: there, press ⌘⇧G and type the path of its `Contents` folder, `/Applications/Ableton Live 12 Suite.app/Contents`.
+- **The Ableton Live app**: it holds the Core Library, and Live's own list of content that moved between versions.
 - **`/Users/Shared`**, if you have libraries from Native Instruments.
 
-Until Live's own content is there, the page says that samples of the Core Library cannot be found.
+Until Live's own content is there, the page says that samples of the Core Library cannot be found, and **Show me how** shows the steps in pictures:
+
+1. In Finder, open your Applications folder (Go › Applications).
+2. Drag **Ableton Live** from there onto **Sample folders** on the page. To a drop, an app is a folder; only its Core Library is read.
+3. Scan again.
+
+![The steps to add the Live app, as the page shows them](images/live-guide-light.webp)
+
+Two other ways lead to the same folder. Right-click the app, choose **Show Package Contents**, and drag its `Contents` folder onto the page. Or use **Add folder**: its dialog cannot open an app, so press ⌘⇧G there and type the path, `/Applications/Ableton Live 12 Suite.app/Contents`.
+
+A browser keeps no folder of an app for a page, so the Live app is added again on every visit.
 
 ## Your folders on your next visit
 

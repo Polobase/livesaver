@@ -27,7 +27,7 @@ and a page cannot see that Live is running. See [Fixing in a browser](#fixing-in
 | Place | What it shows | What can be done |
 |---|---|---|
 | **Overview**, before a scan | what livesaver does in three steps, the project folders and sample folders, the options | add folders, scan |
-| **Overview**, after a scan | how many sets are complete, can be fixed, or have samples that stay missing (one bar); what a fix would do; what is missing, by source, with what to do about the largest; every reference by state; where found samples lie; the last changes | review and fix, download the reports, undo the last fix |
+| **Overview**, after a scan | the library in one line, which opens into its folders and options; how many sets are complete, can be fixed, or have samples that stay missing (one bar); what a fix would do; what is missing, by source, with what to do about the largest; every reference by state; where found samples lie; the last changes | add a folder and scan again without leaving the page; review and fix, download the reports, undo the last fix |
 | **Samples › Projects** | every project: state, sets, what a fix changes, what stays missing, what is copied | fix one, a selection, or all; a project opens from the side with its sets, its changes (old place → new place) and its gaps; show it in Finder |
 | **Samples › Missing** | missing samples grouped by where they came from, each group with advice | add the folder that has them, copy the list, open a sample |
 | **Samples › Changes** | every planned change: how the file was found, and whether the fingerprint confirms it | search, filter (uncertain only), open a change |
@@ -38,6 +38,11 @@ and a page cannot see that Live is running. See [Fixing in a browser](#fixing-in
 | **History** | every run that changed something, by day: what it did, where, and what became of it; on request also the runs that only planned or reported | a run opens from the side with what it was asked, its numbers, its report files and every step; undo a run, after a question that says what the undo does |
 | **Settings** | the folders and options of a scan, the appearance, the keyboard shortcuts, what livesaver found on this computer (Live, its libraries, the settings file, where runs and originals are kept) | change them; reset them to the command line's settings; show a folder in Finder; the app says when a scan is older than they are |
 
+- **The folders are where the result is read.** The first visit has them on the Overview, and
+  so has every later one: the line "Your library" says what was read and opens into the folders
+  and options, with a button that scans again. What points at the folders (a notice, the advice
+  for missing samples) leads there, and a scan that is started in the Settings is watched on
+  the Overview, where its result appears.
 - **Nothing is written without a review.** A fix goes through three steps: what will happen
   (sets, references, copies, per project; with a switch that leaves the uncertain matches out),
   whether everything is ready (Live closed, enough free space, where the backups go), then the
@@ -154,6 +159,10 @@ plug-ins of every set (as `plugins audit` reports them).
   every fix should not wait for. It is kept with the scan.
 - **No cache of complete sets**: a set that is skipped tells nothing about its plug-ins. Its
   report files equal those of `doctor --full`.
+- **Sets of an older Live can be left out** (`minLive`, the command line's `--min-live`): old
+  saves that are kept as they were beside newer ones of the same song. Such a set is read (the
+  Live that saved it is in its first line), and then not checked, not listed and not fixed; the
+  scan says how many were left out, since they are in no other number.
 
 ## One contract, two engines
 The app talks to an `Engine` (`apps/web/src/engine/types.ts`): start, reset, scan, plan an
@@ -220,7 +229,16 @@ up front) and the only way a page can write, but Chromium does not show everythi
   a real music folder that hid 5,220 of 108,423 entries, among them three whole sample folders,
   and the check then called samples missing that are there.
 - No handle is given for a folder in `/Applications` (where Live's `App-Resources` lies), nor for
-  the home, Documents or Desktop folder itself.
+  the home, Documents or Desktop folder itself. Asked for one all the same, Chromium puts a
+  dialog of its own in front of the page ("can't open this folder because it contains system
+  files"), although the folder is read through its entries. So a drop asks for no handle when
+  the folder is an app's by its name (`folderOfAnApp`: the app, `Contents`, `App-Resources`,
+  `Core Library`): the Live app is added without that dialog.
+
+**The page says what handing over a folder means**, where the folders are added: that nothing
+is uploaded (a browser's word for letting a page read), how a drop, the dialog and a handle
+differ, and what the browser's questions mean. And it shows how the Live app is added, in
+pictures that are drawn in the page (they follow the theme, and are no one's screen).
 
 Uploads and drops show every file. In a real project folder (299 projects, 46,507 files) a
 handle hides 118 files: 36 samples, their analysis files, and Finder's icon files; no set and
@@ -503,6 +521,13 @@ there.
     downloaded, a step shown in Finder, an undo that asks first and is then seen everywhere.
   - The settings: what livesaver found, a folder shown in Finder, the reset to the command
     line's settings; what every page says when livesaver is gone, or was started again.
+  - The first steps, in the three engines (`onboarding.e2e.ts`): what the page says about
+    handing it a folder, with what only a browser with handles is told; the steps to add the
+    Live app, in pictures, in light and dark; after a scan the folders on the overview, where
+    one is added and the library scanned again without leaving the page; a scan started in the
+    Settings, which goes to the overview; an old save of a project that is left out by the
+    option, from the hint in the project's panel to the scan that says how many sets it left
+    out. With livesaver behind the app, the same option leaves the same set out.
   - The folders across a reload, with the browser's own database: in the three engines the
     lists with what was typed and ticked, a folder that is added again, one that is removed.
     In Chromium with a profile that is kept (a context of Playwright is a private window): a

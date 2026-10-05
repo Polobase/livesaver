@@ -136,6 +136,9 @@ for (const [name, type] of ENGINES) {
         await input.fill(`${other}/Contents/App-Resources/Core Library`)
         await row.getByRole('button', { name: 'Done' }).click()
         await page.getByTestId('scan').click()
+        // (A scan that is started in the settings is watched on the overview.)
+        await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor()
+        await page.getByRole('link', { name: 'Settings', exact: true }).click()
         // Scanned, the row says which path it took the folder to have.
         expect(
           await eventually(

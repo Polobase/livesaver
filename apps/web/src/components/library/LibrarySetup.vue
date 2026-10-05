@@ -1,20 +1,24 @@
 <script setup lang="ts">
 /** The folders of a scan and how it matches: the same on the first visit and in the settings. */
 import { computed, ref } from 'vue'
-import { keepsDroppedFolders } from '../../engine/storage'
 import { plural } from '../../lib/format'
 import { absentWords, PLUGIN_DATABASE, PLUGIN_FOLDER } from '../../lib/library'
+import { liveGuideOpen } from '../../shell/guide'
 import { useEngineStore } from '../../stores/engine'
 import { useLibraryStore } from '../../stores/library'
 import { useScanStore } from '../../stores/scan'
 import { useWritingStore } from '../../stores/writing'
+import FolderAccessInfo from './FolderAccessInfo.vue'
 import FolderList from './FolderList.vue'
 import ScanOptions from './ScanOptions.vue'
 
 const engines = useEngineStore()
 const library = useLibraryStore()
-/** `plugins`: also the folders that say what is installed (the settings; not the first visit). */
-defineProps<{ plugins?: boolean }>()
+/**
+ * `plugins`: also the folders that say what is installed (the settings; not the first visit).
+ * `compact`: looked at again after a scan, where what a first visit explains is kept short.
+ */
+defineProps<{ plugins?: boolean; compact?: boolean }>()
 const scans = useScanStore()
 const writing = useWritingStore()
 const onComputer = computed(() => engines.capabilities.paths)
@@ -33,7 +37,6 @@ async function allowAll(): Promise<void> {
     }
   }
 }
-const keepsDrops = keepsDroppedFolders()
 /** Folders of the last visit that are not there: said before a scan is made without them. */
 const absent = computed(() =>
   absentWords(
@@ -46,6 +49,8 @@ const absent = computed(() =>
 
 <template>
   <div class="space-y-4">
+    <!-- Before a folder is handed over: what that means, and that nothing leaves the computer. -->
+    <FolderAccessInfo v-if="!onComputer" :compact="compact" />
     <UAlert
       v-if="library.asleep.length"
       color="neutral"
@@ -139,10 +144,16 @@ const absent = computed(() =>
               </template>
               <template v-else>
                 Live's own content: drag the Ableton Live app here from your Applications folder.
-                The folder dialog cannot open an app; there, press
-                <UKbd value="meta" /> <UKbd value="shift" /> <UKbd value="G" /> and type the path of
-                its <code class="text-xs">Contents</code> folder:
-                <code class="text-xs">/Applications/Ableton Live 12 Suite.app/Contents</code>.
+                <!-- (On the grey of this box the usual grey of a link is too faint.) -->
+                <UButton
+                  class="p-0 text-default underline"
+                  color="neutral"
+                  variant="link"
+                  size="sm"
+                  label="Show me how"
+                  data-testid="show-live-guide"
+                  @click="liveGuideOpen = true"
+                />
               </template>
             </li>
           </ul>
@@ -182,23 +193,6 @@ const absent = computed(() =>
         </p>
       </div>
     </FolderList>
-    <p v-if="!onComputer" class="text-sm text-muted" data-testid="kept-note">
-      Your browser may ask whether to "upload" a folder. Nothing is uploaded: the files are only
-      read by this page, on your computer. This browser keeps the list of your folders for your next
-      visit, with what you typed and ticked.
-      <template v-if="keepsDrops">
-        A folder you dropped here{{ writing.on ? ', or chose for editing,' : '' }}
-        is read again then; {{ writing.on ? 'a sample folder' : 'one' }} you chose with “Add folder”
-        has to be added again.
-      </template>
-      <template v-else>The folders themselves have to be added again then.</template>
-      <template v-if="writing.on">
-        A project folder is added to be edited instead. Drop it rather than choosing it with “Add
-        folder”: in a folder it lets a page edit, your browser hides files with some names (a “/” as
-        Finder shows it, or a space at the start or end of the name), and a drop shows this page
-        every file.
-      </template>
-    </p>
     <ScanOptions :disabled="scans.running || !engines.start" />
   </div>
 </template>

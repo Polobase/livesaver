@@ -28,6 +28,12 @@ export interface LiveDoc {
   readonly search: ByteSearch
 }
 
+/** The major version of the Live that saved a document, by its `Creator` (0 = it does not say). */
+export function liveMajor(creator: string): number {
+  const found = /^Ableton Live (\d+)/.exec(creator)
+  return found ? Number(found[1]) : 0
+}
+
 const GZIP_0 = 0x1f
 const GZIP_1 = 0x8b
 

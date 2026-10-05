@@ -26,6 +26,7 @@ export interface DoctorFlags {
   readonly packLimit?: string
   readonly matchLibraryPath?: boolean
   readonly certainOnly?: boolean
+  readonly minLive?: string
   readonly config?: string
   readonly json?: boolean
   readonly quiet?: boolean
@@ -34,6 +35,15 @@ export interface DoctorFlags {
   readonly apply?: boolean
   readonly force?: boolean
   readonly full?: boolean
+}
+
+/** `--min-live`: a major version of Live (0 = every set; anything else is said to be wrong). */
+export function minLiveOf(flag: string | undefined): number {
+  if (flag === undefined || flag === '') return 0
+  const version = Number(flag)
+  if (!Number.isInteger(version) || version < 0)
+    throw new Error(`--min-live takes a major version of Live, such as 10 (got "${flag}")`)
+  return version
 }
 
 /** What a run needs beyond the command line's flags. */
@@ -70,6 +80,7 @@ export async function collectRun(
   hooks: CollectHooks = {},
 ): Promise<CollectRun> {
   const apply = command === 'collect' && Boolean(flags.apply)
+  const minLive = minLiveOf(flags.minLive)
   const resolved = await resolveConfig({
     ...(flags.config ? { config: flags.config } : {}),
     search: flags.search ?? [],
@@ -95,6 +106,7 @@ export async function collectRun(
             packLimit: config.packCopyLimit / 1_000_000,
             matchLibraryPath: Boolean(flags.matchLibraryPath),
             certainOnly: Boolean(flags.certainOnly),
+            ...(minLive ? { minLive } : {}),
             vendorLibraries: config.env.vendorLibraries,
           },
         })
@@ -118,6 +130,7 @@ export async function collectRun(
     packCopyLimit: config.packCopyLimit,
     matchLibraryPath: Boolean(flags.matchLibraryPath),
     certainOnly: Boolean(flags.certainOnly),
+    minLive,
     parser,
     probe,
     ...(cache ? { cache } : {}),
@@ -206,6 +219,7 @@ export async function runCollect(
               unreadable: result.index.unreadable,
             },
             counts: totalCounts(result.results),
+            ...(result.leftOut ? { leftOut: result.leftOut } : {}),
             sets: result.results.map((r) => ({
               set: r.setPath,
               project: r.projectRoot,
@@ -231,7 +245,12 @@ export async function runCollect(
         ),
       )
     } else {
-      console.log(summary(result.results, result.projects, apply))
+      console.log(
+        summary(result.results, result.projects, apply, {
+          sets: result.leftOut,
+          minLive: minLiveOf(flags.minLive),
+        }),
+      )
       if (result.index.unreadable.length) {
         console.log(
           pc.yellow(

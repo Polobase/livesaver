@@ -27,6 +27,7 @@ livesaver collect ~/Music/Projects --apply
 | `--pack-limit <MB>` | pack files above this size stay in the pack (default 50; 0 never copies) |
 | `--match-library-path` | also accept a library file with another fingerprint, as an uncertain match |
 | `--certain-only` | leave uncertain matches out |
+| `--min-live <version>` | leave out sets that were last saved with a Live older than this major version (`10` leaves out Live 9 and older): they are not checked, listed or fixed |
 | `--report-dir <dir>` | write the reports there |
 | `--json` | print the whole result as JSON |
 

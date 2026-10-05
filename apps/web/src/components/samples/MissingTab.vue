@@ -170,7 +170,7 @@ function added(folder: FolderListing): void {
                   variant="subtle"
                   icon="i-lucide-folder-plus"
                   label="Add its folder"
-                  to="/settings"
+                  :to="{ path: '/', query: { folders: 'open' } }"
                 />
               </template>
             </div>

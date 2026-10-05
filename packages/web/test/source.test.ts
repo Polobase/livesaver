@@ -14,6 +14,7 @@ import {
   editable,
   editableFromDrop,
   type FolderSource,
+  folderOfAnApp,
   foldersFromDrop,
   hiddenByHandle,
   lostBehindHandle,
@@ -226,4 +227,33 @@ test('a folder with no such name is its handle alone; one without a handle stays
   expect(editable(listed)).toBe(listed)
   const uploaded = uploadedFolder(samples)
   expect(editable(uploaded)).toBe(uploaded)
+})
+
+test('no handle is asked for the folder of an app: a browser answers that with a dialog of its own', async () => {
+  // The Live app, dragged from the Applications folder, or its Contents folder.
+  expect(
+    ['Ableton Live 12 Suite.app', 'Contents', 'App-Resources', 'Core Library', 'Some.APP'].map(
+      folderOfAnApp,
+    ),
+  ).toEqual([true, true, true, true, true])
+  expect(
+    ['Music', 'Ableton', 'Shared', 'My app notes', 'contents of 2019'].map(folderOfAnApp),
+  ).toEqual([false, false, false, false, false])
+  const contents = join(tmp.path, 'Ableton Live 12 Suite.app', 'Contents')
+  writeFile(join(contents, 'App-Resources', 'Core Library', 'Samples', 'x.wav'), 'RIFF')
+  let asked = 0
+  const handle = async () => {
+    asked++
+    return memoryFolder(contents)
+  }
+  const [app, inner, other] = await drop([
+    { ...folder(join(tmp.path, 'Ableton Live 12 Suite.app')), getAsFileSystemHandle: handle },
+    { ...folder(contents), getAsFileSystemHandle: handle },
+    { ...folder(samples), getAsFileSystemHandle: handle },
+  ])
+  // The two of the app are read through their entries, without a handle; the third has one.
+  expect(asked).toBe(1)
+  expect(listing(app).paths).toEqual(['Contents/App-Resources/Core Library/Samples/x.wav'])
+  expect([listing(app).kept, listing(inner).kept]).toEqual([undefined, undefined])
+  expect(listing(other).kept).toBeDefined()
 })

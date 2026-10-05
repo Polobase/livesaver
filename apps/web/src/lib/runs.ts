@@ -96,6 +96,9 @@ export function runFacts(run: Run): string[] {
       : '',
     options.certainOnly === true ? 'uncertain matches left out' : '',
     options.matchLibraryPath === true ? 'library files accepted by their place' : '',
+    typeof options.minLive === 'number' && options.minLive > 0
+      ? `sets of a Live older than ${options.minLive} left out`
+      : '',
     Array.isArray(options.plugin) && options.plugin.length
       ? `only ${options.plugin.join(', ')}`
       : '',
@@ -137,6 +140,7 @@ const OPTION: Readonly<Record<string, string>> = {
   packLimit: 'Pack files',
   matchLibraryPath: 'Library files',
   certainOnly: 'Uncertain matches',
+  minLive: 'Sets older than Live',
   plugin: 'Only these plug-ins',
   comments: 'Finder comments',
   sheet: 'Rating sheet',

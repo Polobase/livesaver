@@ -171,6 +171,16 @@ async function shots(scheme: 'light' | 'dark'): Promise<void> {
   await own.goto(alone.url)
   // (The page takes no folder before it knows the folders of the last visit.)
   await own.locator('[data-testid="projects-input"]:not([disabled])').waitFor({ state: 'attached' })
+  // What it says where folders are added, and how the Live app gets there (the guide is longer
+  // than the window of the other pictures).
+  await shot('folders', own)
+  await own.getByTestId('show-live-guide').click()
+  await own.getByTestId('live-guide').waitFor()
+  await own.setViewportSize({ width: SIZE.width, height: 1120 })
+  await shot('live-guide', own)
+  await own.setViewportSize(SIZE)
+  await own.getByTestId('guide-close').click()
+  await own.getByRole('dialog').waitFor({ state: 'hidden' })
   await own.getByTestId('projects-input').setInputFiles(demo.projects)
   await own.getByTestId('search-input').setInputFiles(demo.samples)
   await own.getByTestId('scan-library').click()

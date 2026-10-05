@@ -2,9 +2,10 @@
 import { describe, expect, test } from 'bun:test'
 import type { ProjectRow, SetRow } from '@livesaver/ops'
 import type { Scan } from '../src/engine/types.js'
+import { olderSaves } from '../src/lib/detail.js'
 import { bytes, count, percent, plural, seconds, splitPath, when } from '../src/lib/format.js'
 import { projectHealth, setHealth, tally, whyLabel, whyText } from '../src/lib/health.js'
-import { absentWords, requestKey, wantedOf } from '../src/lib/library.js'
+import { absentWords, LEAVE_OUT, leftOutWords, requestKey, wantedOf } from '../src/lib/library.js'
 import { FREE_SPACE_MARGIN, fits, planOf } from '../src/lib/plan.js'
 import { advance, starting } from '../src/lib/progress.js'
 import { isReady, pageReadiness } from '../src/lib/ready.js'
@@ -62,6 +63,29 @@ describe('the state of a set and of a project', () => {
   test('a tally counts every row once', () => {
     const rows = [set(), set({ changes: 1 }), set({ missing: 2 }), set({ error: 'x' }), set()]
     expect(tally(rows, setHealth)).toEqual({ fine: 2, fixable: 1, missing: 1, unreadable: 1 })
+  })
+})
+
+describe('old saves of a project', () => {
+  test('are the incomplete sets an older Live saved than the newest of the project', () => {
+    // A song saved by Live 9, then again and again by Live 11: only the first save has a gap.
+    const song = [
+      set({ live: '11.1.1' }),
+      set({ live: '11.2.6' }),
+      set({ live: '9.1.1', missing: 1 }),
+    ]
+    expect(olderSaves(song)).toEqual({ sets: 1, live: 9, newest: 11 })
+    // A set that a fix would change is not complete either; one that is, is no trouble.
+    expect(olderSaves([set({ live: '12.0' }), set({ live: '10.1', changes: 2 })])).toEqual({
+      sets: 1,
+      live: 10,
+      newest: 12,
+    })
+    expect(olderSaves([set({ live: '12.0' }), set({ live: '9.7' })])).toBeUndefined()
+    // The newest save itself is no old save, whatever it misses; nor is a set of no version.
+    expect(olderSaves([set({ live: '11.0', missing: 1 }), set({ live: '9.7' })])).toBeUndefined()
+    expect(olderSaves([set({ live: '12.0' }), set({ live: '', missing: 1 })])).toBeUndefined()
+    expect(olderSaves([])).toBeUndefined()
   })
 })
 
@@ -179,15 +203,34 @@ describe('the library', () => {
     })
     expect(absentWords(['Music', 'Shared'], true)).toEqual({
       title: 'This scan did not read 2 folders from your last visit',
-      text: '“Music”, “Shared”. Samples that lie in them count as not found here. In the Settings, let the page read them again (their rows say how), then scan again.',
+      text: '“Music”, “Shared”. Samples that lie in them count as not found here. Let the page read them again (their rows say how), then scan again.',
       line: '2 folders from your last visit were not read by this scan: a sample that lies in them counts as not found.',
     })
     // A project folder among them: its sets are not scanned either.
     expect(absentWords(['Projects', 'Shared'], true, true).text).toBe(
-      '“Projects”, “Shared”. Samples that lie in them count as not found here, and sets in them are not checked. In the Settings, let the page read them again (their rows say how), then scan again.',
+      '“Projects”, “Shared”. Samples that lie in them count as not found here, and sets in them are not checked. Let the page read them again (their rows say how), then scan again.',
     )
     expect(absentWords(['Projects'], false, true).text).toContain(
       'Until then a scan does not read it: a sample that lies there counts as not found, and sets in it are not checked.',
+    )
+  })
+
+  test('says which sets a scan left out for the Live that saved them', () => {
+    // The option is the oldest version that is still checked.
+    expect(LEAVE_OUT.map((choice) => [choice.value, choice.label])).toEqual([
+      [0, 'Check every set'],
+      [10, 'Leave out Live 9 and older'],
+      [11, 'Leave out Live 10 and older'],
+      [12, 'Leave out Live 11 and older'],
+    ])
+    expect(leftOutWords(0, 10)).toBe('')
+    expect(leftOutWords(1, 10)).toBe('1 set saved with Live 9 or older is left out, as you set.')
+    expect(leftOutWords(1234, 12)).toBe(
+      '1,234 sets saved with Live 11 or older are left out, as you set.',
+    )
+    // (A scan of a livesaver that does not say what it was asked.)
+    expect(leftOutWords(2, undefined)).toBe(
+      '2 sets saved with an older Live are left out, as you set.',
     )
   })
 

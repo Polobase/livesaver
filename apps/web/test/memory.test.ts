@@ -99,6 +99,14 @@ describe('the folders of a page after a reload', () => {
     expect(again.library.absent.map((folder) => folder.name)).toEqual(['projects', 'samples'])
     // How a scan matches is kept with the folders.
     expect(again.library.options).toEqual({ packLimitMB: 20, matchLibraryPath: true })
+    // So is the Live below which sets are left out, once one is chosen.
+    again.library.options = { ...again.library.options, minLive: 10 }
+    await settled()
+    expect((await page()).library.options).toEqual({
+      packLimitMB: 20,
+      matchLibraryPath: true,
+      minLive: 10,
+    })
     expect(again.library.wanted).toEqual({ libraries: true, live: true })
 
     // Added again, a folder takes the place it had, with its path and its tick.

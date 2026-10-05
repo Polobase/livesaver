@@ -36,6 +36,8 @@ export interface RunOptions {
   apply?: boolean
   packLimit?: number
   matchLibraryPath?: boolean
+  /** Sets saved by a Live older than this major version are left out. */
+  minLive?: number
   /** Another host than Node's as it is (one that sees or makes less). */
   host?: Host
 }
@@ -62,6 +64,7 @@ export function useCollect() {
       env: env(options.env),
       packCopyLimit: options.packLimit ?? DEFAULT_PACK_LIMIT,
       matchLibraryPath: options.matchLibraryPath ?? false,
+      minLive: options.minLive ?? 0,
       probe,
       ...(options.apply ? { writer: applyWriter(host, context, probe) } : {}),
     })

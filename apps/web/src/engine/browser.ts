@@ -202,6 +202,7 @@ export class BrowserEngine implements Engine {
     this.options.memory?.keepOptions({
       packLimitMB: options.packLimitMB,
       matchLibraryPath: options.matchLibraryPath,
+      ...(options.minLive ? { minLive: options.minLive } : {}),
     })
   }
 

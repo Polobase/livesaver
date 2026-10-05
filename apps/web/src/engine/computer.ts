@@ -92,6 +92,8 @@ const scanOf = ({ scan, at }: Pick<WebLastScan, 'scan' | 'at'>): Scan => ({
       sets: 0,
       completeSets: 0,
     },
+    // (And from before it could leave sets of an older Live out.)
+    leftOut: scan.samples.leftOut ?? 0,
   },
   at,
   folders: [],
