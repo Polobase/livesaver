@@ -83,7 +83,9 @@ export function program(): Command {
     .description('Plug-ins: what is installed, what the sets use')
   plugins
     .command('list')
-    .description('The plug-ins installed on this Mac: formats, native or Rosetta, versions')
+    .description(
+      'The plug-ins installed on this computer: formats, versions, and on a Mac whether they run natively or only under Rosetta',
+    )
     .option('--format <vst2|vst3|au>', 'only this format')
     .option('--rosetta', 'only plug-ins that run only under Rosetta')
     .option('--unscanned', 'only bundles Live has not scanned')

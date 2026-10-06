@@ -154,7 +154,9 @@ for (const [name, type] of ENGINES) {
         await page.getByRole('link', { name: 'what that means' }).click()
         const windows = page.getByTestId('windows-status')
         await windows.waitFor()
-        expect(await textOf(windows)).toContain('No one has tried it on a Windows computer')
+        expect(await textOf(windows)).toContain(
+          'no one has tried it on a Windows computer with Live yet',
+        )
         await page.waitForURL(`${site.url}#windows`)
 
         await page.getByRole('link', { name: 'Get livesaver' }).first().click()

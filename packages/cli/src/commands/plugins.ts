@@ -218,7 +218,7 @@ export interface ListFlags {
   readonly auval?: boolean
 }
 
-/** `livesaver plugins list`: the plug-ins installed on this Mac. */
+/** `livesaver plugins list`: the plug-ins installed on this computer. */
 export async function runList(flags: ListFlags): Promise<number> {
   const inventory = await loadInstalledPlugins({
     auvalCache: audioUnitsCachePath(),

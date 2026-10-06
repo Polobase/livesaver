@@ -22,6 +22,12 @@ writes runs on temporary copies.
   with a set of Live 10 that stores its path in backslashes; Live's folders, its settings file
   and the list of running programs as Windows has them (`packages/node/test/windows.test.ts`).
   None of it was tried with Live on Windows.
+- **On a Windows machine** (CI, `windows-latest`): `bun run test:node` runs the built command
+  line there. It fixes the sets of `fixtures/` and takes the fix back byte for byte, with the
+  paths it writes read back from the set (`C:/…/Samples/Imported/1.wav`); says where Ableton
+  keeps its folders there; refuses to write while a program called like Live runs (a copy of
+  Node.js under Live's name); and moves what an undo removes to its trash folder. No Live is
+  installed there, and no browser test runs there.
 - **Output in a pipe**: `doctor --json` over 400 sets through a shell pipe must arrive whole.
   (Under Bun, `console.log` dropped what a pipe could not take at once, 64 KB, as soon as
   `process.stdout` had been looked at; the command line writes through the stream instead.)

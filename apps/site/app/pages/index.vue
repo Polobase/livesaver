@@ -390,8 +390,9 @@ const commands = [
             livesaver is made and tested on a Mac. On Windows it reads and writes paths with drive
             letters, knows where Ableton keeps its folders there, and writes nothing while Live
             runs: that follows what Ableton documents and how sets saved on Windows store their
-            files. No one has tried it on a Windows computer with Live yet. Try a fix on a copy of a
-            project first, and
+            files. Our automated tests run the command line on a Windows machine (a fix and its undo
+            on sets that Live saved), but no one has tried it on a Windows computer with Live yet.
+            Try a fix on a copy of a project first, and
             <NuxtLink
               :to="`${REPOSITORY}/issues`"
               target="_blank"

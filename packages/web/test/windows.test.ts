@@ -2,7 +2,7 @@
  * A page on Windows. The folders it is handed lie on drives, and the sets store paths with
  * drives: `C:/Users/…` as Live 11 and later write them, `C:\Users\…` as Live 9 and 10 did. A
  * page there places its folders by such paths, finds Live's own content where Windows has it,
- * and a fix writes paths as Live does.
+ * and a fix writes a path as Live writes one with a drive into a set of today's format.
  *
  * (No Windows is at hand: the page is told that it runs on one. Where Live's own folders lie
  * on Windows is as Ableton documents it.)
@@ -173,7 +173,32 @@ describe('a scan and a fix in a page on Windows', () => {
     ])
   })
 
-  test('a fix writes the path into the set as Live does on Windows', async () => {
+  test("a folder called Resources is Live's own on Windows only: elsewhere it is searched whole", async () => {
+    // A loop beside the Core Library in the folder, and a set that misses it.
+    writeFile(join(resources, 'Loops', 'lost.wav'), loop)
+    writeSet(
+      join(projects, 'Song Project', 'Song 4.als'),
+      sampleSet('/gone/lost.wav', loop, { relType: REL_NONE, relPath: 'lost.wav' }),
+    )
+    folder = memoryFolder(projects)
+    const scanned = async (windows: boolean) => {
+      const events: ScanEvent[] = []
+      await scanFolders(request(), (event) => events.push(event), { cores: 1, windows })
+      const last = events.at(-1)
+      if (last?.type !== 'scanned') throw new Error(JSON.stringify(last))
+      const { setRows, changes } = last.scan.samples
+      return [
+        setRows.find((row) => row.name === 'Song 4.als')?.counts['not-found'],
+        changes.filter((c) => c.set === 'Song 4.als').map((c) => c.action),
+      ]
+    }
+    // On Windows only the Core Library of Live's folder is searched: the rest is Live's business.
+    expect(await scanned(true)).toEqual([1, []])
+    // On a Mac the name says nothing: a folder of the user's, searched like any other.
+    expect(await scanned(false)).toEqual([0, ['repaired']])
+  })
+
+  test('a fix writes the path into the set with its drive and forward slashes', async () => {
     const events: FixEvent[] = []
     await fixFolders(request(), (event) => events.push(event), {
       cores: 1,

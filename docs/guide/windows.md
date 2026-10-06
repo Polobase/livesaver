@@ -58,6 +58,7 @@ livesaver needs [Node.js](https://nodejs.org) 22.13 or newer, or [Bun](https://b
 ## What is tested, and what is not
 
 - Tested, on a Mac: the handling of Windows paths, of sets that Live 9 and 10 saved on Windows, and of Ableton's folders as Windows has them, on made-up disks with drive letters; and the app in browsers that are told they run on Windows.
+- Tested, on a Windows machine, by automated tests on every change: the command line fixes sets that Live saved and takes the fix back, moves what the undo removes to its trash folder, and writes nothing while a program called like Live runs. No Live is installed on that machine.
 - Not tested: livesaver with Live on a Windows computer, and the app in a browser on Windows. Where Live keeps its folders on Windows is taken from Ableton's documentation. No set that Live 11 or 12 saved on Windows was at hand: what such a set stores is known only as far as [the format notes](../format/fileref.md#windows) say.
 
 If something does not fit your computer, please [tell us](https://github.com/Polobase/livesaver/issues): what you did, what livesaver said, and your versions of Windows and Live.

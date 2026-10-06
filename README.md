@@ -15,8 +15,9 @@ guide, and the app to try in your browser. New here? Start with the
 [guide](docs/guide/getting-started.md): from the first scan to an undo.
 
 **macOS and Windows.** livesaver is made and tested on macOS. Windows is new and only tested on
-macOS so far (paths with drives, Ableton's folders there): no one has tried it
-with Live on a Windows computer yet. See [livesaver on Windows](docs/guide/windows.md).
+macOS so far (paths with drives, Ableton's folders there): automated tests run its command line
+on a Windows machine, but no one has tried it with Live on a Windows computer yet. See
+[livesaver on Windows](docs/guide/windows.md).
 
 ## Quick start
 ```sh

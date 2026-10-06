@@ -218,9 +218,9 @@ function searchFolder(path: string): string {
     name.endsWith('.app') ||
     name === 'contents' ||
     name === 'app-resources' ||
-    // Windows: Live's folder (`Live 12 Suite`) and its `Resources`.
-    name === 'resources' ||
-    /^live \d/.test(name)
+    // Windows: Live's folder (`Live 12 Suite`) and its `Resources`, names that say nothing
+    // on another system.
+    (windows && (name === 'resources' || /^live \d/.test(name)))
   return (ofLive && coreLibraryIn(path)) || path
 }
 

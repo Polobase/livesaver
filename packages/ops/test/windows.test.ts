@@ -4,8 +4,9 @@
  * was made on a Mac, where a path of Windows is one of a computer of long ago and is passed
  * over. Where the project itself lies on a drive, it is a path like any other.
  *
- * (No Windows is at hand: the drives here are folders of a temporary folder. What Live expects
- * to find in a set there is taken from sets that Live saved on Windows.)
+ * (No Windows is at hand: the drives here are folders of a temporary folder. What a set holds
+ * there is taken from sets that Live 9 and 10 saved on Windows, and from how Live writes a path
+ * with a drive into a set of today's format: see docs/format/fileref.md.)
  */
 import { describe, expect, test } from 'bun:test'
 import { cpSync, existsSync } from 'node:fs'
@@ -139,7 +140,7 @@ describe('a project on a drive', () => {
     ])
   })
 
-  test('a sample on another drive is collected, and the set names it as Live does on Windows', async () => {
+  test('a sample on another drive is collected, and the set names it by its path with a drive', async () => {
     const data = bytes('RIFF a loop on the sample drive')
     writeFile(join(tmp.path, 'C', 'Music', 'Song Project', 'Ableton Project Info', 'x.cfg'), '')
     writeFile(join(tmp.path, 'D', 'Samples', 'Loops', 'loop.wav'), data)

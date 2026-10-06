@@ -38,11 +38,16 @@ interface Ableton {
   readonly liveFolder: string
 }
 
-/** Ableton's own folders, recognised by name: a given folder itself, or a folder in it. */
+/**
+ * Ableton's own folders, recognised by name: a given folder itself, or a folder in it.
+ * `windows`: there Live's resources are a folder called `Resources`, a name that says nothing
+ * elsewhere.
+ */
 async function ableton(
   fs: WebFs,
   mounts: readonly Mount[],
   vendor: readonly string[],
+  windows: boolean,
 ): Promise<Ableton> {
   const is = (path: string, name: string) => posix.basename(path).toLowerCase() === name
   const isDir = async (path: string) => (await fs.kind(path)) === 'directory'
@@ -70,7 +75,8 @@ async function ableton(
       appResources = dir
       // Only a folder of the Live app is narrowed to its Core Library when searching, not a
       // folder of the user's that happens to have a "Core Library" in it.
-      if (inside || is(path, 'app-resources') || is(path, 'resources')) liveFolder = path
+      if (inside || is(path, 'app-resources') || (windows && is(path, 'resources')))
+        liveFolder = path
       break
     }
   }
@@ -156,7 +162,7 @@ export async function prepare(
   const probe = new Probe(host.fs, host.hash)
   const targets = mounts.slice(0, request.projects.length).map((m) => m.path)
   const vendor = mounts.filter((_, i) => (inputs[i] as FolderInput).vendor).map((m) => m.path)
-  const { config, liveFolder } = await ableton(host.fs, mounts, vendor)
+  const { config, liveFolder } = await ableton(host.fs, mounts, vendor, windows)
   const parser = options.spawn
     ? createWorkerParser({
         host,
